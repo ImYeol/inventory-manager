@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   redirect: vi.fn(),
+  headers: vi.fn(),
   createSupabaseServerClient: vi.fn(),
 }))
 
@@ -9,68 +10,91 @@ vi.mock('next/navigation', () => ({
   redirect: mocks.redirect,
 }))
 
+vi.mock('next/headers', () => ({
+  headers: mocks.headers,
+}))
+
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: mocks.createSupabaseServerClient,
 }))
 
-import { login, logout } from '@/app/login/actions'
+import { loginWithGoogle, logout } from '@/app/login/actions'
 
 beforeEach(() => {
   mocks.redirect.mockReset()
+  mocks.headers.mockReset()
   mocks.createSupabaseServerClient.mockReset()
+  mocks.headers.mockResolvedValue({
+    get: vi.fn().mockImplementation((key: string) =>
+      key === 'origin' ? 'https://example.com' : null,
+    ),
+  })
 })
 
 afterEach(() => {
   mocks.redirect.mockReset()
+  mocks.headers.mockReset()
   mocks.createSupabaseServerClient.mockReset()
 })
 
-describe('login action', () => {
-  it('returns a validation error when credentials are missing', async () => {
-    const result = await login({}, new FormData())
-
-    expect(result).toEqual({ error: '이메일과 비밀번호를 모두 입력하세요.' })
-    expect(mocks.createSupabaseServerClient).not.toHaveBeenCalled()
-  })
-
-  it('signs in with trimmed email and redirects on success', async () => {
-    const signInWithPassword = vi.fn().mockResolvedValue({ error: null })
+describe('loginWithGoogle action', () => {
+  it('starts the Google OAuth flow and redirects on success', async () => {
+    const signInWithOAuth = vi.fn().mockResolvedValue({
+      data: { url: 'https://accounts.google.com/o/oauth2/auth' },
+      error: null,
+    })
     mocks.createSupabaseServerClient.mockResolvedValue({
       auth: {
-        signInWithPassword,
+        signInWithOAuth,
         signOut: vi.fn(),
       },
     })
 
-    const formData = new FormData()
-    formData.set('email', '  user@example.com  ')
-    formData.set('password', 'secret')
-
-    await login({}, formData)
+    await loginWithGoogle({})
 
     expect(mocks.createSupabaseServerClient).toHaveBeenCalled()
-    expect(signInWithPassword).toHaveBeenCalledWith({
-      email: 'user@example.com',
-      password: 'secret',
+    expect(mocks.headers).toHaveBeenCalled()
+    expect(signInWithOAuth).toHaveBeenCalledWith({
+      provider: 'google',
+      options: {
+        redirectTo: 'https://example.com/auth/callback',
+      },
     })
-    expect(mocks.redirect).toHaveBeenCalledWith('/')
+    expect(mocks.redirect).toHaveBeenCalledWith('https://accounts.google.com/o/oauth2/auth')
   })
 
-  it('returns a friendly error when Supabase sign-in fails', async () => {
-    const signInWithPassword = vi.fn().mockResolvedValue({ error: new Error('bad credentials') })
+  it('returns a friendly error when Google OAuth link creation fails', async () => {
+    const signInWithOAuth = vi.fn().mockResolvedValue({
+      data: null,
+      error: new Error('bad oauth'),
+    })
     mocks.createSupabaseServerClient.mockResolvedValue({
       auth: {
-        signInWithPassword,
+        signInWithOAuth,
         signOut: vi.fn(),
       },
     })
 
-    const formData = new FormData()
-    formData.set('email', 'user@example.com')
-    formData.set('password', 'wrong-password')
+    await expect(loginWithGoogle({})).resolves.toEqual({
+      error: 'Google 로그인 링크 생성에 실패했습니다. 잠시 후 다시 시도하세요.',
+    })
+    expect(mocks.redirect).not.toHaveBeenCalled()
+  })
 
-    await expect(login({}, formData)).resolves.toEqual({
-      error: '로그인에 실패했습니다. 계정 정보를 확인하세요.',
+  it('returns a friendly error when Supabase does not return an OAuth URL', async () => {
+    const signInWithOAuth = vi.fn().mockResolvedValue({
+      data: {},
+      error: null,
+    })
+    mocks.createSupabaseServerClient.mockResolvedValue({
+      auth: {
+        signInWithOAuth,
+        signOut: vi.fn(),
+      },
+    })
+
+    await expect(loginWithGoogle({})).resolves.toEqual({
+      error: 'Google 로그인 링크를 받지 못했습니다. 브라우저 설정을 확인하세요.',
     })
     expect(mocks.redirect).not.toHaveBeenCalled()
   })

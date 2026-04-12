@@ -1,24 +1,10 @@
-export const WAREHOUSE_VALUES = ['OGEUMDONG', 'DAEJADONG'] as const
 export const TRANSACTION_TYPE_VALUES = ['INBOUND', 'OUTBOUND', 'ADJUSTMENT'] as const
-
-export type WarehouseValue = (typeof WAREHOUSE_VALUES)[number]
 export type TransactionTypeValue = (typeof TRANSACTION_TYPE_VALUES)[number]
-
-export const warehouseLabels: Record<WarehouseValue, string> = {
-  OGEUMDONG: '오금동',
-  DAEJADONG: '대자동',
-}
 
 export const transactionTypeLabels: Record<TransactionTypeValue, string> = {
   INBOUND: '입고',
   OUTBOUND: '반출',
   ADJUSTMENT: '재고조정',
-}
-
-export function parseWarehouse(value: string): WarehouseValue {
-  if (value === '오금동' || value === 'OGEUMDONG') return 'OGEUMDONG'
-  if (value === '대자동' || value === 'DAEJADONG') return 'DAEJADONG'
-  throw new Error(`Unsupported warehouse: ${value}`)
 }
 
 export function parseTransactionType(value: string): TransactionTypeValue {

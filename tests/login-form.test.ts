@@ -9,12 +9,12 @@ afterEach(() => {
 })
 
 describe('LoginForm', () => {
-  it('renders the expected email/password fields and submit button', () => {
+  it('renders the Google login button only', () => {
     render(React.createElement(LoginForm))
 
-    expect(screen.getByLabelText('이메일').getAttribute('type')).toBe('email')
-    expect(screen.getByLabelText('비밀번호').getAttribute('type')).toBe('password')
-    expect(screen.getByRole('button', { name: '로그인' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Google로 로그인' })).toBeTruthy()
+    expect(screen.queryByLabelText('이메일')).toBeNull()
+    expect(screen.queryByLabelText('비밀번호')).toBeNull()
   })
 
   it('does not show an error message before submission', () => {

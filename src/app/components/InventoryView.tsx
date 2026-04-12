@@ -1,188 +1,469 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { cx, ui } from './ui';
+import { useMemo, useState } from 'react'
+import { addTransaction, adjustInventory } from '@/lib/actions'
+import { cx, ui } from './ui'
 
 type InventoryItem = {
-  id: number;
-  modelId: number;
-  sizeId: number;
-  colorId: number;
-  warehouse: string;
-  quantity: number;
-};
+  id: number
+  modelId: number
+  sizeId: number
+  colorId: number
+  warehouseId: number
+  warehouseName: string
+  quantity: number
+}
 
 type ColorType = {
-  id: number;
-  name: string;
-  rgbCode: string;
-  textWhite: boolean;
-  sortOrder: number;
-  modelId: number;
-};
+  id: number
+  name: string
+  rgbCode: string
+  textWhite: boolean
+  sortOrder: number
+  modelId: number
+}
 
 type SizeType = {
-  id: number;
-  name: string;
-  sortOrder: number;
-  modelId: number;
-};
+  id: number
+  name: string
+  sortOrder: number
+  modelId: number
+}
 
 type ModelWithRelations = {
-  id: number;
-  name: string;
-  sizes: SizeType[];
-  colors: ColorType[];
-  inventory: InventoryItem[];
-};
+  id: number
+  name: string
+  sizes: SizeType[]
+  colors: ColorType[]
+  inventory: InventoryItem[]
+}
 
-type WarehouseTab = '합계' | '오금동' | '대자동';
+type WarehouseLookup = {
+  id: number
+  name: string
+}
 
-export default function InventoryView({ models }: { models: ModelWithRelations[] }) {
-  const [expanded, setExpanded] = useState<number | null>(models.length === 1 ? models[0].id : null);
-  const [warehouseTab, setWarehouseTab] = useState<Record<number, WarehouseTab>>({});
+type InventoryViewProps = {
+  models: ModelWithRelations[]
+  warehouses: WarehouseLookup[]
+}
 
-  const getWarehouse = (modelId: number) => warehouseTab[modelId] || '합계';
+function todayText() {
+  const today = new Date()
+  return `${String(today.getFullYear()).slice(2)}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`
+}
 
-  const getQty = (model: ModelWithRelations, colorId: number, sizeId: number, wh: WarehouseTab) => {
-    if (wh === '합계') {
+function makeEditKey(colorId: number, sizeId: number) {
+  return `${colorId}:${sizeId}`
+}
+
+export default function InventoryView({ models, warehouses }: InventoryViewProps) {
+  const [expanded, setExpanded] = useState<number | null>(models.length === 1 ? models[0].id : null)
+  const [viewByModel, setViewByModel] = useState<Record<number, number | 'all'>>({})
+  const [adjustModelId, setAdjustModelId] = useState<number | null>(null)
+  const [adjustWarehouseByModel, setAdjustWarehouseByModel] = useState<Record<number, number>>({})
+  const [adjustEdits, setAdjustEdits] = useState<Record<number, Record<string, number>>>({})
+
+  const hasWarehouses = warehouses.length > 0
+  const [submitting, setSubmitting] = useState(false)
+  const [message, setMessage] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
+
+  const warehouseNameById = useMemo(
+    () => new Map(warehouses.map((warehouse) => [warehouse.id, warehouse.name])),
+    [warehouses],
+  )
+
+  const getView = (modelId: number) => viewByModel[modelId] ?? 'all'
+
+  const setView = (modelId: number, value: number | 'all') => {
+    setViewByModel((prev) => ({
+      ...prev,
+      [modelId]: value,
+    }))
+  }
+
+  const getWarehouseQty = (
+    model: ModelWithRelations,
+    colorId: number,
+    sizeId: number,
+    warehouseId: number | 'all',
+  ) => {
+    if (warehouseId === 'all') {
       return model.inventory
         .filter((inv) => inv.colorId === colorId && inv.sizeId === sizeId)
-        .reduce((sum, inv) => sum + inv.quantity, 0);
+        .reduce((sum, inv) => sum + inv.quantity, 0)
     }
     const inv = model.inventory.find(
-      (i) => i.colorId === colorId && i.sizeId === sizeId && i.warehouse === wh
-    );
-    return inv?.quantity ?? 0;
-  };
+      (item) => item.colorId === colorId && item.sizeId === sizeId && item.warehouseId === warehouseId,
+    )
+    return inv?.quantity ?? 0
+  }
 
-  const getTotalQty = (model: ModelWithRelations, wh: WarehouseTab) => {
-    if (wh === '합계') {
-      return model.inventory.reduce((sum, inv) => sum + inv.quantity, 0);
+  const getTotalQty = (model: ModelWithRelations, warehouseId: number | 'all') =>
+    model.inventory
+      .filter((inv) => warehouseId === 'all' || inv.warehouseId === warehouseId)
+      .reduce((sum, inv) => sum + inv.quantity, 0)
+
+  const getInventoryByModelAndFilter = (model: ModelWithRelations, warehouseId: number | 'all') => {
+    const colorRows = model.colors.map((color) => {
+      const sizeCells = model.sizes.map((size) => {
+        const quantity = getWarehouseQty(model, color.id, size.id, warehouseId)
+        return { size, quantity }
+      })
+      return {
+        color,
+        cells: sizeCells,
+        total: sizeCells.reduce((sum, cell) => sum + cell.quantity, 0),
+      }
+    })
+
+    return colorRows
+  }
+
+  const getModelInventoryRow = (model: ModelWithRelations, colorId: number, sizeId: number, warehouseId: number) => {
+    return model.inventory.find(
+      (item) => item.colorId === colorId && item.sizeId === sizeId && item.warehouseId === warehouseId,
+    )
+  }
+
+  const openAdjust = (model: ModelWithRelations) => {
+    if (!hasWarehouses) return
+    const defaultWarehouse = warehouses[0]?.id
+
+    if (!defaultWarehouse) return
+
+    setAdjustModelId(model.id)
+    setAdjustWarehouseByModel((prev) => ({
+      ...prev,
+      [model.id]: defaultWarehouse,
+    }))
+    setAdjustEdits((prev) => ({
+      ...prev,
+      [model.id]: {},
+    }))
+  }
+
+  const closeAdjust = (modelId: number) => {
+    setAdjustModelId((current) => (current === modelId ? null : current))
+    setAdjustEdits((prev) => {
+      const next = { ...prev }
+      delete next[modelId]
+      return next
+    })
+    setMessage(null)
+  }
+
+  const setAdjustQty = (modelId: number, colorId: number, sizeId: number, next: string) => {
+    const num = next === '' ? 0 : Number.parseInt(next, 10)
+    if (Number.isNaN(num) || num < 0) return
+    const key = makeEditKey(colorId, sizeId)
+
+    setAdjustEdits((prev) => {
+      const modelEdits = prev[modelId] || {}
+      return {
+        ...prev,
+        [modelId]: {
+          ...modelEdits,
+          [key]: num,
+        },
+      }
+    })
+  }
+
+  const isEditingModel = (modelId: number) => adjustModelId === modelId
+
+  const editCount =
+    adjustModelId !== null ? Object.keys(adjustEdits[adjustModelId] || {}).length : 0
+
+  const handleSaveAdjust = async (model: ModelWithRelations) => {
+    const modelId = model.id
+    const edits = adjustEdits[modelId] || {}
+    const rowsToSave = Object.entries(edits)
+
+    if (rowsToSave.length === 0 || !hasWarehouses) return
+
+    const warehouseId = adjustWarehouseByModel[modelId] ?? warehouses[0]?.id
+    if (!warehouseId) return
+
+    try {
+      setSubmitting(true)
+      await Promise.all(
+        rowsToSave.map(async ([key, value]) => {
+          const [colorId, sizeId] = key.split(':').map(Number)
+          const existing = getModelInventoryRow(model, colorId, sizeId, warehouseId)
+          if (existing) {
+            await adjustInventory(existing.id, value)
+            return
+          }
+
+          await addTransaction({
+            date: todayText(),
+            modelId,
+            sizeId,
+            colorId,
+            type: '재고조정',
+            quantity: value,
+            warehouseId,
+          })
+        }),
+      )
+
+      setMessage({ type: 'ok', text: `${model.name} 재고 조정이 완료되었습니다.` })
+      setAdjustEdits((prev) => ({
+        ...prev,
+        [modelId]: {},
+      }))
+    } catch {
+      setMessage({ type: 'error', text: '조정 중 오류가 발생했습니다.' })
+    } finally {
+      setSubmitting(false)
     }
-    return model.inventory
-      .filter((inv) => inv.warehouse === wh)
-      .reduce((sum, inv) => sum + inv.quantity, 0);
-  };
+  }
 
   return (
     <div className="space-y-3">
+      {message && (
+        <div
+          className={`rounded-xl px-4 py-3 text-center text-sm border ${
+            message.type === 'ok'
+              ? 'bg-slate-50 border-slate-200 text-slate-700'
+              : 'bg-red-50 border-red-200 text-red-700'
+          }`}
+        >
+          {message.text}
+        </div>
+      )}
+
       {models.map((model) => {
-        const isOpen = expanded === model.id;
-        const wh = getWarehouse(model.id);
-        const totalQty = getTotalQty(model, '합계');
+        const isOpen = expanded === model.id
+        const filter = getView(model.id)
+        const totalQty = getTotalQty(model, 'all')
+        const rowData = getInventoryByModelAndFilter(model, filter)
+        const isEmptySize = model.sizes.length === 0 || model.colors.length === 0
+        const adjusting = isEditingModel(model.id)
+        const editWarehouseId = adjustWarehouseByModel[model.id] ?? warehouses[0]?.id
+        const currentEditValues = adjustEdits[model.id] || {}
 
         return (
-          <div
-            key={model.id}
-            className={ui.panel}
-          >
-            {/* Model Header */}
+          <div key={model.id} className={ui.panel}>
             <button
               onClick={() => setExpanded(isOpen ? null : model.id)}
               className="flex w-full items-center justify-between px-4 py-4 text-left transition-colors hover:bg-slate-50 md:px-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-inset"
             >
-              <span className="text-base font-semibold tracking-tight text-slate-950 md:text-lg">
-                {model.name}
-              </span>
+              <span className="text-base font-semibold tracking-tight text-slate-950 md:text-lg">{model.name}</span>
               <div className="flex items-center gap-3">
-                <span className="ui-pill text-slate-700">
-                  {totalQty}개
-                </span>
+                <span className="ui-pill text-slate-700">{totalQty}개</span>
                 <span className="text-slate-400 text-lg">{isOpen ? '▴' : '▾'}</span>
               </div>
             </button>
 
-            {/* Expanded Content */}
             {isOpen && (
               <div className="border-t border-slate-200 bg-slate-50/60">
-                {/* Warehouse Tabs */}
-                <div className="flex px-4 pt-3 gap-2">
-                  {(['합계', '오금동', '대자동'] as WarehouseTab[]).map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() =>
-                        setWarehouseTab((prev) => ({ ...prev, [model.id]: tab }))
+                <div className="flex items-center justify-between gap-2 px-4 py-3">
+                  <label className="flex items-center gap-2 text-sm text-slate-600">
+                    <span>창고 보기</span>
+                    <select
+                      value={filter}
+                      onChange={(e) =>
+                        setView(
+                          model.id,
+                          e.target.value === 'all' ? 'all' : Number(e.target.value),
+                        )
                       }
-                      className={cx('px-4 py-2 rounded-lg text-sm font-medium transition-colors', wh === tab ? 'bg-slate-950 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50')}
+                      className={ui.controlSm}
                     >
-                      {tab}
-                      <span className="ml-1.5 text-xs opacity-80">
-                        ({getTotalQty(model, tab)})
-                      </span>
-                    </button>
-                  ))}
+                      <option value="all">전체</option>
+                      {warehouses.map((warehouse) => (
+                        <option key={warehouse.id} value={warehouse.id}>
+                          {warehouse.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => (adjusting ? closeAdjust(model.id) : openAdjust(model))}
+                    disabled={hasWarehouses === false}
+                    className={cx(
+                      ui.buttonSecondary,
+                      'text-sm h-9 px-3',
+                      hasWarehouses ? '' : 'opacity-50 cursor-not-allowed',
+                    )}
+                  >
+                    {adjusting ? '조정 닫기' : '조정'}
+                  </button>
                 </div>
 
-                {/* Matrix Table */}
-                {model.sizes.length === 0 || model.colors.length === 0 ? (
-                  <div className="px-4 py-8 text-center text-sm text-slate-400">
-                    사이즈 또는 색상 데이터가 없습니다.
-                  </div>
-                ) : (
-                  <div className="p-3 md:p-4 overflow-x-auto scrollbar-thin">
-                    <table className="w-full border-collapse min-w-max">
-                      <thead>
-                        <tr>
-                          <th className="ui-table-head sticky left-0 z-10 px-3 py-2.5 text-left min-w-[100px]">
-                            색상
-                          </th>
-                          {model.sizes.map((size) => (
-                            <th
-                              key={size.id}
-                              className="ui-table-head px-3 py-2.5 text-center min-w-[60px]"
-                            >
-                              {size.name}
+                <div className="px-4 pb-3">
+                  {isEmptySize ? (
+                    <div className="px-4 py-8 text-center text-sm text-slate-400">
+                      사이즈 또는 색상 데이터가 없습니다.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto scrollbar-thin">
+                      <table className="w-full border-collapse min-w-max">
+                        <thead>
+                          <tr>
+                            <th className="ui-table-head sticky left-0 z-10 px-3 py-2.5 text-left min-w-[100px]">
+                              색상
                             </th>
-                          ))}
-                          <th className="ui-table-head px-3 py-2.5 text-center min-w-[60px]">
-                            소계
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {model.colors.map((color) => {
-                          const rowTotal = model.sizes.reduce(
-                            (sum, size) => sum + getQty(model, color.id, size.id, wh),
-                            0
-                          );
-                          return (
-                            <tr key={color.id} className="hover:bg-slate-50/70">
+                            {model.sizes.map((size) => (
+                              <th key={size.id} className="ui-table-head px-3 py-2.5 text-center min-w-[60px]">
+                                {size.name}
+                              </th>
+                            ))}
+                            <th className="ui-table-head px-3 py-2.5 text-center min-w-[70px]">소계</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rowData.map((row) => (
+                            <tr key={row.color.id} className="hover:bg-slate-50/70">
                               <td className="ui-table-cell sticky left-0 z-10 bg-white font-medium text-sm text-slate-700">
                                 <div className="flex items-center gap-2">
                                   <span
                                     className="inline-block w-4 h-4 rounded-full border border-slate-200 flex-shrink-0"
-                                    style={{ backgroundColor: color.rgbCode }}
+                                    style={{ backgroundColor: row.color.rgbCode }}
                                   />
-                                  <span>{color.name}</span>
+                                  <span>{row.color.name}</span>
                                 </div>
                               </td>
-                              {model.sizes.map((size) => {
-                                const qty = getQty(model, color.id, size.id, wh);
+                              {row.cells.map((cell) => {
+                                const qty = cell.quantity
                                 return (
                                   <td
-                                    key={size.id}
-                                    className={cx('ui-table-cell text-center text-base font-semibold', qty === 0 ? 'text-slate-300' : 'text-slate-900')}
+                                    key={cell.size.id}
+                                    className={cx(
+                                      'ui-table-cell text-center text-base font-semibold',
+                                      qty === 0 ? 'text-slate-300' : 'text-slate-900',
+                                    )}
                                   >
                                     {qty}
                                   </td>
-                                );
+                                )
                               })}
                               <td className="ui-table-cell text-center text-base font-semibold text-slate-950 bg-slate-50">
-                                {rowTotal}
+                                {row.total}
                               </td>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {adjusting && (
+                  <div className="border-t border-slate-200 px-4 py-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div>
+                        <label className="text-sm text-slate-600">조정 창고</label>
+                        <select
+                          value={editWarehouseId ?? ''}
+                          onChange={(e) =>
+                            setAdjustWarehouseByModel((prev) => ({
+                              ...prev,
+                              [model.id]: Number(e.target.value),
+                            }))
+                          }
+                          className={cx(ui.controlSm, 'ml-2')}
+                        >
+                          {warehouses.map((warehouse) => (
+                            <option key={warehouse.id} value={warehouse.id}>
+                              {warehouse.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <span className="text-xs text-slate-500">
+                        {editCount > 0 ? `변경값 ${editCount}건` : '수량을 수정해 저장하세요'}
+                      </span>
+                    </div>
+
+                    {isEmptySize ? null : (
+                      <div className="overflow-x-auto scrollbar-thin">
+                        <table className="w-full border-collapse min-w-max">
+                          <thead>
+                            <tr>
+                              <th className="ui-table-head px-3 py-2.5 text-left">색상</th>
+                              {model.sizes.map((size) => (
+                                <th key={size.id} className="ui-table-head px-3 py-2.5 text-center">
+                                  {size.name}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {model.colors.map((color) => {
+                              const selectedWarehouse = editWarehouseId ?? warehouses[0]?.id
+                              if (!selectedWarehouse) return null
+
+                              return (
+                                <tr key={color.id} className="hover:bg-slate-50/70">
+                                  <td className="ui-table-cell">
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className="inline-block w-4 h-4 rounded-full border border-slate-200 flex-shrink-0"
+                                        style={{ backgroundColor: color.rgbCode }}
+                                      />
+                                      {color.name}
+                                    </div>
+                                  </td>
+                                  {model.sizes.map((size) => {
+                                    const inv = getModelInventoryRow(
+                                      model,
+                                      color.id,
+                                      size.id,
+                                      selectedWarehouse,
+                                    )
+                                    const key = makeEditKey(color.id, size.id)
+                                    const edited = currentEditValues[key]
+                                    const defaultQty = inv ? inv.quantity : 0
+                                    const display = edited === undefined ? defaultQty : edited
+                                    return (
+                                      <td key={size.id} className="ui-table-cell px-1 py-1 text-center">
+                                        <input
+                                          type="number"
+                                          value={display}
+                                          min={0}
+                                          className={cx(ui.controlSm, 'w-full text-center')}
+                                          onChange={(event) =>
+                                            setAdjustQty(
+                                              model.id,
+                                              color.id,
+                                              size.id,
+                                              event.target.value,
+                                            )
+                                          }
+                                        />
+                                      </td>
+                                    )
+                                  })}
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    <div className="mt-3 flex items-center justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleSaveAdjust(model)}
+                        disabled={submitting || editCount === 0}
+                        className={cx(ui.buttonPrimary, 'h-11 px-5 text-sm')}
+                      >
+                        {submitting ? '저장 중...' : '조정 저장'}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
             )}
           </div>
-        );
+        )
       })}
     </div>
-  );
+  )
 }

@@ -5,6 +5,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
   getShippingSettingsSummary: vi.fn(),
+  enforceSetupComplete: vi.fn(),
   shippingView: vi.fn(),
 }))
 
@@ -24,6 +25,10 @@ vi.mock('@/lib/actions/shipping-settings', () => ({
   getShippingSettingsSummary: mocks.getShippingSettingsSummary,
 }))
 
+vi.mock('@/lib/setup-guard', () => ({
+  enforceSetupComplete: mocks.enforceSetupComplete,
+}))
+
 vi.mock('@/app/(protected)/shipping/ShippingView', () => ({
   default: (props: { settingsSummary: unknown }) => {
     mocks.shippingView(props)
@@ -39,7 +44,9 @@ import ShippingPage from '@/app/(protected)/shipping/page'
 afterEach(() => {
   cleanup()
   mocks.getShippingSettingsSummary.mockReset()
+  mocks.enforceSetupComplete.mockReset()
   mocks.shippingView.mockReset()
+  mocks.enforceSetupComplete.mockResolvedValue(undefined)
 })
 
 describe('ShippingPage', () => {
@@ -61,6 +68,7 @@ describe('ShippingPage', () => {
 
     render(await ShippingPage())
 
+    expect(mocks.enforceSetupComplete).toHaveBeenCalledTimes(1)
     expect(mocks.getShippingSettingsSummary).toHaveBeenCalledTimes(1)
     expect(mocks.shippingView).toHaveBeenCalledWith(expect.objectContaining({ settingsSummary: summary }))
     expect(screen.getByRole('link', { name: '배송 연동 설정' }).getAttribute('href')).toBe('/settings')

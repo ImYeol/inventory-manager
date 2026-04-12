@@ -7,13 +7,6 @@ datasource db {
   provider = "postgresql"
 }
 
-enum WarehouseValue {
-  OGEUMDONG
-  DAEJADONG
-
-  @@map("warehouse_value")
-}
-
 enum TransactionTypeValue {
   INBOUND
   OUTBOUND
@@ -86,21 +79,36 @@ model Color {
   @@map("colors")
 }
 
+model Warehouse {
+  id        BigInt        @id @default(autoincrement()) @db.BigInt
+  userId    String        @map("user_id") @db.Uuid
+  name      String
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  inventory Inventory[]
+  Transaction Transaction[]
+
+  @@unique([id, userId])
+  @@unique([userId, name])
+  @@index([userId, createdAt(sort: Desc)], map: "warehouses_user_id_created_at_idx")
+  @@map("warehouses")
+}
+
 model Inventory {
   id        BigInt         @id @default(autoincrement()) @db.BigInt
   userId    String         @map("user_id") @db.Uuid
   modelId   BigInt         @map("model_id") @db.BigInt
   sizeId    BigInt         @map("size_id") @db.BigInt
   colorId   BigInt         @map("color_id") @db.BigInt
-  warehouse WarehouseValue
+  warehouseId BigInt       @map("warehouse_id") @db.BigInt
   quantity  Int            @default(0)
   createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime       @default(now()) @map("updated_at") @db.Timestamptz(6)
   model     Model          @relation(fields: [modelId, userId], references: [id, userId], onDelete: Cascade)
   size      Size           @relation(fields: [modelId, sizeId, userId], references: [modelId, id, userId], onDelete: Cascade)
   color     Color          @relation(fields: [modelId, colorId, userId], references: [modelId, id, userId], onDelete: Cascade)
+  warehouse Warehouse      @relation(fields: [warehouseId, userId], references: [id, userId], onDelete: Cascade)
 
-  @@unique([userId, modelId, sizeId, colorId, warehouse])
+  @@unique([userId, modelId, sizeId, colorId, warehouseId])
   @@index([modelId, userId], map: "inventory_model_id_user_id_idx")
   @@index([modelId, sizeId, userId], map: "inventory_model_id_size_id_user_id_idx")
   @@index([modelId, colorId, userId], map: "inventory_model_id_color_id_user_id_idx")
@@ -116,11 +124,12 @@ model Transaction {
   colorId   BigInt               @map("color_id") @db.BigInt
   type      TransactionTypeValue
   quantity  Int
-  warehouse WarehouseValue
+  warehouseId BigInt             @map("warehouse_id") @db.BigInt
   createdAt DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   model     Model                @relation(fields: [modelId, userId], references: [id, userId], onDelete: Cascade)
   size      Size                 @relation(fields: [modelId, sizeId, userId], references: [modelId, id, userId], onDelete: Cascade)
   color     Color                @relation(fields: [modelId, colorId, userId], references: [modelId, id, userId], onDelete: Cascade)
+  warehouse Warehouse            @relation(fields: [warehouseId, userId], references: [id, userId], onDelete: Cascade)
 
   @@index([userId, date(sort: Desc), createdAt(sort: Desc)], map: "transactions_user_date_created_at_idx")
   @@index([modelId, userId], map: "transactions_model_id_user_id_idx")

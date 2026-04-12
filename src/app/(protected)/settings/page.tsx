@@ -2,10 +2,12 @@ import Link from 'next/link';
 import { getShippingSettingsSummary } from '@/lib/actions/shipping-settings';
 import { PageHeader, ui } from '../../components/ui';
 import SettingsView from './SettingsView';
+import { enforceSetupComplete } from '@/lib/setup-guard';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SettingsPage() {
+  await enforceSetupComplete()
   const summary = await getShippingSettingsSummary();
 
   return (

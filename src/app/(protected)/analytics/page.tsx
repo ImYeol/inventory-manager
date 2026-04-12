@@ -1,10 +1,12 @@
 import { getAnalyticsData } from '@/lib/data';
 import AnalyticsView from './AnalyticsView';
 import { PageHeader, ui } from '../../components/ui';
+import { enforceSetupComplete } from '@/lib/setup-guard';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AnalyticsPage() {
+  await enforceSetupComplete()
   const { models, inventorySummary } = await getAnalyticsData();
 
   return (

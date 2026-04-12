@@ -1,16 +1,32 @@
 'use client'
 
-import { useState, useTransition, useCallback, useMemo } from 'react'
+import Link from 'next/link'
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createTransactions, getCurrentStock } from '@/lib/actions'
 import { cx, ui } from '../../components/ui'
 
 type SizeType = { id: number; name: string; sortOrder: number; modelId: number }
 type ColorType = {
-  id: number; name: string; rgbCode: string; textWhite: boolean
-  sortOrder: number; modelId: number
+  id: number
+  name: string
+  rgbCode: string
+  textWhite: boolean
+  sortOrder: number
+  modelId: number
 }
-type ModelType = { id: number; name: string; sizes: SizeType[]; colors: ColorType[] }
+
+type ModelType = {
+  id: number
+  name: string
+  sizes: SizeType[]
+  colors: ColorType[]
+}
+
+type WarehouseLookup = {
+  id: number
+  name: string
+}
 
 type RowData = {
   key: string
@@ -20,6 +36,19 @@ type RowData = {
   quantity: number | ''
   currentStock: number | null
   stockLoading: boolean
+}
+
+const INITIAL_ROW_COUNT = 8
+
+function todayString() {
+  const d = new Date()
+  return d.toISOString().slice(0, 10)
+}
+
+function formatDateKR(dateStr: string) {
+  const p = dateStr.split('-')
+  if (p.length === 3) return `${p[0].slice(2)}.${p[1]}.${p[2]}`
+  return dateStr
 }
 
 function emptyRow(): RowData {
@@ -34,18 +63,6 @@ function emptyRow(): RowData {
   }
 }
 
-function todayString() {
-  const d = new Date()
-  return d.toISOString().slice(0, 10)
-}
-
-function formatDateKR(dateStr: string) {
-  const p = dateStr.split('-')
-  if (p.length === 3) return `${p[0].slice(2)}.${p[1]}.${p[2]}`
-  return dateStr
-}
-
-// ── 상속 체인 함수 ──
 function getEffectiveModelId(rows: RowData[], idx: number): number | '' {
   for (let i = idx; i >= 0; i--) {
     if (rows[i].modelId !== '') return rows[i].modelId
@@ -53,9 +70,7 @@ function getEffectiveModelId(rows: RowData[], idx: number): number | '' {
   return ''
 }
 
-function getEffectiveSizeId(
-  rows: RowData[], idx: number, models: ModelType[],
-): number | '' {
+function getEffectiveSizeId(rows: RowData[], idx: number, models: ModelType[]): number | '' {
   const effModelId = getEffectiveModelId(rows, idx)
   if (!effModelId) return ''
   const model = models.find((m) => m.id === effModelId)
@@ -63,33 +78,45 @@ function getEffectiveSizeId(
 
   for (let i = idx; i >= 0; i--) {
     if (rows[i].sizeId !== '') {
-      // 이 사이즈가 effective 모델에 속하는지 확인
-      if (model.sizes.some((s) => s.id === rows[i].sizeId)) {
-        return rows[i].sizeId
-      }
-      return '' // 다른 모델의 사이즈 → 상속 끊김
+      if (model.sizes.some((s) => s.id === rows[i].sizeId)) return rows[i].sizeId
+      return ''
     }
-    // 위 행에서 명시적으로 다른 모델을 선택했으면 사이즈 상속 끊김
     if (i < idx && rows[i].modelId !== '') break
   }
+
   return ''
 }
 
-const INITIAL_ROW_COUNT = 8
-
-export default function InOutForm({ models }: { models: ModelType[] }) {
+export default function InOutForm({ models, warehouses }: { models: ModelType[]; warehouses: WarehouseLookup[] }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
   const [type, setType] = useState<'입고' | '반출'>('입고')
   const [date, setDate] = useState(todayString())
-  const [warehouse, setWarehouse] = useState('오금동')
-  const [rows, setRows] = useState<RowData[]>(
-    () => Array.from({ length: INITIAL_ROW_COUNT }, emptyRow),
-  )
+  const [warehouseId, setWarehouseId] = useState<number>(warehouses[0]?.id ?? -1)
+  const [rows, setRows] = useState<RowData[]>(() => Array.from({ length: INITIAL_ROW_COUNT }, emptyRow))
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null)
 
-  // ── helpers ──
+  const [overrides, setOverrides] = useState<Record<string, { model?: boolean; size?: boolean }>>({})
+
+  useEffect(() => {
+    if (warehouses.length === 0) {
+      setWarehouseId(-1)
+      return
+    }
+
+    setWarehouseId((current) => {
+      if (current > 0 && warehouses.some((item) => item.id === current)) return current
+      return warehouses[0]?.id ?? -1
+    })
+  }, [warehouses])
+
+  const [overriddenWarehouseId, setOverriddenWarehouseId] = useState<number | null>(
+    null,
+  )
+
+  const selectedWarehouseId = overriddenWarehouseId ?? warehouseId
+
   const modelMap = useMemo(() => {
     const map = new Map<number, ModelType>()
     for (const m of models) map.set(m.id, m)
@@ -108,10 +135,10 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
   )
 
   const fetchStock = useCallback(
-    async (key: string, mId: number, sId: number, cId: number, wh: string) => {
+    async (key: string, mId: number, sId: number, cId: number, selectedWarehouseId: number) => {
       updateRow(key, { stockLoading: true })
       try {
-        const stock = await getCurrentStock(mId, sId, cId, wh)
+        const stock = await getCurrentStock(mId, sId, cId, selectedWarehouseId)
         updateRow(key, { currentStock: stock, stockLoading: false })
       } catch {
         updateRow(key, { currentStock: null, stockLoading: false })
@@ -120,35 +147,44 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
     [updateRow],
   )
 
-  // ── effective 값에 기반한 재고 조회 ──
   const tryFetchStock = useCallback(
-    (key: string, effModelId: number | '', effSizeId: number | '', colorId: number | '', wh: string) => {
-      if (effModelId && effSizeId && colorId) {
-        fetchStock(key, effModelId as number, effSizeId as number, colorId as number, wh)
-      } else {
+    (key: string, effModelId: number | '', effSizeId: number | '', colorId: number | '') => {
+      if (!selectedWarehouseId || !effModelId || !effSizeId || !colorId) {
         updateRow(key, { currentStock: null })
+        return
       }
+
+      fetchStock(key, effModelId, effSizeId, colorId, selectedWarehouseId)
     },
-    [fetchStock, updateRow],
+    [fetchStock, selectedWarehouseId, updateRow],
   )
 
-  // ── row event handlers ──
-  const handleModelChange = (key: string, val: string) => {
-    const newModelId = val ? Number(val) : ('' as const)
-    updateRow(key, { modelId: newModelId, sizeId: '', colorId: '', currentStock: null })
-  }
+  const handleModelChange = useCallback(
+    (key: string, val: string) => {
+      const newModelId = val ? Number(val) : ('' as const)
+      updateRow(key, { modelId: newModelId, sizeId: '', colorId: '', currentStock: null })
+      setOverrides((prev) => ({ ...prev, [key]: { ...prev[key], model: false, size: false } }))
+    },
+    [updateRow],
+  )
 
-  const handleSizeChange = (key: string, val: string, effModelId: number | '', colorId: number | '') => {
-    const newSizeId = val ? Number(val) : ('' as const)
-    updateRow(key, { sizeId: newSizeId, currentStock: null })
-    tryFetchStock(key, effModelId, newSizeId || '' , colorId, warehouse)
-  }
+  const handleSizeChange = useCallback(
+    (key: string, val: string, effModelId: number | '', colorId: number | '') => {
+      const newSizeId = val ? Number(val) : ('' as const)
+      updateRow(key, { sizeId: newSizeId, currentStock: null })
+      tryFetchStock(key, effModelId, newSizeId || '', colorId)
+    },
+    [tryFetchStock, updateRow],
+  )
 
-  const handleColorChange = (key: string, val: string, effModelId: number | '', effSizeId: number | '') => {
-    const newColorId = val ? Number(val) : ('' as const)
-    updateRow(key, { colorId: newColorId, currentStock: null })
-    tryFetchStock(key, effModelId, effSizeId, newColorId, warehouse)
-  }
+  const handleColorChange = useCallback(
+    (key: string, val: string, effModelId: number | '', effSizeId: number | '') => {
+      const newColorId = val ? Number(val) : ('' as const)
+      updateRow(key, { colorId: newColorId, currentStock: null })
+      tryFetchStock(key, effModelId, effSizeId, newColorId)
+    },
+    [tryFetchStock, updateRow],
+  )
 
   const addRows = (count: number = 5) => {
     setRows((prev) => [...prev, ...Array.from({ length: count }, emptyRow)])
@@ -166,7 +202,6 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
     setMessage(null)
   }
 
-  // ── 제출용 resolved rows ──
   const resolvedRows = useMemo(() => {
     return rows.map((r, idx) => {
       const effModelId = getEffectiveModelId(rows, idx)
@@ -186,13 +221,19 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
       setMessage({ text: '입력된 항목이 없습니다.', error: true })
       return
     }
+
+    if (!selectedWarehouseId) {
+      setMessage({ text: '창고를 먼저 등록하고 선택해주세요.', error: true })
+      return
+    }
+
     startTransition(async () => {
       try {
         await createTransactions(
           filledRows.map((r) => ({
             type,
             date: formatDateKR(date),
-            warehouse,
+            warehouseId: selectedWarehouseId,
             modelId: r.effModelId as number,
             sizeId: r.effSizeId as number,
             colorId: r.colorId as number,
@@ -209,7 +250,6 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
     })
   }
 
-  // ── 상속 표시 컴포넌트 ──
   function InheritedBadge({
     label,
     onOverride,
@@ -243,18 +283,10 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
     )
   }
 
-  // ── 행별 override 상태 (상속 표시를 클릭해서 드롭다운으로 전환) ──
-  const [overrides, setOverrides] = useState<Record<string, { model?: boolean; size?: boolean }>>({})
-  const setOverride = (key: string, field: 'model' | 'size', val: boolean) => {
-    setOverrides((prev) => ({
-      ...prev,
-      [key]: { ...prev[key], [field]: val },
-    }))
-  }
+  const canInput = warehouses.length > 0 && selectedWarehouseId > 0
 
   return (
     <div className="space-y-4">
-      {/* 메시지 배너 */}
       {message && (
         <div
           className={`px-4 py-3 rounded-xl text-center font-medium text-sm border ${
@@ -268,23 +300,8 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
         </div>
       )}
 
-      {/* ─── 상단 공통 설정 카드 ─── */}
       <div className={cx(ui.panel, ui.panelBody, 'md:p-5')}>
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={() => setType('입고')}
-            className={cx('flex-1 h-[52px] rounded-xl text-[15px] font-semibold tracking-tight transition-colors', type === '입고' ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200')}
-          >
-            ▼ 입고
-          </button>
-          <button
-            onClick={() => setType('반출')}
-            className={cx('flex-1 h-[52px] rounded-xl text-[15px] font-semibold tracking-tight transition-colors', type === '반출' ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200')}
-          >
-            ▲ 반출
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className={ui.label}>날짜</label>
             <input
@@ -294,24 +311,64 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
               className={ui.controlSm}
             />
           </div>
+
           <div>
             <label className={ui.label}>창고</label>
-            <div className="flex gap-1.5 h-11">
-              {['오금동', '대자동'].map((wh) => (
-                <button
-                  key={wh}
-                  onClick={() => setWarehouse(wh)}
-                  className={cx('flex-1 rounded-lg text-sm font-medium transition-colors', warehouse === wh ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200')}
-                >
-                  {wh}
-                </button>
-              ))}
-            </div>
+            {warehouses.length === 0 ? (
+              <div className="flex gap-2 items-center h-11 px-3 py-2.5 rounded-lg border border-dashed border-slate-200 text-sm text-slate-500">
+                창고가 없습니다.
+                <Link href="/master-data" className="text-slate-700 underline underline-offset-2">
+                  창고 등록하러 가기
+                </Link>
+              </div>
+            ) : (
+              <select
+                value={selectedWarehouseId}
+                onChange={(e) => {
+                  const next = Number(e.target.value)
+                  setWarehouseId(next)
+                  setOverriddenWarehouseId(next)
+                }}
+                className={ui.controlSm}
+              >
+                {warehouses.map((warehouse) => (
+                  <option key={warehouse.id} value={warehouse.id}>
+                    {warehouse.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            onClick={() => setType('입고')}
+            className={cx(
+              'h-11 rounded-xl text-[15px] font-semibold tracking-tight transition-colors',
+              type === '입고' ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200',
+            )}
+          >
+            ▼ 입고
+          </button>
+          <button
+            type="button"
+            onClick={() => setType('반출')}
+            className={cx(
+              'h-11 rounded-xl text-[15px] font-semibold tracking-tight transition-colors',
+              type === '반출' ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200',
+            )}
+          >
+            ▲ 반출
+          </button>
+        </div>
+
+        {!canInput ? (
+          <p className="mt-4 text-sm text-slate-500">입출고 등록은 창고 등록 후 이용할 수 있습니다.</p>
+        ) : null}
       </div>
 
-      {/* ─── 상속 안내 ─── */}
       <div className="flex items-center gap-2 px-1 text-xs text-slate-500">
         <span className="inline-flex items-center gap-0.5 rounded border border-dashed border-slate-300 px-1.5 py-0.5 text-[11px] italic text-slate-500">
           ↑ 상속
@@ -319,7 +376,6 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
         <span>= 비어있으면 위 행의 모델/사이즈를 자동 적용</span>
       </div>
 
-      {/* ═══════ 데스크톱 테이블 ═══════ */}
       <div className={cx('hidden md:block', ui.tableShell)}>
         <div className="surface-header flex items-center justify-between px-4 py-3">
           <span className="text-sm font-semibold text-slate-700">
@@ -329,16 +385,10 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
             )}
           </span>
           <div className="flex gap-2">
-            <button
-              onClick={() => addRows(5)}
-              className={ui.buttonSecondary + ' px-3 py-1.5 text-xs'}
-            >
+            <button type="button" onClick={() => addRows(5)} className={ui.buttonSecondary + ' px-3 py-1.5 text-xs'}>
               + 5행 추가
             </button>
-            <button
-              onClick={clearAll}
-              className={ui.buttonSecondary + ' px-3 py-1.5 text-xs text-slate-600'}
-            >
+            <button type="button" onClick={clearAll} className={ui.buttonSecondary + ' px-3 py-1.5 text-xs text-slate-600'}>
               초기화
             </button>
           </div>
@@ -368,11 +418,8 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
                 const showModelDropdown = !isModelInherited || overrides[row.key]?.model
                 const showSizeDropdown = !isSizeInherited || overrides[row.key]?.size
 
-                // 상속된 모델/사이즈 이름
                 const inheritedModelName = effModel?.name ?? ''
                 const inheritedSizeName = effModel?.sizes.find((s) => s.id === effSizeId)?.name ?? ''
-
-                // 색상의 색깔 dot
                 const selectedColor = effModel?.colors.find((c) => c.id === row.colorId)
 
                 return (
@@ -380,49 +427,44 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
                     key={row.key}
                     className="group transition-colors hover:bg-slate-50/70"
                   >
-                    <td className="px-2 py-1.5 text-center text-xs text-slate-400 font-mono">
-                      {idx + 1}
-                    </td>
+                    <td className="px-2 py-1.5 text-center text-xs text-slate-400 font-mono">{idx + 1}</td>
 
-                    {/* ── 모델 ── */}
                     <td className="px-2 py-1.5">
                       {showModelDropdown ? (
                         <select
                           value={row.modelId}
                           onChange={(e) => {
                             handleModelChange(row.key, e.target.value)
-                            setOverride(row.key, 'model', false)
+                            setOverrides((prev) => ({ ...prev, [row.key]: { ...prev[row.key], model: false } }))
                           }}
                           onBlur={() => {
-                            if (row.modelId === '') setOverride(row.key, 'model', false)
+                            if (row.modelId === '') setOverrides((prev) => ({ ...prev, [row.key]: { ...prev[row.key], model: false } }))
                           }}
                           autoFocus={overrides[row.key]?.model}
                           className={ui.controlSm}
                         >
                           <option value="">선택</option>
                           {models.map((m) => (
-                            <option key={m.id} value={m.id}>{m.name}</option>
+                            <option key={m.id} value={m.id}>
+                              {m.name}
+                            </option>
                           ))}
                         </select>
                       ) : (
-                        <InheritedBadge
-                          label={inheritedModelName}
-                          onOverride={() => setOverride(row.key, 'model', true)}
-                        />
+                        <InheritedBadge label={inheritedModelName} onOverride={() => setOverrides((prev) => ({ ...prev, [row.key]: { ...prev[row.key], model: true } }))} />
                       )}
                     </td>
 
-                    {/* ── 사이즈 ── */}
                     <td className="px-2 py-1.5">
                       {showSizeDropdown ? (
                         <select
                           value={row.sizeId}
                           onChange={(e) => {
                             handleSizeChange(row.key, e.target.value, effModelId, row.colorId)
-                            setOverride(row.key, 'size', false)
+                            setOverrides((prev) => ({ ...prev, [row.key]: { ...prev[row.key], size: false } }))
                           }}
                           onBlur={() => {
-                            if (row.sizeId === '') setOverride(row.key, 'size', false)
+                            if (row.sizeId === '') setOverrides((prev) => ({ ...prev, [row.key]: { ...prev[row.key], size: false } }))
                           }}
                           disabled={!effModelId}
                           autoFocus={overrides[row.key]?.size}
@@ -430,18 +472,16 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
                         >
                           <option value="">선택</option>
                           {(effModel?.sizes ?? []).map((s) => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
+                            <option key={s.id} value={s.id}>
+                              {s.name}
+                            </option>
                           ))}
                         </select>
                       ) : (
-                        <InheritedBadge
-                          label={inheritedSizeName}
-                          onOverride={() => setOverride(row.key, 'size', true)}
-                        />
+                        <InheritedBadge label={inheritedSizeName} onOverride={() => setOverrides((prev) => ({ ...prev, [row.key]: { ...prev[row.key], size: true } }))} />
                       )}
                     </td>
 
-                    {/* ── 색상 (상속 안함 / 항상 드롭다운) ── */}
                     <td className="px-2 py-1.5">
                       <div className="flex items-center gap-1.5">
                         {selectedColor && (
@@ -453,18 +493,19 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
                         <select
                           value={row.colorId}
                           onChange={(e) => handleColorChange(row.key, e.target.value, effModelId, effSizeId)}
-                          disabled={!effModelId}
-                        className={ui.controlSm}
-                      >
+                          disabled={!effModelId || !canInput}
+                          className={ui.controlSm}
+                        >
                           <option value="">색상 선택</option>
                           {(effModel?.colors ?? []).map((c) => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
                           ))}
                         </select>
                       </div>
                     </td>
 
-                    {/* ── 수량 ── */}
                     <td className="px-2 py-1.5">
                       <input
                         type="number"
@@ -476,11 +517,11 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
                         }
                         placeholder="0"
                         min={1}
+                        disabled={!canInput}
                         className={cx(ui.controlSm, 'text-right font-semibold')}
                       />
                     </td>
 
-                    {/* ── 현재 재고 ── */}
                     <td className="px-2 py-1.5 text-right">
                       {row.stockLoading ? (
                         <span className="text-xs text-slate-400 animate-pulse">…</span>
@@ -491,15 +532,15 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
                       )}
                     </td>
 
-                    {/* ── 삭제 ── */}
                     <td className="px-2 py-1.5 text-center">
-                    <button
-                      onClick={() => removeRow(row.key)}
-                      className="text-slate-300 transition-colors text-lg leading-none hover:text-slate-950"
-                      aria-label="행 삭제"
-                    >
-                      ×
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => removeRow(row.key)}
+                        className="text-slate-300 transition-colors text-lg leading-none hover:text-slate-950"
+                        aria-label="행 삭제"
+                      >
+                        ×
+                      </button>
                     </td>
                   </tr>
                 )
@@ -509,7 +550,6 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
         </div>
       </div>
 
-      {/* ═══════ 모바일 카드 ═══════ */}
       <div className="md:hidden space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-sm font-semibold text-slate-700">
@@ -519,16 +559,10 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
             )}
           </span>
           <div className="flex gap-2">
-            <button
-              onClick={() => addRows(3)}
-              className={ui.buttonSecondary + ' px-3 py-1.5 text-xs'}
-            >
+            <button type="button" onClick={() => addRows(3)} className={ui.buttonSecondary + ' px-3 py-1.5 text-xs'}>
               + 추가
             </button>
-            <button
-              onClick={clearAll}
-              className={ui.buttonSecondary + ' px-3 py-1.5 text-xs text-slate-600'}
-            >
+            <button type="button" onClick={clearAll} className={ui.buttonSecondary + ' px-3 py-1.5 text-xs text-slate-600'}>
               초기화
             </button>
           </div>
@@ -547,31 +581,19 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
           const inheritedSizeName = effModel?.sizes.find((s) => s.id === effSizeId)?.name ?? ''
 
           return (
-            <div
-              key={row.key}
-              className="surface space-y-2.5 p-3.5 transition-colors"
-            >
-              {/* 카드 헤더 */}
+            <div key={row.key} className="surface space-y-2.5 p-3.5 transition-colors">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-slate-400">#{idx + 1}</span>
-                  {/* 상속 배지 표시 */}
                   {(isModelInherited || isSizeInherited) && (
                     <div className="flex items-center gap-1 text-[11px] text-slate-400 italic">
-                      {isModelInherited && (
-                        <span className="px-1.5 py-0.5 border border-dashed border-slate-200 rounded bg-slate-50">
-                          ↑ {inheritedModelName}
-                        </span>
-                      )}
-                      {isSizeInherited && (
-                        <span className="px-1.5 py-0.5 border border-dashed border-slate-200 rounded bg-slate-50">
-                          ↑ {inheritedSizeName}
-                        </span>
-                      )}
+                      {isModelInherited && <span className="px-1.5 py-0.5 border border-dashed border-slate-200 rounded bg-slate-50">↑ {inheritedModelName}</span>}
+                      {isSizeInherited && <span className="px-1.5 py-0.5 border border-dashed border-slate-200 rounded bg-slate-50">↑ {inheritedSizeName}</span>}
                     </div>
                   )}
                 </div>
                 <button
+                  type="button"
                   onClick={() => removeRow(row.key)}
                   className="text-sm px-1 text-slate-400 hover:text-slate-950"
                   aria-label="행 삭제"
@@ -580,7 +602,6 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
                 </button>
               </div>
 
-              {/* 모델 - 상속 시 컴팩트 / 아닐 때 풀 드롭다운 */}
               {isModelInherited ? (
                 <InheritedBadgeMobile label={`모델: ${inheritedModelName}`} />
               ) : (
@@ -591,12 +612,13 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
                 >
                   <option value="">모델 선택</option>
                   {models.map((m) => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
                   ))}
                 </select>
               )}
 
-              {/* 사이즈 + 색상 */}
               <div className="grid grid-cols-2 gap-2">
                 {isSizeInherited ? (
                   <InheritedBadgeMobile label={inheritedSizeName} />
@@ -609,24 +631,27 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
                   >
                     <option value="">사이즈</option>
                     {(effModel?.sizes ?? []).map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
                     ))}
                   </select>
                 )}
                 <select
                   value={row.colorId}
                   onChange={(e) => handleColorChange(row.key, e.target.value, effModelId, effSizeId)}
-                  disabled={!effModelId}
+                  disabled={!effModelId || !canInput}
                   className={ui.control}
                 >
                   <option value="">색상</option>
                   {(effModel?.colors ?? []).map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
                   ))}
                 </select>
               </div>
 
-              {/* 수량 + 현재 재고 */}
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -638,6 +663,7 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
                   }
                   placeholder="수량"
                   min={1}
+                  disabled={!canInput}
                   className={cx(ui.control, 'text-right font-semibold')}
                 />
                 {row.currentStock !== null && (
@@ -652,11 +678,10 @@ export default function InOutForm({ models }: { models: ModelType[] }) {
         })}
       </div>
 
-      {/* ─── 하단 일괄 등록 버튼 ─── */}
       <div className="sticky bottom-16 md:bottom-0 z-10 bg-gradient-to-t from-slate-50 via-slate-50 to-slate-50/0 pt-4 pb-2">
         <button
           onClick={submitAll}
-          disabled={isPending || filledRows.length === 0}
+          disabled={isPending || filledRows.length === 0 || !canInput}
           className={cx(
             'w-full h-14 rounded-xl text-lg font-semibold transition-colors',
             ui.buttonPrimary,

@@ -1,11 +1,13 @@
 import { getTransactionsWithRelations } from '@/lib/data';
 import HistoryView from './HistoryView';
 import { PageHeader, ui } from '../../components/ui';
+import { enforceSetupComplete } from '@/lib/setup-guard';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HistoryPage() {
-  const { transactions, models } = await getTransactionsWithRelations();
+  await enforceSetupComplete()
+  const { transactions, models, warehouses } = await getTransactionsWithRelations();
 
   return (
     <div className={ui.shell}>
@@ -17,6 +19,7 @@ export default async function HistoryPage() {
       <HistoryView
         transactions={transactions}
         models={models}
+        warehouses={warehouses}
       />
     </div>
   );

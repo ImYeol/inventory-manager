@@ -39,12 +39,13 @@ describe('Nav', () => {
   it('renders the main inventory navigation labels', () => {
     render(React.createElement(Nav))
 
-    expect(screen.getAllByText('재고현황').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('재고').length).toBeGreaterThan(0)
     expect(screen.getAllByText('입출고').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('재고조정').length).toBeGreaterThan(0)
     expect(screen.getAllByText('이력').length).toBeGreaterThan(0)
     expect(screen.getAllByText('운송장').length).toBeGreaterThan(0)
     expect(screen.getAllByText('분석').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('기초정보').length).toBeGreaterThan(0)
+    expect(screen.queryByText('재고조정')).toBeNull()
     expect(screen.getAllByRole('link', { name: '설정' })).toHaveLength(2)
   })
 
@@ -54,6 +55,15 @@ describe('Nav', () => {
     const activeLink = screen.getAllByRole('link', { name: '분석' })[0]
     expect(activeLink.className).toContain('bg-slate-50')
     expect(activeLink.className).toContain('text-slate-950')
+  })
+
+  it('marks master data as active on the master data route', () => {
+    mocks.pathname = '/master-data'
+
+    render(React.createElement(Nav))
+
+    const activeLink = screen.getAllByRole('link', { name: '기초정보' })[0]
+    expect(activeLink.getAttribute('aria-current')).toBe('page')
   })
 
   it('marks settings as active when the settings route is open', () => {

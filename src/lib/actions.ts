@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { getSetupState } from './data'
 import {
   getCatalogData,
   getCurrentStockRow,
@@ -9,15 +10,24 @@ import {
   runBulkTransaction,
   runInventoryAdjustment,
 } from './data'
+import { getSupabaseWithUser } from './db'
 
 export async function getModels() {
-  const models = await getCatalogData()
+  const { models } = await getCatalogData()
   return models.map(({ inventory, ...model }) => model)
 }
 
+export async function getCatalogState() {
+  return getCatalogData()
+}
+
+export async function getSetupProgress() {
+  return getSetupState()
+}
+
 export async function getInventory(modelId?: number) {
-  const allModels = await getCatalogData()
-  const targetModels = modelId ? allModels.filter((model) => model.id === modelId) : allModels
+  const { models, warehouses } = await getCatalogData()
+  const targetModels = modelId ? models.filter((model) => model.id === modelId) : models
 
   const grouped: Record<
     number,
@@ -29,59 +39,60 @@ export async function getInventory(modelId?: number) {
         name: string
         rgbCode: string
         textWhite: boolean
-        inventory: Record<
-          string,
-          { ogeumdog: { id: number; quantity: number }; daejadong: { id: number; quantity: number } }
-        >
+        inventory: Record<string, Record<string, { id: number; quantity: number; name: string }>>
       }>
     }
   > = {}
 
   for (const model of targetModels) {
-    for (const inv of model.inventory) {
-      if (!grouped[inv.modelId]) {
-        grouped[inv.modelId] = {
-          model: { id: model.id, name: model.name },
-          sizes: [],
-          colors: [],
-        }
-      }
+    const group = {
+      model: { id: model.id, name: model.name },
+      sizes: [...model.sizes],
+      colors: model.colors.map((color) => ({
+        id: color.id,
+        name: color.name,
+        rgbCode: color.rgbCode,
+        textWhite: color.textWhite,
+        inventory: Object.fromEntries(
+          model.sizes.map((size) => [
+            size.name,
+            Object.fromEntries(
+              warehouses.map((warehouse) => [
+                warehouse.name,
+                { id: 0, quantity: 0, name: warehouse.name },
+              ]),
+            ),
+          ]),
+        ),
+      })),
+    }
 
-      const group = grouped[inv.modelId]
+    for (const inv of model.inventory) {
       const size = model.sizes.find((item) => item.id === inv.sizeId)
       const color = model.colors.find((item) => item.id === inv.colorId)
       if (!size || !color) continue
 
-      if (!group.sizes.find((entry) => entry.id === size.id)) {
-        group.sizes.push({ id: size.id, name: size.name })
+      const colorEntry = group.colors.find((entry) => entry.id === color.id)
+      if (!colorEntry) continue
+
+      const currentSizeEntry = colorEntry.inventory[size.name]
+      if (!currentSizeEntry) {
+        colorEntry.inventory[size.name] = Object.fromEntries(
+          warehouses.map((warehouse) => [
+            warehouse.name,
+            { id: 0, quantity: 0, name: warehouse.name },
+          ]),
+        )
       }
 
-      let colorEntry = group.colors.find((entry) => entry.id === color.id)
-      if (!colorEntry) {
-        colorEntry = {
-          id: color.id,
-          name: color.name,
-          rgbCode: color.rgbCode,
-          textWhite: color.textWhite,
-          inventory: {},
-        }
-        group.colors.push(colorEntry)
-      }
-
-      const sizeKey = size.name
-      if (!colorEntry.inventory[sizeKey]) {
-        colorEntry.inventory[sizeKey] = {
-          ogeumdog: { id: 0, quantity: 0 },
-          daejadong: { id: 0, quantity: 0 },
-        }
-      }
-
-      if (inv.warehouse === '오금동') {
-        colorEntry.inventory[sizeKey].ogeumdog = { id: inv.id, quantity: inv.quantity }
-      } else {
-        colorEntry.inventory[sizeKey].daejadong = { id: inv.id, quantity: inv.quantity }
+      colorEntry.inventory[size.name][inv.warehouseName] = {
+        id: inv.id,
+        quantity: inv.quantity,
+        name: inv.warehouseName,
       }
     }
+
+    grouped[model.id] = group
   }
 
   return Object.values(grouped)
@@ -94,7 +105,7 @@ export async function addTransaction(data: {
   colorId: number
   type: string
   quantity: number
-  warehouse: string
+  warehouseId: number
 }) {
   await runBulkTransaction([data])
   revalidateInventoryPaths()
@@ -109,8 +120,8 @@ export async function addBatchTransactions(
     colorId: number
     type: string
     quantity: number
-    warehouse: string
-  }>
+    warehouseId: number
+  }>,
 ) {
   await runBulkTransaction(items)
   revalidateInventoryPaths()
@@ -122,23 +133,22 @@ export async function getTransactions(filters?: {
   sizeId?: number
   colorId?: number
   type?: string
-  warehouse?: string
+  warehouseId?: number
   dateFrom?: string
   dateTo?: string
 }) {
   const { transactions } = await getTransactionsWithRelations()
   return transactions.filter((item) => {
     if (filters?.type && item.type !== filters.type) return false
-    if (filters?.warehouse && item.warehouse !== filters.warehouse) return false
+    if (typeof filters?.warehouseId === 'number' && item.warehouseId !== filters.warehouseId)
+      return false
     return true
   })
 }
 
 export async function adjustInventory(inventoryId: number, newQuantity: number) {
   await runInventoryAdjustment(inventoryId, newQuantity)
-  revalidatePath('/')
-  revalidatePath('/adjust')
-  revalidatePath('/history')
+  revalidateInventoryPaths()
   return { success: true }
 }
 
@@ -150,12 +160,12 @@ export async function createTransactions(
   items: {
     type: '입고' | '반출'
     date: string
-    warehouse: string
+    warehouseId: number
     modelId: number
     sizeId: number
     colorId: number
     quantity: number
-  }[]
+  }[],
 ) {
   await addBatchTransactions(items)
   return { success: true }
@@ -169,14 +179,101 @@ export async function getCurrentStock(
   modelId: number,
   sizeId: number,
   colorId: number,
-  warehouse: string
+  warehouseId: number,
 ) {
-  return getCurrentStockRow(modelId, sizeId, colorId, warehouse)
+  return getCurrentStockRow(modelId, sizeId, colorId, warehouseId)
+}
+
+export async function createWarehouse(name: string) {
+  const title = name.trim()
+  if (!title) {
+    throw new Error('창고 이름을 입력해주세요.')
+  }
+
+  const { supabase } = await getSupabaseWithUser()
+  const { error } = await supabase.from('warehouses').insert({ name: title })
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidateInventoryPaths()
+  revalidatePath('/master-data')
+  revalidatePath('/setup')
+  return { success: true }
+}
+
+export async function createModel(name: string) {
+  const title = name.trim()
+  if (!title) {
+    throw new Error('모델명을 입력해주세요.')
+  }
+
+  const { supabase } = await getSupabaseWithUser()
+  const { error } = await supabase.from('models').insert({ name: title })
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/master-data')
+  revalidatePath('/setup')
+  revalidatePath('/')
+  return { success: true }
+}
+
+export async function createModelSize(modelId: number, sizeName: string) {
+  const name = sizeName.trim()
+  if (!modelId || !name) {
+    throw new Error('모델과 사이즈를 모두 입력해주세요.')
+  }
+
+  const { supabase } = await getSupabaseWithUser()
+  const { error } = await supabase.from('sizes').insert({
+    model_id: modelId,
+    name,
+  })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/master-data')
+  revalidatePath('/setup')
+  revalidateInventoryPaths()
+  return { success: true }
+}
+
+export async function createModelColor(
+  modelId: number,
+  colorName: string,
+  options?: { rgbCode?: string; textWhite?: boolean },
+) {
+  const name = colorName.trim()
+  if (!modelId || !name) {
+    throw new Error('모델과 색상을 모두 입력해주세요.')
+  }
+
+  const { supabase } = await getSupabaseWithUser()
+  const { error } = await supabase.from('colors').insert({
+    model_id: modelId,
+    name,
+    rgb_code: options?.rgbCode ?? '#000000',
+    text_white: options?.textWhite ?? false,
+  })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/master-data')
+  revalidatePath('/setup')
+  revalidateInventoryPaths()
+  return { success: true }
 }
 
 function revalidateInventoryPaths() {
   revalidatePath('/')
   revalidatePath('/inout')
-  revalidatePath('/adjust')
   revalidatePath('/history')
+  revalidatePath('/analytics')
+  revalidatePath('/master-data')
 }

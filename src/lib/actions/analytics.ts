@@ -21,15 +21,18 @@ export type InventoryHistoryItem = {
 
 export type WarehouseCompareItem = {
   modelName: string
-  ogeumdog: number
-  daejadong: number
+  warehouseTotals: Array<{
+    id: number
+    name: string
+    quantity: number
+  }>
 }
 
 export async function getTransactionTrend(
   period: 'daily' | 'monthly' | 'yearly',
   modelId?: number,
   dateFrom?: string,
-  dateTo?: string
+  dateTo?: string,
 ): Promise<TrendItem[]> {
   const transactions = (await getRawTransactions()).filter((item) => {
     if (modelId && item.model_id !== modelId) return false
@@ -58,7 +61,7 @@ export async function getInventorySummary(): Promise<InventorySummaryItem[]> {
 
 export async function getInventoryHistory(
   period: 'daily' | 'monthly' | 'yearly',
-  modelId?: number
+  modelId?: number,
 ): Promise<InventoryHistoryItem[]> {
   const transactions = (await getRawTransactions()).filter((item) => !modelId || item.model_id === modelId)
   const { inventorySummary, models } = await getAnalyticsData()
@@ -86,19 +89,37 @@ export async function getInventoryHistory(
 }
 
 export async function getWarehouseComparison(modelId?: number): Promise<WarehouseCompareItem[]> {
-  const { catalog } = await getAnalyticsData()
-  const grouped: Record<string, { ogeumdog: number; daejadong: number }> = {}
+  const { catalog, warehouses } = await getAnalyticsData()
+  const modelFilter = modelId ? new Set([modelId]) : undefined
+
+  const warehouseNameById = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse.name]))
+  const grouped: Record<string, { modelName: string; totals: Map<number, number> }> = {}
 
   for (const model of catalog) {
-    if (modelId && model.id !== modelId) continue
-    grouped[model.name] = { ogeumdog: 0, daejadong: 0 }
+    if (modelFilter && !modelFilter.has(model.id)) continue
+
+    const totalMap = new Map<number, number>()
+    for (const warehouse of warehouses) {
+      totalMap.set(warehouse.id, 0)
+    }
+
     for (const item of model.inventory) {
-      if (item.warehouse === '오금동') grouped[model.name].ogeumdog += item.quantity
-      if (item.warehouse === '대자동') grouped[model.name].daejadong += item.quantity
+      const next = (totalMap.get(item.warehouseId) ?? 0) + item.quantity
+      totalMap.set(item.warehouseId, next)
+    }
+
+    grouped[model.name] = {
+      modelName: model.name,
+      totals: totalMap,
     }
   }
 
-  return Object.entries(grouped)
-    .map(([modelName, data]) => ({ modelName, ...data }))
-    .sort((a, b) => b.ogeumdog + b.daejadong - (a.ogeumdog + a.daejadong))
+  return Object.values(grouped).map((entry) => ({
+    modelName: entry.modelName,
+    warehouseTotals: [...entry.totals.entries()].map(([id, quantity]) => ({
+      id,
+      name: warehouseNameById.get(id) ?? `창고 #${id}`,
+      quantity,
+    })),
+  }))
 }

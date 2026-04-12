@@ -17,8 +17,9 @@ const seedUserId = process.env.SEED_USER_ID?.trim()
 const seedUserEmail = process.env.SEED_USER_EMAIL?.trim() || null
 const dataPath = path.join(process.cwd(), 'extracted_data.json')
 
-type WarehouseValue = 'OGEUMDONG' | 'DAEJADONG'
 type TransactionTypeValue = 'INBOUND' | 'OUTBOUND' | 'ADJUSTMENT'
+type WarehouseKey = 'OGEUMDONG' | 'DAEJADONG'
+type WarehouseLookup = Record<WarehouseKey, bigint>
 
 const colorInfoMap: Record<string, { rgb: string; textWhite: boolean }> = {
   '블랙': { rgb: '#000000', textWhite: true },
@@ -81,7 +82,7 @@ function normalizeSizeName(value: string) {
   return value.replace(/(\d+)\.(\d+)/g, '$1$2')
 }
 
-function parseWarehouse(value: string): WarehouseValue {
+function normalizeWarehouseKey(value: string): WarehouseKey {
   switch (value.trim()) {
     case '오금동':
     case 'OGEUMDONG':
@@ -141,6 +142,25 @@ async function clearUserData(userId: string) {
   await prisma.color.deleteMany({ where: { userId } })
   await prisma.size.deleteMany({ where: { userId } })
   await prisma.model.deleteMany({ where: { userId } })
+  await prisma.warehouse.deleteMany({ where: { userId } })
+}
+
+async function getSeedWarehouses(userId: string) {
+  const namesByKey: Array<{ key: WarehouseKey; name: string }> = [
+    { key: 'OGEUMDONG', name: '오금동' },
+    { key: 'DAEJADONG', name: '대자동' },
+  ]
+  const records = await Promise.all(
+    namesByKey.map(({ key, name }) =>
+      prisma.warehouse.upsert({
+        where: { userId_name: { userId, name } },
+        update: {},
+        create: { userId, name },
+      })
+    ),
+  )
+
+  return Object.fromEntries(records.map((record, index) => [namesByKey[index].key, record.id])) as WarehouseLookup
 }
 
 async function main() {
@@ -177,6 +197,8 @@ async function main() {
 
   await ensureSeedUserExists(seedUserId, seedUserEmail)
   await clearUserData(seedUserId)
+
+  const seedWarehouses = await getSeedWarehouses(seedUserId)
 
   const modelMap = new Map<string, bigint>()
   const sizeMap = new Map<string, Map<string, bigint>>()
@@ -240,6 +262,8 @@ async function main() {
       for (const [sizeName, sizeId] of modelSizes) {
         const ogeumQty = item.ogeumdog[sizeName] ?? 0
         const daejaQty = item.daejadong[sizeName] ?? 0
+        const ogeumWarehouseId = seedWarehouses.OGEUMDONG
+        const daejaWarehouseId = seedWarehouses.DAEJADONG
 
         await prisma.inventory.create({
           data: {
@@ -247,7 +271,7 @@ async function main() {
             modelId: model.id,
             sizeId,
             colorId,
-            warehouse: 'OGEUMDONG',
+            warehouseId: ogeumWarehouseId,
             quantity: ogeumQty,
           },
         })
@@ -258,7 +282,7 @@ async function main() {
             modelId: model.id,
             sizeId,
             colorId,
-            warehouse: 'DAEJADONG',
+            warehouseId: daejaWarehouseId,
             quantity: daejaQty,
           },
         })
@@ -302,6 +326,15 @@ async function main() {
       continue
     }
 
+    let warehouseId: bigint
+    try {
+      const key = normalizeWarehouseKey(tx.warehouse)
+      warehouseId = seedWarehouses[key]
+    } catch {
+      skippedTransactions += 1
+      continue
+    }
+
     await prisma.transaction.create({
       data: {
         userId: seedUserId,
@@ -311,7 +344,7 @@ async function main() {
         colorId,
         type: parseTransactionType(tx.type),
         quantity: tx.quantity,
-        warehouse: parseWarehouse(tx.warehouse),
+        warehouseId,
       },
     })
   }
@@ -332,7 +365,7 @@ async function main() {
         skippedTransactions,
       },
       null,
-      2
+      2,
     )
   )
 }

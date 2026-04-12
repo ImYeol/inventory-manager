@@ -49,26 +49,32 @@ afterEach(() => {
 
 describe('server action wrappers', () => {
   it('strips inventory from model listings', async () => {
-    mocks.getCatalogData.mockResolvedValue([
-      { id: 1, name: 'LP01', inventory: [{ id: 1 }], sizes: [], colors: [] },
-    ])
+    mocks.getCatalogData.mockResolvedValue({
+      models: [{ id: 1, name: 'LP01', inventory: [{ id: 1 }] }],
+    })
 
-    await expect(getModels()).resolves.toEqual([{ id: 1, name: 'LP01', sizes: [], colors: [] }])
+    await expect(getModels()).resolves.toEqual([{ id: 1, name: 'LP01' }])
   })
 
   it('groups inventory into color and warehouse buckets', async () => {
-    mocks.getCatalogData.mockResolvedValue([
-      {
-        id: 1,
-        name: 'LP01',
-        sizes: [{ id: 10, name: 'S' }],
-        colors: [{ id: 20, name: '네이비', rgbCode: '#111111', textWhite: true }],
-        inventory: [
-          { id: 101, modelId: 1, sizeId: 10, colorId: 20, warehouse: '오금동', quantity: 2 },
-          { id: 102, modelId: 1, sizeId: 10, colorId: 20, warehouse: '대자동', quantity: 3 },
-        ],
-      },
-    ])
+    mocks.getCatalogData.mockResolvedValue({
+      models: [
+        {
+          id: 1,
+          name: 'LP01',
+          sizes: [{ id: 10, name: 'S' }],
+          colors: [{ id: 20, name: '네이비', rgbCode: '#111111', textWhite: true }],
+          inventory: [
+            { id: 101, modelId: 1, sizeId: 10, colorId: 20, warehouseId: 1, warehouseName: '오금동', quantity: 2 },
+            { id: 102, modelId: 1, sizeId: 10, colorId: 20, warehouseId: 2, warehouseName: '대자동', quantity: 3 },
+          ],
+        },
+      ],
+      warehouses: [
+        { id: 1, name: '오금동' },
+        { id: 2, name: '대자동' },
+      ],
+    })
 
     await expect(getInventory()).resolves.toEqual([
       {
@@ -82,8 +88,8 @@ describe('server action wrappers', () => {
             textWhite: true,
             inventory: {
               S: {
-                ogeumdog: { id: 101, quantity: 2 },
-                daejadong: { id: 102, quantity: 3 },
+                오금동: { id: 101, quantity: 2, name: '오금동' },
+                대자동: { id: 102, quantity: 3, name: '대자동' },
               },
             },
           },
@@ -95,14 +101,14 @@ describe('server action wrappers', () => {
   it('filters transaction rows by type and warehouse', async () => {
     mocks.getTransactionsWithRelations.mockResolvedValue({
       transactions: [
-        { id: 1, type: '입고', warehouse: '오금동' },
-        { id: 2, type: '반출', warehouse: '오금동' },
-        { id: 3, type: '입고', warehouse: '대자동' },
+        { id: 1, type: '입고', warehouseId: 1 },
+        { id: 2, type: '반출', warehouseId: 1 },
+        { id: 3, type: '입고', warehouseId: 2 },
       ],
     })
 
-    await expect(getTransactions({ type: '입고', warehouse: '오금동' })).resolves.toEqual([
-      { id: 1, type: '입고', warehouse: '오금동' },
+    await expect(getTransactions({ type: '입고', warehouseId: 1 })).resolves.toEqual([
+      { id: 1, type: '입고', warehouseId: 1 },
     ])
   })
 
@@ -117,7 +123,7 @@ describe('server action wrappers', () => {
         colorId: 20,
         type: '입고',
         quantity: 3,
-        warehouse: '오금동',
+        warehouseId: 1,
       })
     ).resolves.toEqual({ success: true })
 
@@ -129,7 +135,7 @@ describe('server action wrappers', () => {
         colorId: 20,
         type: '입고',
         quantity: 3,
-        warehouse: '오금동',
+        warehouseId: 1,
       },
     ])
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/')
@@ -149,7 +155,7 @@ describe('server action wrappers', () => {
           colorId: 20,
           type: '입고',
           quantity: 3,
-          warehouse: '오금동',
+          warehouseId: 1,
         },
       ])
     ).resolves.toEqual({ success: true })
@@ -157,6 +163,6 @@ describe('server action wrappers', () => {
     await expect(adjustInventory(99, 12)).resolves.toEqual({ success: true })
     await expect(createTransactions([])).resolves.toEqual({ success: true })
     await expect(getModelDetails(1)).resolves.toBeUndefined()
-    await expect(getCurrentStock(1, 10, 20, '오금동')).resolves.toBeUndefined()
+    await expect(getCurrentStock(1, 10, 20, 1)).resolves.toBeUndefined()
   })
 })

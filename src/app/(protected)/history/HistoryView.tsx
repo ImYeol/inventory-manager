@@ -9,6 +9,7 @@ type TransactionItem = {
   type: string;
   quantity: number;
   warehouse: string;
+  warehouseId: number;
   createdAt: string;
   modelName: string;
   sizeName: string;
@@ -17,6 +18,7 @@ type TransactionItem = {
 };
 
 type ModelItem = { id: number; name: string };
+type WarehouseItem = { id: number; name: string };
 
 const PAGE_SIZE = 20;
 
@@ -29,31 +31,33 @@ const typeStyle: Record<string, string> = {
 export default function HistoryView({
   transactions,
   models,
+  warehouses,
 }: {
   transactions: TransactionItem[];
   models: ModelItem[];
+  warehouses: WarehouseItem[];
 }) {
   const [filterModel, setFilterModel] = useState('');
   const [filterType, setFilterType] = useState('');
-  const [filterWarehouse, setFilterWarehouse] = useState('');
+  const [filterWarehouseId, setFilterWarehouseId] = useState<number | ''>('');
   const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
     let result = transactions;
     if (filterModel) result = result.filter((t) => t.modelName === filterModel);
     if (filterType) result = result.filter((t) => t.type === filterType);
-    if (filterWarehouse) result = result.filter((t) => t.warehouse === filterWarehouse);
+    if (filterWarehouseId) result = result.filter((t) => t.warehouseId === filterWarehouseId);
     return result;
-  }, [transactions, filterModel, filterType, filterWarehouse]);
+  }, [transactions, filterModel, filterType, filterWarehouseId]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paged = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  const resetFilters = () => {
+    const resetFilters = () => {
     setFilterModel('');
     setFilterType('');
-    setFilterWarehouse('');
+    setFilterWarehouseId('');
     setPage(1);
   };
 
@@ -91,17 +95,23 @@ export default function HistoryView({
           <div>
             <label className={ui.label}>창고</label>
             <select
-              value={filterWarehouse}
-              onChange={(e) => { setFilterWarehouse(e.target.value); setPage(1); }}
+              value={filterWarehouseId}
+              onChange={(e) => {
+                setFilterWarehouseId(e.target.value ? Number(e.target.value) : '');
+                setPage(1);
+              }}
               className={ui.controlSm}
             >
               <option value="">전체</option>
-              <option value="오금동">오금동</option>
-              <option value="대자동">대자동</option>
+              {warehouses.map((warehouse) => (
+                <option key={warehouse.id} value={warehouse.id}>
+                  {warehouse.name}
+                </option>
+              ))}
             </select>
           </div>
         </div>
-        {(filterModel || filterType || filterWarehouse) && (
+        {(filterModel || filterType || filterWarehouseId) && (
           <button
             onClick={resetFilters}
             className="mt-3 text-sm font-medium text-slate-600 hover:text-slate-950"

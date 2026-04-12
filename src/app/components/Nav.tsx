@@ -5,12 +5,12 @@ import { usePathname } from 'next/navigation'
 import { cx } from './ui'
 
 const navItems = [
-  { href: '/', label: '재고현황' },
+  { href: '/master-data', label: '기초정보' },
+  { href: '/', label: '재고' },
   { href: '/inout', label: '입출고' },
-  { href: '/adjust', label: '재고조정' },
   { href: '/history', label: '이력' },
-  { href: '/shipping', label: '운송장' },
   { href: '/analytics', label: '분석' },
+  { href: '/shipping', label: '운송장' },
 ]
 
 const settingsItem = { href: '/settings', label: '설정' }

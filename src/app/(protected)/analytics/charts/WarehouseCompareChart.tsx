@@ -1,22 +1,54 @@
-'use client';
+'use client'
 
 import {
-  BarChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from 'recharts';
-import { ui } from '../../../components/ui';
+} from 'recharts'
+import { ui } from '../../../components/ui'
+
+const BAR_COLORS = ['#334155', '#94a3b8', '#0ea5e9', '#f59e0b', '#10b981', '#ec4899', '#14b8a6', '#8b5cf6']
+
+type WarehouseTotal = {
+  id: number
+  name: string
+  quantity: number
+}
 
 type Props = {
-  data: { modelName: string; ogeumdog: number; daejadong: number }[];
-};
+  data: {
+    modelName: string
+    warehouseTotals: WarehouseTotal[]
+  }[]
+}
+
+type ChartRow = {
+  modelName: string
+  [key: `w_${number}`]: number
+}
 
 export default function WarehouseCompareChart({ data }: Props) {
+  const warehouseNames = new Map<number, string>()
+  const allWarehouses = data.flatMap((entry) => entry.warehouseTotals)
+  for (const warehouse of allWarehouses) {
+    if (!warehouseNames.has(warehouse.id)) {
+      warehouseNames.set(warehouse.id, warehouse.name)
+    }
+  }
+
+  const chartRows: ChartRow[] = data.map((entry) => {
+    const row: ChartRow = { modelName: entry.modelName }
+    for (const total of entry.warehouseTotals) {
+      row[`w_${total.id}`] = total.quantity
+    }
+    return row
+  })
+
   if (data.length === 0) {
     return (
       <div className={ui.panel}>
@@ -27,7 +59,7 @@ export default function WarehouseCompareChart({ data }: Props) {
           데이터가 없습니다.
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -36,7 +68,7 @@ export default function WarehouseCompareChart({ data }: Props) {
         <h3 className="text-sm font-semibold text-slate-700">창고별 비교</h3>
       </div>
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={data} layout="vertical">
+        <BarChart data={chartRows} layout="vertical">
           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
           <XAxis type="number" fontSize={11} tick={{ fill: '#64748b' }} />
           <YAxis
@@ -44,7 +76,7 @@ export default function WarehouseCompareChart({ data }: Props) {
             dataKey="modelName"
             fontSize={11}
             tick={{ fill: '#64748b' }}
-            width={80}
+            width={90}
           />
           <Tooltip
             contentStyle={{
@@ -54,10 +86,17 @@ export default function WarehouseCompareChart({ data }: Props) {
             }}
           />
           <Legend />
-          <Bar dataKey="ogeumdog" name="오금동" fill="#334155" radius={[0, 4, 4, 0]} />
-          <Bar dataKey="daejadong" name="대자동" fill="#94a3b8" radius={[0, 4, 4, 0]} />
+          {Array.from(warehouseNames.entries()).map(([id, name], index) => (
+            <Bar
+              key={id}
+              dataKey={`w_${id}`}
+              name={name}
+              fill={BAR_COLORS[index % BAR_COLORS.length]}
+              radius={[0, 4, 4, 0]}
+            />
+          ))}
         </BarChart>
       </ResponsiveContainer>
     </div>
-  );
+  )
 }

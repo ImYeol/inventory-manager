@@ -55,7 +55,7 @@ afterEach(() => {
 })
 
 describe('Supabase data mappers', () => {
-  it('maps catalog rows into the model, size, color, and inventory shape used by the UI', async () => {
+  it('maps catalog rows into the model, size, color, inventory and warehouse shape used by the UI', async () => {
     const supabase = createSupabaseMock({
       models: {
         data: [{ id: 1, name: 'LP01', created_at: '2026-04-12T00:00:00.000Z' }],
@@ -76,10 +76,17 @@ describe('Supabase data mappers', () => {
       },
       inventory: {
         data: [
-          { id: 101, model_id: 1, size_id: 10, color_id: 20, warehouse: 'OGEUMDONG', quantity: 2 },
-          { id: 102, model_id: 1, size_id: 10, color_id: 20, warehouse: 'DAEJADONG', quantity: 3 },
-          { id: 103, model_id: 1, size_id: 11, color_id: 20, warehouse: 'OGEUMDONG', quantity: 4 },
-          { id: 104, model_id: 1, size_id: 11, color_id: 20, warehouse: 'DAEJADONG', quantity: 5 },
+          { id: 101, model_id: 1, size_id: 10, color_id: 20, warehouse_id: 1, quantity: 2 },
+          { id: 102, model_id: 1, size_id: 10, color_id: 20, warehouse_id: 2, quantity: 3 },
+          { id: 103, model_id: 1, size_id: 11, color_id: 20, warehouse_id: 1, quantity: 4 },
+          { id: 104, model_id: 1, size_id: 11, color_id: 20, warehouse_id: 2, quantity: 5 },
+        ],
+        error: null,
+      },
+      warehouses: {
+        data: [
+          { id: 1, name: '오금동' },
+          { id: 2, name: '대자동' },
         ],
         error: null,
       },
@@ -87,26 +94,32 @@ describe('Supabase data mappers', () => {
 
     mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
 
-    await expect(getCatalogData()).resolves.toEqual([
-      {
-        id: 1,
-        name: 'LP01',
-        createdAt: '2026-04-12T00:00:00.000Z',
-        sizes: [
-          { id: 10, name: 'S', sortOrder: 1, modelId: 1 },
-          { id: 11, name: 'M', sortOrder: 2, modelId: 1 },
-        ],
-        colors: [
-          { id: 20, name: '네이비', rgbCode: '#0f172a', textWhite: true, sortOrder: 1, modelId: 1 },
-        ],
-        inventory: [
-          { id: 101, modelId: 1, sizeId: 10, colorId: 20, warehouse: '오금동', quantity: 2 },
-          { id: 102, modelId: 1, sizeId: 10, colorId: 20, warehouse: '대자동', quantity: 3 },
-          { id: 103, modelId: 1, sizeId: 11, colorId: 20, warehouse: '오금동', quantity: 4 },
-          { id: 104, modelId: 1, sizeId: 11, colorId: 20, warehouse: '대자동', quantity: 5 },
-        ],
-      },
-    ])
+    await expect(getCatalogData()).resolves.toEqual({
+      models: [
+        {
+          id: 1,
+          name: 'LP01',
+          createdAt: '2026-04-12T00:00:00.000Z',
+          sizes: [
+            { id: 10, name: 'S', sortOrder: 1, modelId: 1 },
+            { id: 11, name: 'M', sortOrder: 2, modelId: 1 },
+          ],
+          colors: [
+            { id: 20, name: '네이비', rgbCode: '#0f172a', textWhite: true, sortOrder: 1, modelId: 1 },
+          ],
+          inventory: [
+            { id: 101, modelId: 1, sizeId: 10, colorId: 20, warehouseId: 1, warehouseName: '오금동', quantity: 2 },
+            { id: 102, modelId: 1, sizeId: 10, colorId: 20, warehouseId: 2, warehouseName: '대자동', quantity: 3 },
+            { id: 103, modelId: 1, sizeId: 11, colorId: 20, warehouseId: 1, warehouseName: '오금동', quantity: 4 },
+            { id: 104, modelId: 1, sizeId: 11, colorId: 20, warehouseId: 2, warehouseName: '대자동', quantity: 5 },
+          ],
+        },
+      ],
+      warehouses: [
+        { id: 1, name: '오금동' },
+        { id: 2, name: '대자동' },
+      ],
+    })
   })
 
   it('builds transaction labels from row lookups', async () => {
@@ -121,7 +134,7 @@ describe('Supabase data mappers', () => {
             color_id: 20,
             type: 'INBOUND',
             quantity: 3,
-            warehouse: 'OGEUMDONG',
+            warehouse_id: 1,
             created_at: '2026-04-12T03:00:00.000Z',
           },
         ],
@@ -130,8 +143,8 @@ describe('Supabase data mappers', () => {
       models: { data: [{ id: 1, name: 'LP01' }], error: null },
       sizes: { data: [{ id: 10, name: 'S' }], error: null },
       colors: { data: [{ id: 20, name: '네이비', rgb_code: '#0f172a' }], error: null },
+      warehouses: { data: [{ id: 1, name: '오금동' }], error: null },
     })
-
     mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
 
     await expect(getTransactionsWithRelations()).resolves.toEqual({
@@ -141,7 +154,9 @@ describe('Supabase data mappers', () => {
           date: '26.04.12',
           type: '입고',
           quantity: 3,
+          warehouseId: 1,
           warehouse: '오금동',
+          warehouseName: '오금동',
           createdAt: '2026-04-12T03:00:00.000Z',
           modelName: 'LP01',
           sizeName: 'S',
@@ -150,10 +165,11 @@ describe('Supabase data mappers', () => {
         },
       ],
       models: [{ id: 1, name: 'LP01' }],
+      warehouses: [{ id: 1, name: '오금동' }],
     })
   })
 
-  it('returns the current stock quantity for a canonical warehouse value', async () => {
+  it('returns the current stock quantity for a warehouse id', async () => {
     const inventoryQuery = createQuery({
       data: { quantity: 7 },
       error: null,
@@ -166,7 +182,7 @@ describe('Supabase data mappers', () => {
 
     mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
 
-    await expect(getCurrentStockRow(1, 10, 20, '오금동')).resolves.toBe(7)
+    await expect(getCurrentStockRow(1, 10, 20, 1)).resolves.toBe(7)
   })
 
   it('maps bulk transaction payloads into Supabase RPC enums', async () => {
@@ -182,7 +198,7 @@ describe('Supabase data mappers', () => {
         colorId: 20,
         type: '입고',
         quantity: 3,
-        warehouse: '오금동',
+        warehouseId: 1,
       },
     ])
 
@@ -195,7 +211,7 @@ describe('Supabase data mappers', () => {
           color_id: 20,
           type: 'INBOUND',
           quantity: 3,
-          warehouse: 'OGEUMDONG',
+          warehouse_id: 1,
         },
       ],
     })
@@ -218,11 +234,23 @@ describe('Supabase data mappers', () => {
     const supabase = createSupabaseMock({
       models: { data: [{ id: 1, name: 'LP01', created_at: '2026-04-12T00:00:00.000Z' }], error: null },
       sizes: { data: [{ id: 10, name: 'S', sort_order: 1, model_id: 1 }], error: null },
-      colors: { data: [{ id: 20, name: '네이비', rgb_code: '#0f172a', text_white: true, sort_order: 1, model_id: 1 }], error: null },
+      colors: {
+        data: [
+          { id: 20, name: '네이비', rgb_code: '#0f172a', text_white: true, sort_order: 1, model_id: 1 },
+        ],
+        error: null,
+      },
       inventory: {
         data: [
-          { id: 101, model_id: 1, size_id: 10, color_id: 20, warehouse: 'OGEUMDONG', quantity: 2 },
-          { id: 102, model_id: 1, size_id: 10, color_id: 20, warehouse: 'DAEJADONG', quantity: 3 },
+          { id: 101, model_id: 1, size_id: 10, color_id: 20, warehouse_id: 1, quantity: 2 },
+          { id: 102, model_id: 1, size_id: 10, color_id: 20, warehouse_id: 2, quantity: 3 },
+        ],
+        error: null,
+      },
+      warehouses: {
+        data: [
+          { id: 1, name: '오금동' },
+          { id: 2, name: '대자동' },
         ],
         error: null,
       },
@@ -242,10 +270,14 @@ describe('Supabase data mappers', () => {
             { id: 20, name: '네이비', rgbCode: '#0f172a', textWhite: true, sortOrder: 1, modelId: 1 },
           ],
           inventory: [
-            { id: 101, modelId: 1, sizeId: 10, colorId: 20, warehouse: '오금동', quantity: 2 },
-            { id: 102, modelId: 1, sizeId: 10, colorId: 20, warehouse: '대자동', quantity: 3 },
+            { id: 101, modelId: 1, sizeId: 10, colorId: 20, warehouseId: 1, warehouseName: '오금동', quantity: 2 },
+            { id: 102, modelId: 1, sizeId: 10, colorId: 20, warehouseId: 2, warehouseName: '대자동', quantity: 3 },
           ],
         },
+      ],
+      warehouses: [
+        { id: 1, name: '오금동' },
+        { id: 2, name: '대자동' },
       ],
     })
   })
@@ -256,6 +288,12 @@ describe('Supabase data mappers', () => {
       sizes: { data: [{ id: 10, name: 'S', sort_order: 1, model_id: 1 }], error: null },
       colors: { data: [{ id: 20, name: '네이비', rgb_code: '#0f172a', text_white: true, sort_order: 1, model_id: 1 }], error: null },
       inventory: { data: [], error: null },
+      warehouses: {
+        data: [
+          { id: 1, name: '오금동' },
+        ],
+        error: null,
+      },
     })
     mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
 
@@ -276,7 +314,6 @@ describe('Supabase data mappers', () => {
             type: 'INBOUND',
             quantity: 3,
             model_id: 1,
-            warehouse: 'OGEUMDONG',
           },
         ],
         error: null,
@@ -290,7 +327,6 @@ describe('Supabase data mappers', () => {
         type: 'INBOUND',
         quantity: 3,
         model_id: 1,
-        warehouse: 'OGEUMDONG',
       },
     ])
   })
