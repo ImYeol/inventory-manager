@@ -1,14 +1,10 @@
 'use client'
 
 import { createBrowserClient } from '@supabase/ssr'
+import { getSupabasePublicEnv } from './env'
 
 export function createSupabaseBrowserClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const { url, publishableKey } = getSupabasePublicEnv()
 
-  if (!url || !anonKey) {
-    throw new Error('Missing Supabase environment variables.')
-  }
-
-  return createBrowserClient(url, anonKey)
+  return createBrowserClient(url, publishableKey)
 }

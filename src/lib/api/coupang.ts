@@ -3,6 +3,8 @@
 
 import crypto from 'crypto';
 
+import type { CoupangCredentials } from '../shipping-credentials';
+
 const BASE_URL = 'https://api-gateway.coupang.com';
 
 export type CoupangOrder = {
@@ -29,14 +31,13 @@ function generateHmacSignature(
     .digest('hex');
 }
 
-function getAuthHeader(method: string, path: string): string {
-  const accessKey = process.env.COUPANG_ACCESS_KEY;
-  const secretKey = process.env.COUPANG_SECRET_KEY;
-
-  if (!accessKey || !secretKey) {
-    throw new Error('COUPANG_ACCESS_KEY와 COUPANG_SECRET_KEY 환경변수를 설정해주세요.');
-  }
-
+function getAuthHeader(
+  method: string,
+  path: string,
+  credentials: Pick<CoupangCredentials, 'accessKey' | 'secretKey'>
+): string {
+  const accessKey = credentials.accessKey;
+  const secretKey = credentials.secretKey;
   const datetime = new Date()
     .toISOString()
     .replace(/[-:]/g, '')
@@ -49,11 +50,10 @@ function getAuthHeader(method: string, path: string): string {
 }
 
 // 미발송 주문 조회
-export async function fetchCoupangPendingOrders(): Promise<CoupangOrder[]> {
-  const vendorId = process.env.COUPANG_VENDOR_ID;
-  if (!vendorId) {
-    throw new Error('COUPANG_VENDOR_ID 환경변수를 설정해주세요.');
-  }
+export async function fetchCoupangPendingOrders(
+  credentials: CoupangCredentials
+): Promise<CoupangOrder[]> {
+  const vendorId = credentials.vendorId;
 
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -63,7 +63,7 @@ export async function fetchCoupangPendingOrders(): Promise<CoupangOrder[]> {
 
   const path = `/v2/providers/openapi/apis/api/v4/vendors/${vendorId}/ordersheets?createdAtFrom=${createdAtFrom}&createdAtTo=${createdAtTo}&status=ACCEPT`;
 
-  const authorization = getAuthHeader('GET', path);
+  const authorization = getAuthHeader('GET', path, credentials);
 
   const res = await fetch(`${BASE_URL}${path}`, {
     method: 'GET',
@@ -106,19 +106,17 @@ export async function confirmCoupangShipments(
     shipmentBoxId: number;
     trackingNumber: string;
     deliveryCompanyCode?: string;
-  }[]
+  }[],
+  credentials: CoupangCredentials
 ): Promise<{ success: boolean; failedBoxes: number[] }> {
-  const vendorId = process.env.COUPANG_VENDOR_ID;
-  if (!vendorId) {
-    throw new Error('COUPANG_VENDOR_ID 환경변수를 설정해주세요.');
-  }
+  const vendorId = credentials.vendorId;
 
   const failedBoxes: number[] = [];
 
   for (const shipment of shipments) {
     try {
       const path = `/v2/providers/openapi/apis/api/v4/vendors/${vendorId}/ordersheets/${shipment.shipmentBoxId}/shipments`;
-      const authorization = getAuthHeader('PUT', path);
+      const authorization = getAuthHeader('PUT', path, credentials);
 
       const res = await fetch(`${BASE_URL}${path}`, {
         method: 'PUT',

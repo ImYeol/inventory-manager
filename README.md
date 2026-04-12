@@ -14,10 +14,10 @@ Next.js inventory manager backed by Supabase.
 Required Supabase values:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
 Find both in the Supabase dashboard under `Project Settings > API`.
-Use the project URL as `NEXT_PUBLIC_SUPABASE_URL` and the `anon public` key as `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+Use the project URL as `NEXT_PUBLIC_SUPABASE_URL` and the publishable key as `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 
 Prisma connection strings are no longer required.
 The app uses Supabase JS plus RLS, so there is no `DATABASE_URL` or `DIRECT_URL` in the example file.

@@ -1,16 +1,12 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useCallback, useTransition } from 'react';
 import * as XLSX from 'xlsx';
 import { parseExcelRow, type CourierRow } from '@/lib/excel';
-import {
-  fetchNaverOrders,
-  sendNaverTrackingNumbers,
-  fetchCoupangOrders,
-  sendCoupangTrackingNumbers,
-  type NaverOrder,
-  type CoupangOrder,
-} from '@/lib/actions/shipping';
+import * as shippingActions from '@/lib/actions/shipping';
+import type { NaverOrder, CoupangOrder } from '@/lib/actions/shipping';
+import type { ShippingSettingsSummary } from '@/lib/shipping-credentials';
 import { cx, ui } from '../../components/ui';
 
 type MatchedNaverOrder = NaverOrder & {
@@ -56,7 +52,93 @@ function matchOrders<T extends { recipientName?: string; receiverName?: string; 
   });
 }
 
-export default function ShippingView() {
+function formatUpdatedAt(value?: string | null) {
+  if (!value) return '아직 저장 이력이 없습니다.';
+
+  return new Intl.DateTimeFormat('ko-KR', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
+}
+
+function ProviderStatusCard({
+  label,
+  configured,
+  maskedSummary,
+  updatedAt,
+}: {
+  label: string;
+  configured: boolean;
+  maskedSummary?: string;
+  updatedAt?: string | null;
+}) {
+  return (
+    <div className="surface p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-slate-950">{label}</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {configured ? 'API 키가 저장되어 주문 조회에 사용할 수 있습니다.' : '아직 API 키가 저장되지 않았습니다.'}
+          </p>
+        </div>
+        <span className={cx(ui.pill, configured ? '' : 'bg-slate-50')}>
+          <span
+            aria-hidden="true"
+            className={cx('h-2 w-2 rounded-full', configured ? 'bg-emerald-500' : 'bg-amber-500')}
+          />
+          {configured ? '설정 완료' : '설정 필요'}
+        </span>
+      </div>
+      <dl className="mt-4 space-y-2 text-sm">
+        <div className="flex items-center justify-between gap-3">
+          <dt className="text-slate-500">저장 상태</dt>
+          <dd className="font-medium text-slate-800">{configured ? '연결됨' : '미연결'}</dd>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <dt className="text-slate-500">저장된 키</dt>
+          <dd className="font-medium text-slate-800" translate="no">
+            {maskedSummary ?? '저장된 키 없음'}
+          </dd>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <dt className="text-slate-500">최근 변경</dt>
+          <dd className="text-right text-slate-600">{formatUpdatedAt(updatedAt)}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
+function ProviderMissingState({
+  provider,
+  message,
+  ctaLabel,
+}: {
+  provider: string;
+  message: string;
+  ctaLabel: string;
+}) {
+  return (
+    <div className="px-4 py-10">
+      <div className={ui.emptyState}>
+        <p className="text-base font-semibold text-slate-900">{provider} API 키를 먼저 설정하세요.</p>
+        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">{message}</p>
+        <div className="mt-5">
+          <Link href="/settings" className={ui.buttonSecondary}>
+            {ctaLabel}
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ShippingView({ settingsSummary }: { settingsSummary: ShippingSettingsSummary }) {
+  const fetchNaverOrders = shippingActions.fetchNaverOrders;
+  const sendNaverTrackingNumbers = shippingActions.sendNaverTrackingNumbers;
+  const fetchCoupangOrders = shippingActions.fetchCoupangOrders;
+  const sendCoupangTrackingNumbers = shippingActions.sendCoupangTrackingNumbers;
+
   const [courierRows, setCourierRows] = useState<CourierRow[]>([]);
   const [fileName, setFileName] = useState('');
 
@@ -74,10 +156,15 @@ export default function ShippingView() {
   const [coupangSending, startCoupangSendTransition] = useTransition();
   const [coupangSentMessage, setCoupangSentMessage] = useState('');
 
+  const hasNaverConfig = settingsSummary.naver.configured;
+  const hasCoupangConfig = settingsSummary.coupang.configured;
+  const hasAnyProviderConfig = hasNaverConfig || hasCoupangConfig;
+  const hasAllProviderConfig = hasNaverConfig && hasCoupangConfig;
+
   const handleFileUpload = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (!file) return;
+      if (!file || !hasAnyProviderConfig) return;
 
       setFileName(file.name);
       setNaverSentMessage('');
@@ -94,30 +181,39 @@ export default function ShippingView() {
         const parsed = jsonRows.map(parseExcelRow).filter((r) => r.trackingNumber);
         setCourierRows(parsed);
 
-        // 동시에 네이버/쿠팡 주문 조회
-        startNaverTransition(async () => {
+        if (hasNaverConfig) {
+          startNaverTransition(async () => {
+            setNaverError('');
+            const result = await fetchNaverOrders();
+            if (result.success) {
+              setNaverOrders(matchOrders(result.orders, parsed) as MatchedNaverOrder[]);
+            } else {
+              setNaverError(result.error ?? '네이버 주문 조회 실패');
+            }
+          });
+        } else {
+          setNaverOrders([]);
           setNaverError('');
-          const result = await fetchNaverOrders();
-          if (result.success) {
-            setNaverOrders(matchOrders(result.orders, parsed) as MatchedNaverOrder[]);
-          } else {
-            setNaverError(result.error ?? '네이버 주문 조회 실패');
-          }
-        });
+        }
 
-        startCoupangTransition(async () => {
+        if (hasCoupangConfig) {
+          startCoupangTransition(async () => {
+            setCoupangError('');
+            const result = await fetchCoupangOrders();
+            if (result.success) {
+              setCoupangOrders(matchOrders(result.orders, parsed) as MatchedCoupangOrder[]);
+            } else {
+              setCoupangError(result.error ?? '쿠팡 주문 조회 실패');
+            }
+          });
+        } else {
+          setCoupangOrders([]);
           setCoupangError('');
-          const result = await fetchCoupangOrders();
-          if (result.success) {
-            setCoupangOrders(matchOrders(result.orders, parsed) as MatchedCoupangOrder[]);
-          } else {
-            setCoupangError(result.error ?? '쿠팡 주문 조회 실패');
-          }
-        });
+        }
       };
       reader.readAsArrayBuffer(file);
     },
-    []
+    [fetchCoupangOrders, fetchNaverOrders, hasAnyProviderConfig, hasCoupangConfig, hasNaverConfig]
   );
 
   const toggleNaverExclude = (idx: number) => {
@@ -201,28 +297,115 @@ export default function ShippingView() {
 
   return (
     <div className="space-y-5">
-      {/* 엑셀 업로드 */}
-      <div className={cx(ui.panel, ui.panelBody)}>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <label className={cx(ui.buttonPrimary, 'cursor-pointer')}>
-            <span>📁 엑셀 업로드</span>
+      <section className={cx(ui.panel, ui.panelBody, 'space-y-4')}>
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Setup</p>
+            <h2 className="text-xl font-semibold tracking-tight text-slate-950">배송 채널 연동 상태</h2>
+            <p className="max-w-3xl text-sm leading-6 text-slate-500">
+              엑셀 파일은 운송장 번호를 매칭하는 재료일 뿐입니다. 네이버와 쿠팡 주문 목록은 사용자별 API 키가 있어야만 조회할 수 있습니다.
+            </p>
+          </div>
+          <Link href="/settings" className={ui.buttonSecondary}>
+            설정으로 이동
+          </Link>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ProviderStatusCard
+            label="네이버"
+            configured={hasNaverConfig}
+            maskedSummary={settingsSummary.naver.masked.clientId}
+            updatedAt={settingsSummary.naver.updatedAt}
+          />
+          <ProviderStatusCard
+            label="쿠팡"
+            configured={hasCoupangConfig}
+            maskedSummary={
+              [settingsSummary.coupang.masked.accessKey, settingsSummary.coupang.masked.vendorId]
+                .filter(Boolean)
+                .join(' / ') || undefined
+            }
+            updatedAt={settingsSummary.coupang.updatedAt}
+          />
+        </div>
+
+        {!hasAnyProviderConfig ? (
+          <div className={ui.emptyState}>
+            <p className="text-base font-semibold text-slate-900">API 연동 설정이 필요합니다.</p>
+            <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+              엑셀 업로드만으로는 주문 목록을 불러올 수 없습니다. 먼저 설정 화면에서 네이버 또는 쿠팡 API 키를 저장한 뒤 다시 시도하세요.
+            </p>
+            <div className="mt-5">
+              <Link href="/settings" className={ui.buttonPrimary}>
+                설정으로 이동
+              </Link>
+            </div>
+          </div>
+        ) : !hasAllProviderConfig ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-4">
+            <p className="text-base font-semibold text-slate-900">일부 연동만 완료되었습니다.</p>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              설정된 채널만 주문을 조회할 수 있습니다. 누락된 채널은 설정을 마친 뒤 같은 엑셀 파일로 함께 처리하세요.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {!hasNaverConfig ? (
+                <>
+                  <p className="self-center text-sm font-medium text-slate-800">네이버 API 키를 먼저 설정하세요.</p>
+                  <Link href="/settings" className={ui.buttonSecondary}>
+                    네이버 설정하기
+                  </Link>
+                </>
+              ) : null}
+              {!hasCoupangConfig ? (
+                <>
+                  <p className="self-center text-sm font-medium text-slate-800">쿠팡 API 키를 먼저 설정하세요.</p>
+                  <Link href="/settings" className={ui.buttonSecondary}>
+                    쿠팡 설정하기
+                  </Link>
+                </>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-4">
+            <p className="text-base font-semibold text-slate-900">두 채널 모두 연동되었습니다.</p>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              엑셀 파일을 업로드하면 네이버와 쿠팡 주문을 동시에 조회해 운송장 번호를 매칭합니다.
+            </p>
+          </div>
+        )}
+      </section>
+
+      {hasAnyProviderConfig ? (
+        <div className={cx(ui.panel, ui.panelBody)}>
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+            <label htmlFor="shipping-excel-upload" className={cx(ui.buttonPrimary, 'cursor-pointer')}>
+              <span>엑셀 업로드</span>
+            </label>
             <input
+              id="shipping-excel-upload"
+              name="shipping-excel-upload"
               type="file"
               accept=".xlsx,.xls"
-              className="hidden"
+              className="sr-only"
               onChange={handleFileUpload}
             />
-          </label>
-          {fileName && (
-            <div className="text-sm text-slate-600">
-              <span className="font-medium">{fileName}</span>
-              <span className="text-slate-400 ml-2">
-                ({courierRows.length}건 운송장 로드됨)
-              </span>
-            </div>
-          )}
+            {fileName ? (
+              <div className="text-sm text-slate-600">
+                <span className="font-medium">{fileName}</span>
+                <span className="ml-2 text-slate-400">({courierRows.length}건 운송장 로드됨)</span>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">
+                {hasAllProviderConfig
+                  ? '업로드 즉시 두 채널의 미발송 주문을 조회합니다.'
+                  : '업로드 후 설정된 채널만 주문을 조회합니다.'}
+              </p>
+            )}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {courierRows.length > 0 && (
         <>
@@ -253,11 +436,15 @@ export default function ShippingView() {
               </div>
             </div>
 
-            {naverError && (
+            {!hasNaverConfig ? (
+              <ProviderMissingState
+                provider="네이버"
+                message="이 채널은 설정 전이라 엑셀을 올려도 주문 목록을 확인할 수 없습니다. 설정 화면에서 API 키를 저장한 뒤 다시 업로드하세요."
+                ctaLabel="네이버 설정하기"
+              />
+            ) : naverError ? (
               <div className="px-4 py-3 text-sm text-red-600">{naverError}</div>
-            )}
-
-            {naverLoading ? (
+            ) : naverLoading ? (
               <div className="px-4 py-12 text-center text-slate-400">주문 조회 중…</div>
             ) : naverOrders.length === 0 ? (
               <div className="px-4 py-12 text-center text-slate-400">
@@ -286,12 +473,15 @@ export default function ShippingView() {
                           className={`transition-colors ${o.excluded ? 'bg-slate-50 opacity-50' : 'hover:bg-slate-50'}`}
                         >
                           <td className="px-4 py-2.5 border-b border-slate-100">
-                            <input
-                              type="checkbox"
-                              checked={!o.excluded}
-                              onChange={() => toggleNaverExclude(i)}
-                              className="w-4 h-4 rounded border-slate-300"
-                            />
+                            <label className="inline-flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={!o.excluded}
+                                onChange={() => toggleNaverExclude(i)}
+                                aria-label={`네이버 주문 ${o.productOrderId} 포함`}
+                                className="h-4 w-4 rounded border-slate-300"
+                              />
+                            </label>
                           </td>
                           <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-100 font-mono text-xs">
                             {o.productOrderId}
@@ -332,12 +522,15 @@ export default function ShippingView() {
                     >
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={!o.excluded}
-                            onChange={() => toggleNaverExclude(i)}
-                            className="w-4 h-4 rounded border-slate-300"
-                          />
+                          <label className="inline-flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={!o.excluded}
+                              onChange={() => toggleNaverExclude(i)}
+                              aria-label={`네이버 주문 ${o.productOrderId} 포함`}
+                              className="h-4 w-4 rounded border-slate-300"
+                            />
+                          </label>
                           <span className="text-sm font-medium text-slate-800">{o.recipientName}</span>
                         </div>
                         {o.sent && <span className="text-xs font-semibold text-slate-700">완료</span>}
@@ -388,11 +581,15 @@ export default function ShippingView() {
               </div>
             </div>
 
-            {coupangError && (
+            {!hasCoupangConfig ? (
+              <ProviderMissingState
+                provider="쿠팡"
+                message="이 채널은 설정 전이라 엑셀을 올려도 주문 목록을 확인할 수 없습니다. 설정 화면에서 API 키를 저장한 뒤 다시 업로드하세요."
+                ctaLabel="쿠팡 설정하기"
+              />
+            ) : coupangError ? (
               <div className="px-4 py-3 text-sm text-red-600">{coupangError}</div>
-            )}
-
-            {coupangLoading ? (
+            ) : coupangLoading ? (
               <div className="px-4 py-12 text-center text-slate-400">주문 조회 중…</div>
             ) : coupangOrders.length === 0 ? (
               <div className="px-4 py-12 text-center text-slate-400">
@@ -421,12 +618,15 @@ export default function ShippingView() {
                           className={`transition-colors ${o.excluded ? 'bg-slate-50 opacity-50' : 'hover:bg-slate-50'}`}
                         >
                           <td className="px-4 py-2.5 border-b border-slate-100">
-                            <input
-                              type="checkbox"
-                              checked={!o.excluded}
-                              onChange={() => toggleCoupangExclude(i)}
-                              className="w-4 h-4 rounded border-slate-300"
-                            />
+                            <label className="inline-flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={!o.excluded}
+                                onChange={() => toggleCoupangExclude(i)}
+                                aria-label={`쿠팡 주문 ${o.orderId} 포함`}
+                                className="h-4 w-4 rounded border-slate-300"
+                              />
+                            </label>
                           </td>
                           <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-100 font-mono text-xs">
                             {o.orderId}
@@ -467,12 +667,15 @@ export default function ShippingView() {
                     >
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={!o.excluded}
-                            onChange={() => toggleCoupangExclude(i)}
-                            className="w-4 h-4 rounded border-slate-300"
-                          />
+                          <label className="inline-flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={!o.excluded}
+                              onChange={() => toggleCoupangExclude(i)}
+                              aria-label={`쿠팡 주문 ${o.orderId} 포함`}
+                              className="h-4 w-4 rounded border-slate-300"
+                            />
+                          </label>
                           <span className="text-sm font-medium text-slate-800">{o.receiverName}</span>
                         </div>
                         {o.sent && <span className="text-xs font-semibold text-slate-700">완료</span>}

@@ -2,6 +2,7 @@
 
 import { fetchNaverPendingOrders, dispatchNaverOrders, type NaverOrder } from '../api/naver'
 import { fetchCoupangPendingOrders, confirmCoupangShipments, type CoupangOrder } from '../api/coupang'
+import { getRequiredShippingCredentials } from '../shipping-credentials'
 
 export type { NaverOrder, CoupangOrder }
 
@@ -11,7 +12,8 @@ export async function fetchNaverOrders(): Promise<{
   error?: string;
 }> {
   try {
-    const orders = await fetchNaverPendingOrders()
+    const credentials = await getRequiredShippingCredentials('naver')
+    const orders = await fetchNaverPendingOrders(credentials)
     return { success: true, orders }
   } catch (e) {
     return {
@@ -30,7 +32,8 @@ export async function sendNaverTrackingNumbers(
   error?: string;
 }> {
   try {
-    const result = await dispatchNaverOrders(matches)
+    const credentials = await getRequiredShippingCredentials('naver')
+    const result = await dispatchNaverOrders(matches, credentials)
     return result
   } catch (e) {
     return {
@@ -47,7 +50,8 @@ export async function fetchCoupangOrders(): Promise<{
   error?: string;
 }> {
   try {
-    const orders = await fetchCoupangPendingOrders()
+    const credentials = await getRequiredShippingCredentials('coupang')
+    const orders = await fetchCoupangPendingOrders(credentials)
     return { success: true, orders }
   } catch (e) {
     return {
@@ -66,7 +70,8 @@ export async function sendCoupangTrackingNumbers(
   error?: string;
 }> {
   try {
-    const result = await confirmCoupangShipments(matches)
+    const credentials = await getRequiredShippingCredentials('coupang')
+    const result = await confirmCoupangShipments(matches, credentials)
     return result
   } catch (e) {
     return {

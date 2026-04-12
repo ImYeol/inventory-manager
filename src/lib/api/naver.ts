@@ -3,6 +3,8 @@
 
 import crypto from 'crypto';
 
+import type { NaverCredentials } from '../shipping-credentials';
+
 const BASE_URL = 'https://api.commerce.naver.com/external';
 
 export type NaverOrder = {
@@ -16,13 +18,9 @@ export type NaverOrder = {
   productOrderStatus: string;
 };
 
-async function getAccessToken(): Promise<string> {
-  const clientId = process.env.NAVER_CLIENT_ID;
-  const clientSecret = process.env.NAVER_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    throw new Error('NAVER_CLIENT_ID와 NAVER_CLIENT_SECRET 환경변수를 설정해주세요.');
-  }
+async function getAccessToken(credentials: NaverCredentials): Promise<string> {
+  const clientId = credentials.clientId;
+  const clientSecret = credentials.clientSecret;
 
   // bcrypt 타입 시그니처 생성
   const timestamp = Date.now();
@@ -56,8 +54,10 @@ async function getAccessToken(): Promise<string> {
 }
 
 // 미발송 주문 조회 (PAYED 상태)
-export async function fetchNaverPendingOrders(): Promise<NaverOrder[]> {
-  const token = await getAccessToken();
+export async function fetchNaverPendingOrders(
+  credentials: NaverCredentials
+): Promise<NaverOrder[]> {
+  const token = await getAccessToken(credentials);
 
   // 최근 7일간 주문 조회
   const now = new Date();
@@ -144,9 +144,10 @@ export async function dispatchNaverOrders(
     productOrderId: string;
     trackingNumber: string;
     deliveryCompanyCode?: string;
-  }[]
+  }[],
+  credentials: NaverCredentials
 ): Promise<{ success: boolean; failedOrders: string[] }> {
-  const token = await getAccessToken();
+  const token = await getAccessToken(credentials);
 
   const failedOrders: string[] = [];
 

@@ -17,6 +17,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 const originalEnv = {
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
 }
 
@@ -24,17 +25,20 @@ beforeEach(() => {
   mocks.cookies.mockReset()
   mocks.createServerClient.mockReset()
   process.env.NEXT_PUBLIC_SUPABASE_URL = originalEnv.NEXT_PUBLIC_SUPABASE_URL
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = originalEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = originalEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY
 })
 
 afterEach(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = originalEnv.NEXT_PUBLIC_SUPABASE_URL
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = originalEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = originalEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY
 })
 
 describe('createSupabaseServerClient', () => {
   it('throws when the public Supabase env vars are missing', async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = ''
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = ''
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = ''
     mocks.cookies.mockResolvedValue({
       getAll: vi.fn(),
@@ -46,9 +50,9 @@ describe('createSupabaseServerClient', () => {
     )
   })
 
-  it('passes the Supabase URL, anon key, and cookie bridge to createServerClient', async () => {
+  it('passes the Supabase URL, publishable key, and cookie bridge to createServerClient', async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon-key'
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'publishable-key'
 
     const cookieStore = {
       getAll: vi.fn().mockReturnValue([
@@ -63,7 +67,7 @@ describe('createSupabaseServerClient', () => {
 
     expect(mocks.createServerClient).toHaveBeenCalledWith(
       'https://example.supabase.co',
-      'anon-key',
+      'publishable-key',
       expect.objectContaining({
         cookies: expect.objectContaining({
           getAll: expect.any(Function),
@@ -81,5 +85,25 @@ describe('createSupabaseServerClient', () => {
       { name: 'sb-session', value: 'updated', options: { path: '/' } },
     ])
     expect(cookieStore.set).toHaveBeenCalledWith('sb-session', 'updated', { path: '/' })
+  })
+
+  it('falls back to the legacy anon env var when publishable key is not set', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = ''
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon-key'
+
+    mocks.cookies.mockResolvedValue({
+      getAll: vi.fn(),
+      set: vi.fn(),
+    })
+    mocks.createServerClient.mockReturnValue({ auth: {} })
+
+    await createSupabaseServerClient()
+
+    expect(mocks.createServerClient).toHaveBeenCalledWith(
+      'https://example.supabase.co',
+      'anon-key',
+      expect.any(Object)
+    )
   })
 })
