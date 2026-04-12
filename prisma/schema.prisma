@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Model {
+  id            Int       @id @default(autoincrement())
+  name          String    @unique
+  createdAt     DateTime  @default(now())
+
+  sizes         Size[]
+  colors        Color[]
+  inventory     Inventory[]
+  transactions  Transaction[]
+}
+
+model Size {
+  id        Int    @id @default(autoincrement())
+  name      String
+  sortOrder Int    @default(0)
+  modelId   Int
+  model     Model  @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  inventory    Inventory[]
+  transactions Transaction[]
+
+  @@unique([modelId, name])
+}
+
+model Color {
+  id        Int     @id @default(autoincrement())
+  name      String
+  rgbCode   String  @default("#888888")
+  textWhite Boolean @default(false)
+  sortOrder Int     @default(0)
+  modelId   Int
+  model     Model   @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  inventory    Inventory[]
+  transactions Transaction[]
+
+  @@unique([modelId, name])
+}
+
+model Inventory {
+  id        Int    @id @default(autoincrement())
+  modelId   Int
+  sizeId    Int
+  colorId   Int
+  warehouse String // "오금동" | "대자동"
+  quantity  Int    @default(0)
+
+  model Model @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  size  Size  @relation(fields: [sizeId], references: [id], onDelete: Cascade)
+  color Color @relation(fields: [colorId], references: [id], onDelete: Cascade)
+
+  @@unique([modelId, sizeId, colorId, warehouse])
+}
+
+model Transaction {
+  id        Int      @id @default(autoincrement())
+  date      String
+  modelId   Int
+  sizeId    Int
+  colorId   Int
+  type      String   // "입고" | "반출" | "재고조정"
+  quantity  Int
+  warehouse String   // "오금동" | "대자동"
+  createdAt DateTime @default(now())
+
+  model Model @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  size  Size  @relation(fields: [sizeId], references: [id], onDelete: Cascade)
+  color Color @relation(fields: [colorId], references: [id], onDelete: Cascade)
+}
