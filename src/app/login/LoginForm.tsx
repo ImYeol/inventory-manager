@@ -2,7 +2,7 @@
 
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
-import { login } from './actions'
+import { loginWithGoogle } from './actions'
 import { cx, ui } from '../components/ui'
 
 const initialState = { error: '' }
@@ -16,45 +16,22 @@ function SubmitButton() {
       disabled={pending}
       className={cx(ui.buttonPrimary, 'h-12 w-full')}
     >
-      {pending ? '로그인 중…' : '로그인'}
+      {pending ? '로그인 처리 중…' : 'Google 계정으로 계속'}
     </button>
   )
 }
 
 export default function LoginForm() {
-  const [state, formAction] = useActionState(login, initialState)
+  const [state, formAction] = useActionState(loginWithGoogle, initialState)
 
   return (
     <form action={formAction} className="space-y-4">
-      <div>
-        <label htmlFor="email" className={ui.label}>
-          이메일
-        </label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          autoComplete="email"
-          spellCheck={false}
-          required
-          className={cx(ui.control, 'h-12')}
-        />
-      </div>
-      <div>
-        <label htmlFor="password" className={ui.label}>
-          비밀번호
-        </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          className={cx(ui.control, 'h-12')}
-        />
-      </div>
       {state.error ? (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" aria-live="polite">
+        <p
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          aria-live="polite"
+          role="status"
+        >
           {state.error}
         </p>
       ) : null}
