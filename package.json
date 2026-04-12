@@ -4,15 +4,16 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --experimental-build-mode=compile",
     "start": "next start",
+    "test": "vitest run",
     "lint": "eslint",
     "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@prisma/adapter-better-sqlite3": "^7.7.0",
     "@prisma/client": "^7.7.0",
-    "better-sqlite3": "^12.8.0",
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.103.0",
     "dotenv": "^17.4.1",
     "next": "16.2.3",
     "prisma": "^7.7.0",

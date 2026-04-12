@@ -1,13 +1,15 @@
-import { PrismaClient } from '../generated/prisma/client'
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
-import path from 'path'
+import { createSupabaseServerClient } from './supabase/server'
 
-function createPrismaClient() {
-  const dbPath = path.join(process.cwd(), 'dev.db')
-  const adapter = new PrismaBetterSqlite3({ url: `file:${dbPath}` })
-  return new PrismaClient({ adapter })
+export async function getSupabaseWithUser() {
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
+
+  if (error || !user) {
+    throw new Error('Authentication is required.')
+  }
+
+  return { supabase, user }
 }
-
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient }
-export const prisma = globalForPrisma.prisma || createPrismaClient()
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma

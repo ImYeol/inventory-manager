@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Inventory Web
 
-## Getting Started
+Next.js inventory manager backed by Supabase.
 
-First, run the development server:
+## Setup
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. Create a Supabase project.
+2. Open `supabase/schema.sql` in the Supabase SQL editor and run it.
+3. Copy `.env.example` to `.env.local` and fill the values below.
+4. Run the app with `npm run dev`.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment Variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Required Supabase values:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-## Learn More
+Find both in the Supabase dashboard under `Project Settings > API`.
+Use the project URL as `NEXT_PUBLIC_SUPABASE_URL` and the `anon public` key as `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 
-To learn more about Next.js, take a look at the following resources:
+Prisma connection strings are no longer required.
+The app uses Supabase JS plus RLS, so there is no `DATABASE_URL` or `DIRECT_URL` in the example file.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Optional shipping integration values:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `NAVER_CLIENT_ID`
+- `NAVER_CLIENT_SECRET`
+- `COUPANG_ACCESS_KEY`
+- `COUPANG_SECRET_KEY`
+- `COUPANG_VENDOR_ID`
 
-## Deploy on Vercel
+These are only needed if you use the Naver or Coupang shipping actions.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Schema Notes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The schema is Supabase-first:
+
+- every inventory table carries a `user_id`
+- row level security restricts each user to their own data
+- foreign keys are composite so rows cannot point at another user's models, sizes, or colors
+- RPC functions are provided for bulk inventory transactions and direct inventory adjustments

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { cx, ui } from './ui';
 
 type InventoryItem = {
   id: number;
@@ -74,27 +75,27 @@ export default function InventoryView({ models }: { models: ModelWithRelations[]
         return (
           <div
             key={model.id}
-            className="border border-slate-200 rounded-xl shadow-sm overflow-hidden"
+            className={ui.panel}
           >
             {/* Model Header */}
             <button
               onClick={() => setExpanded(isOpen ? null : model.id)}
-              className="w-full flex items-center justify-between px-4 py-4 md:px-6 bg-white hover:bg-slate-50 transition-colors"
+              className="flex w-full items-center justify-between px-4 py-4 text-left transition-colors hover:bg-slate-50 md:px-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-inset"
             >
-              <span className="text-base md:text-lg font-semibold text-slate-800">
+              <span className="text-base font-semibold tracking-tight text-slate-950 md:text-lg">
                 {model.name}
               </span>
               <div className="flex items-center gap-3">
-                <span className="bg-blue-100 text-blue-700 text-sm font-bold px-3 py-1 rounded-full">
+                <span className="ui-pill text-slate-700">
                   {totalQty}개
                 </span>
-                <span className="text-slate-400 text-lg">{isOpen ? '▲' : '▼'}</span>
+                <span className="text-slate-400 text-lg">{isOpen ? '▴' : '▾'}</span>
               </div>
             </button>
 
             {/* Expanded Content */}
             {isOpen && (
-              <div className="border-t border-slate-100 bg-slate-50/50">
+              <div className="border-t border-slate-200 bg-slate-50/60">
                 {/* Warehouse Tabs */}
                 <div className="flex px-4 pt-3 gap-2">
                   {(['합계', '오금동', '대자동'] as WarehouseTab[]).map((tab) => (
@@ -103,11 +104,7 @@ export default function InventoryView({ models }: { models: ModelWithRelations[]
                       onClick={() =>
                         setWarehouseTab((prev) => ({ ...prev, [model.id]: tab }))
                       }
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        wh === tab
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                      }`}
+                      className={cx('px-4 py-2 rounded-lg text-sm font-medium transition-colors', wh === tab ? 'bg-slate-950 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50')}
                     >
                       {tab}
                       <span className="ml-1.5 text-xs opacity-80">
@@ -119,7 +116,7 @@ export default function InventoryView({ models }: { models: ModelWithRelations[]
 
                 {/* Matrix Table */}
                 {model.sizes.length === 0 || model.colors.length === 0 ? (
-                  <div className="px-4 py-8 text-center text-slate-400">
+                  <div className="px-4 py-8 text-center text-sm text-slate-400">
                     사이즈 또는 색상 데이터가 없습니다.
                   </div>
                 ) : (
@@ -127,18 +124,18 @@ export default function InventoryView({ models }: { models: ModelWithRelations[]
                     <table className="w-full border-collapse min-w-max">
                       <thead>
                         <tr>
-                          <th className="sticky left-0 z-10 bg-slate-100 px-3 py-2.5 text-left text-sm font-semibold text-slate-600 border-b border-slate-200 min-w-[100px]">
+                          <th className="ui-table-head sticky left-0 z-10 px-3 py-2.5 text-left min-w-[100px]">
                             색상
                           </th>
                           {model.sizes.map((size) => (
                             <th
                               key={size.id}
-                              className="px-3 py-2.5 text-center text-sm font-semibold text-slate-600 bg-slate-100 border-b border-slate-200 min-w-[60px]"
+                              className="ui-table-head px-3 py-2.5 text-center min-w-[60px]"
                             >
                               {size.name}
                             </th>
                           ))}
-                          <th className="px-3 py-2.5 text-center text-sm font-bold text-slate-700 bg-slate-100 border-b border-slate-200 min-w-[60px]">
+                          <th className="ui-table-head px-3 py-2.5 text-center min-w-[60px]">
                             소계
                           </th>
                         </tr>
@@ -150,8 +147,8 @@ export default function InventoryView({ models }: { models: ModelWithRelations[]
                             0
                           );
                           return (
-                            <tr key={color.id} className="hover:bg-blue-50/50">
-                              <td className="sticky left-0 z-10 bg-white px-3 py-2.5 border-b border-slate-100 font-medium text-sm text-slate-700">
+                            <tr key={color.id} className="hover:bg-slate-50/70">
+                              <td className="ui-table-cell sticky left-0 z-10 bg-white font-medium text-sm text-slate-700">
                                 <div className="flex items-center gap-2">
                                   <span
                                     className="inline-block w-4 h-4 rounded-full border border-slate-200 flex-shrink-0"
@@ -165,15 +162,13 @@ export default function InventoryView({ models }: { models: ModelWithRelations[]
                                 return (
                                   <td
                                     key={size.id}
-                                    className={`px-3 py-2.5 text-center border-b border-slate-100 text-base font-semibold ${
-                                      qty === 0 ? 'text-slate-300' : 'text-slate-800'
-                                    }`}
+                                    className={cx('ui-table-cell text-center text-base font-semibold', qty === 0 ? 'text-slate-300' : 'text-slate-900')}
                                   >
                                     {qty}
                                   </td>
                                 );
                               })}
-                              <td className="px-3 py-2.5 text-center border-b border-slate-100 text-base font-bold text-blue-700 bg-blue-50/50">
+                              <td className="ui-table-cell text-center text-base font-semibold text-slate-950 bg-slate-50">
                                 {rowTotal}
                               </td>
                             </tr>

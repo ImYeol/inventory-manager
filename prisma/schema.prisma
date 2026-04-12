@@ -4,7 +4,20 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Warehouse {
+  OGEUMDONG
+  DAEJADONG
+}
+
+enum TransactionType {
+  INBOUND
+  OUTBOUND
+  ADJUSTMENT
 }
 
 model Model {
@@ -51,7 +64,7 @@ model Inventory {
   modelId   Int
   sizeId    Int
   colorId   Int
-  warehouse String // "오금동" | "대자동"
+  warehouse Warehouse
   quantity  Int    @default(0)
 
   model Model @relation(fields: [modelId], references: [id], onDelete: Cascade)
@@ -59,20 +72,28 @@ model Inventory {
   color Color @relation(fields: [colorId], references: [id], onDelete: Cascade)
 
   @@unique([modelId, sizeId, colorId, warehouse])
+  @@index([warehouse])
+  @@index([modelId, warehouse])
 }
 
 model Transaction {
-  id        Int      @id @default(autoincrement())
-  date      String
+  id        Int             @id @default(autoincrement())
+  date      DateTime        @db.Date
   modelId   Int
   sizeId    Int
   colorId   Int
-  type      String   // "입고" | "반출" | "재고조정"
+  type      TransactionType
   quantity  Int
-  warehouse String   // "오금동" | "대자동"
-  createdAt DateTime @default(now())
+  warehouse Warehouse
+  createdAt DateTime        @default(now())
+  actorId   String?
 
   model Model @relation(fields: [modelId], references: [id], onDelete: Cascade)
   size  Size  @relation(fields: [sizeId], references: [id], onDelete: Cascade)
   color Color @relation(fields: [colorId], references: [id], onDelete: Cascade)
+
+  @@index([date, createdAt(sort: Desc)])
+  @@index([modelId, date])
+  @@index([warehouse, date])
+  @@index([type, date])
 }

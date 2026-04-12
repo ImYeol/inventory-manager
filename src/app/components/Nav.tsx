@@ -1,71 +1,94 @@
-'use client';
+'use client'
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { cx } from './ui'
 
 const navItems = [
-  { href: '/', label: '재고현황', icon: '📦' },
-  { href: '/inout', label: '입출고', icon: '📥' },
-  { href: '/adjust', label: '재고조정', icon: '🔧' },
-  { href: '/history', label: '이력', icon: '📋' },
-  { href: '/shipping', label: '운송장', icon: '🚚' },
-  { href: '/analytics', label: '재고분석', icon: '📊' },
-];
+  { href: '/', label: '재고현황' },
+  { href: '/inout', label: '입출고' },
+  { href: '/adjust', label: '재고조정' },
+  { href: '/history', label: '이력' },
+  { href: '/shipping', label: '운송장' },
+  { href: '/analytics', label: '분석' },
+]
 
 export default function Nav() {
-  const pathname = usePathname();
+  const pathname = usePathname()
 
   return (
     <>
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex md:flex-col md:w-56 md:min-h-screen bg-slate-800 text-white fixed left-0 top-0 z-30">
-        <div className="px-5 py-6 border-b border-slate-700">
-          <h1 className="text-xl font-bold tracking-tight">📦 재고관리</h1>
-          <p className="text-sm text-slate-400 mt-1">시스템</p>
+      <aside className="fixed left-0 top-0 z-30 hidden h-screen w-60 border-r border-slate-200 bg-white/95 backdrop-blur md:flex md:flex-col">
+        <div className="border-b border-slate-200 px-5 py-6">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">
+            Inventory Manager
+          </p>
+          <h1 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
+            재고관리 시스템
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">사용자별 인벤토리 관리</p>
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {navItems.map((item) => {
-            const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
-                  isActive
-                    ? 'bg-blue-600 text-white'
-                    : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                }`}
-              >
-                <span className="text-lg">{item.icon}</span>
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
+
+        <nav className="flex-1 px-3 py-4" aria-label="주요 메뉴">
+          <div className="space-y-1">
+            {navItems.map((item) => {
+              const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={cx(
+                    'group flex items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+                    isActive
+                      ? 'border-slate-200 bg-slate-50 text-slate-950 shadow-[0_1px_1px_rgba(15,23,42,0.03)]'
+                      : 'border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-950',
+                  )}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={cx(
+                      'h-2 w-2 rounded-full transition-colors',
+                      isActive ? 'bg-slate-900' : 'bg-slate-300 group-hover:bg-slate-500',
+                    )}
+                  />
+                  <span>{item.label}</span>
+                </Link>
+              )
+            })}
+          </div>
         </nav>
       </aside>
 
-      {/* Mobile Bottom Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-30 safe-area-bottom">
-        <div className="flex justify-around items-center h-16">
+      <nav
+        className="safe-area-bottom fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur md:hidden"
+        aria-label="모바일 주요 메뉴"
+      >
+        <div className="grid grid-cols-6 gap-1 px-2 py-2">
           {navItems.map((item) => {
-            const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+            const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
+
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center justify-center gap-0.5 px-1 py-1 min-w-[48px] transition-colors ${
-                  isActive ? 'text-blue-600' : 'text-slate-500'
-                }`}
+                aria-current={isActive ? 'page' : undefined}
+                className={cx(
+                  'flex flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+                  isActive ? 'bg-slate-100 text-slate-950' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950',
+                )}
               >
-                <span className="text-xl">{item.icon}</span>
-                <span className={`text-xs font-medium ${isActive ? 'text-blue-600' : 'text-slate-500'}`}>
-                  {item.label}
-                </span>
+                <span
+                  aria-hidden="true"
+                  className={cx('h-1.5 w-1.5 rounded-full', isActive ? 'bg-slate-900' : 'bg-slate-300')}
+                />
+                <span className="truncate">{item.label}</span>
               </Link>
-            );
+            )
           })}
         </div>
       </nav>
     </>
-  );
+  )
 }
