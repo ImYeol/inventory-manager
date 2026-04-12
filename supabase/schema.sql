@@ -106,18 +106,17 @@ create table if not exists public.shipping_provider_credentials (
 );
 
 create index if not exists models_user_id_created_at_idx on public.models (user_id, created_at desc);
-create index if not exists sizes_user_id_model_id_sort_order_idx on public.sizes (user_id, model_id, sort_order, name);
-create index if not exists colors_user_id_model_id_sort_order_idx on public.colors (user_id, model_id, sort_order, name);
-create index if not exists inventory_user_warehouse_idx on public.inventory (user_id, warehouse);
-create index if not exists inventory_user_model_warehouse_idx on public.inventory (user_id, model_id, warehouse);
-create index if not exists inventory_user_slot_idx on public.inventory (user_id, model_id, size_id, color_id, warehouse);
+create index if not exists sizes_model_id_user_id_idx on public.sizes (model_id, user_id);
+create index if not exists sizes_user_id_sort_order_model_id_name_idx on public.sizes (user_id, sort_order, model_id, name);
+create index if not exists colors_model_id_user_id_idx on public.colors (model_id, user_id);
+create index if not exists colors_user_id_sort_order_model_id_name_idx on public.colors (user_id, sort_order, model_id, name);
+create index if not exists inventory_model_id_user_id_idx on public.inventory (model_id, user_id);
+create index if not exists inventory_model_id_size_id_user_id_idx on public.inventory (model_id, size_id, user_id);
+create index if not exists inventory_model_id_color_id_user_id_idx on public.inventory (model_id, color_id, user_id);
+create index if not exists transactions_model_id_user_id_idx on public.transactions (model_id, user_id);
+create index if not exists transactions_model_id_size_id_user_id_idx on public.transactions (model_id, size_id, user_id);
+create index if not exists transactions_model_id_color_id_user_id_idx on public.transactions (model_id, color_id, user_id);
 create index if not exists transactions_user_date_created_at_idx on public.transactions (user_id, date desc, created_at desc);
-create index if not exists transactions_user_model_date_idx on public.transactions (user_id, model_id, date desc);
-create index if not exists transactions_user_warehouse_date_idx on public.transactions (user_id, warehouse, date desc);
-create index if not exists transactions_user_type_date_idx on public.transactions (user_id, type, date desc);
-create index if not exists transactions_user_model_slot_idx on public.transactions (user_id, model_id, size_id, color_id);
-create index if not exists shipping_provider_credentials_user_provider_idx
-on public.shipping_provider_credentials (user_id, provider);
 
 alter table public.app_users enable row level security;
 alter table public.models enable row level security;
@@ -133,14 +132,6 @@ on public.app_users
 for select
 to authenticated
 using ((select auth.uid()) = id);
-
-drop policy if exists "Users can update their own profile" on public.app_users;
-create policy "Users can update their own profile"
-on public.app_users
-for update
-to authenticated
-using ((select auth.uid()) = id)
-with check ((select auth.uid()) = id);
 
 drop policy if exists "Users manage own models" on public.models;
 create policy "Users manage own models"
@@ -194,7 +185,7 @@ create or replace function private.handle_new_user()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 begin
   insert into public.app_users (id, email, full_name)

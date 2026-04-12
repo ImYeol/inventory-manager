@@ -19,8 +19,9 @@ Required Supabase values:
 Find both in the Supabase dashboard under `Project Settings > API`.
 Use the project URL as `NEXT_PUBLIC_SUPABASE_URL` and the publishable key as `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 
-Prisma connection strings are no longer required.
-The app uses Supabase JS plus RLS, so there is no `DATABASE_URL` or `DIRECT_URL` in the example file.
+Prisma connection strings are not required for the app runtime.
+The app uses Supabase JS plus RLS, so there is no `DATABASE_URL` or `DIRECT_URL` in the example file by default.
+If you use Prisma tooling directly, set `DATABASE_URL` to your Supabase Postgres connection string.
 
 Optional shipping integration values:
 
@@ -31,6 +32,13 @@ Optional shipping integration values:
 - `COUPANG_VENDOR_ID`
 
 These are only needed if you use the Naver or Coupang shipping actions.
+
+Optional Prisma seed values:
+
+- `SEED_USER_ID`
+- `SEED_USER_EMAIL`
+
+`npm run seed` now targets Supabase Postgres and expects `SEED_USER_ID` to already exist in `auth.users`.
 
 ## Schema Notes
 

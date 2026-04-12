@@ -1,15 +1,26 @@
 import 'dotenv/config'
-import { PrismaClient } from '../src/generated/prisma/client'
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
-import * as fs from 'fs'
-import * as path from 'path'
+import fs from 'fs'
+import path from 'path'
 
-const dbPath = path.join(process.cwd(), 'dev.db')
-const adapter = new PrismaBetterSqlite3({ url: `file:${dbPath}` })
+import { PrismaPg } from '@prisma/adapter-pg'
+import { PrismaClient } from '../src/generated/prisma/client'
+
+const databaseUrl = process.env.DATABASE_URL?.trim()
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL is required.')
+}
+
+const adapter = new PrismaPg({ connectionString: databaseUrl })
 const prisma = new PrismaClient({ adapter })
 
-// Color RGB mapping
-const colorMap: Record<string, { rgb: string; textWhite: boolean }> = {
+const seedUserId = process.env.SEED_USER_ID?.trim()
+const seedUserEmail = process.env.SEED_USER_EMAIL?.trim() || null
+const dataPath = path.join(process.cwd(), 'extracted_data.json')
+
+type WarehouseValue = 'OGEUMDONG' | 'DAEJADONG'
+type TransactionTypeValue = 'INBOUND' | 'OUTBOUND' | 'ADJUSTMENT'
+
+const colorInfoMap: Record<string, { rgb: string; textWhite: boolean }> = {
   '블랙': { rgb: '#000000', textWhite: true },
   '네이비': { rgb: '#000080', textWhite: true },
   '브라운': { rgb: '#654321', textWhite: true },
@@ -46,27 +57,102 @@ const colorMap: Record<string, { rgb: string; textWhite: boolean }> = {
   '쿨그레이': { rgb: '#9BA4B4', textWhite: false },
 }
 
-function getColorInfo(name: string): { rgb: string; textWhite: boolean } {
-  if (colorMap[name]) return colorMap[name]
-  // Fallback heuristics
-  if (name.startsWith('다크') || name.startsWith('딥') || name.startsWith('심플') || name.startsWith('차콜')) {
+function getColorInfo(name: string) {
+  if (colorInfoMap[name]) return colorInfoMap[name]
+  if (
+    name.startsWith('다크') ||
+    name.startsWith('딥') ||
+    name.startsWith('심플') ||
+    name.startsWith('차콜')
+  ) {
     return { rgb: '#555555', textWhite: true }
   }
-  if (name.startsWith('라이트') || name.startsWith('크림') || name.startsWith('오트밀')) {
+  if (
+    name.startsWith('라이트') ||
+    name.startsWith('크림') ||
+    name.startsWith('오트밀')
+  ) {
     return { rgb: '#CCCCCC', textWhite: false }
   }
   return { rgb: '#888888', textWhite: false }
 }
 
-// Best-effort size matching: normalize by removing dots from numbers
-function normalizeSizeName(s: string): string {
-  // "13.3인치(M)" -> "133인치(M)", "단일사이즈" -> "단일사이즈"
-  return s.replace(/(\d+)\.(\d+)/g, '$1$2')
+function normalizeSizeName(value: string) {
+  return value.replace(/(\d+)\.(\d+)/g, '$1$2')
+}
+
+function parseWarehouse(value: string): WarehouseValue {
+  switch (value.trim()) {
+    case '오금동':
+    case 'OGEUMDONG':
+      return 'OGEUMDONG'
+    case '대자동':
+    case 'DAEJADONG':
+      return 'DAEJADONG'
+    default:
+      throw new Error(`Unknown warehouse value: ${value}`)
+  }
+}
+
+function parseTransactionType(value: string): TransactionTypeValue {
+  switch (value.trim()) {
+    case '입고':
+    case 'INBOUND':
+      return 'INBOUND'
+    case '반출':
+    case '출고':
+    case 'OUTBOUND':
+      return 'OUTBOUND'
+    case '조정':
+    case 'ADJUSTMENT':
+      return 'ADJUSTMENT'
+    default:
+      throw new Error(`Unknown transaction type: ${value}`)
+  }
+}
+
+async function ensureSeedUserExists(userId: string, email: string | null) {
+  const rows = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+    select exists (
+      select 1
+      from auth.users
+      where id = ${userId}::uuid
+    ) as exists
+  `
+
+  if (!rows[0]?.exists) {
+    throw new Error(
+      `SEED_USER_ID ${userId} does not exist in auth.users. Create a Supabase Auth user first.`
+    )
+  }
+
+  await prisma.$executeRaw`
+    insert into public.app_users (id, email)
+    values (${userId}::uuid, ${email})
+    on conflict (id) do update
+      set email = coalesce(excluded.email, public.app_users.email)
+  `
+}
+
+async function clearUserData(userId: string) {
+  await prisma.transaction.deleteMany({ where: { userId } })
+  await prisma.inventory.deleteMany({ where: { userId } })
+  await prisma.shippingProviderCredential.deleteMany({ where: { userId } })
+  await prisma.color.deleteMany({ where: { userId } })
+  await prisma.size.deleteMany({ where: { userId } })
+  await prisma.model.deleteMany({ where: { userId } })
 }
 
 async function main() {
-  const dataPath = path.join(process.cwd(), 'extracted_data.json')
-  const raw = fs.readFileSync(dataPath, 'utf-8')
+  if (!seedUserId) {
+    throw new Error('SEED_USER_ID is required.')
+  }
+
+  if (!fs.existsSync(dataPath)) {
+    throw new Error(`Seed data file not found: ${dataPath}`)
+  }
+
+  const raw = fs.readFileSync(dataPath, 'utf8')
   const data = JSON.parse(raw) as {
     models: Array<{
       name: string
@@ -89,96 +175,90 @@ async function main() {
     }>
   }
 
-  console.log('Clearing existing data...')
-  await prisma.transaction.deleteMany()
-  await prisma.inventory.deleteMany()
-  await prisma.color.deleteMany()
-  await prisma.size.deleteMany()
-  await prisma.model.deleteMany()
+  await ensureSeedUserExists(seedUserId, seedUserEmail)
+  await clearUserData(seedUserId)
 
-  console.log(`Seeding ${data.models.length} models...`)
-
-  // Maps for transaction lookup
-  const modelMap = new Map<string, number>()
-  const sizeMap = new Map<string, Map<string, number>>() // modelName -> sizeName -> sizeId
-  const colorMap2 = new Map<string, Map<string, number>>() // modelName -> colorName -> colorId
+  const modelMap = new Map<string, bigint>()
+  const sizeMap = new Map<string, Map<string, bigint>>()
+  const colorMap = new Map<string, Map<string, bigint>>()
 
   for (const modelData of data.models) {
     const model = await prisma.model.create({
-      data: { name: modelData.name },
+      data: {
+        userId: seedUserId,
+        name: modelData.name,
+      },
     })
+
     modelMap.set(model.name, model.id)
     sizeMap.set(model.name, new Map())
-    colorMap2.set(model.name, new Map())
+    colorMap.set(model.name, new Map())
 
-    // Deduplicate sizes, preserving order
     const uniqueSizes: string[] = []
     const seenSizes = new Set<string>()
-    for (const s of modelData.sizes) {
-      if (!seenSizes.has(s)) {
-        seenSizes.add(s)
-        uniqueSizes.push(s)
+    for (const sizeName of modelData.sizes) {
+      if (!seenSizes.has(sizeName)) {
+        seenSizes.add(sizeName)
+        uniqueSizes.push(sizeName)
       }
     }
 
-    // Create sizes
-    for (let i = 0; i < uniqueSizes.length; i++) {
+    for (const [index, sizeName] of uniqueSizes.entries()) {
       const size = await prisma.size.create({
         data: {
-          name: uniqueSizes[i],
-          sortOrder: i,
+          userId: seedUserId,
           modelId: model.id,
+          name: sizeName,
+          sortOrder: index,
         },
       })
       sizeMap.get(model.name)!.set(size.name, size.id)
     }
 
-    // Create colors
-    for (let i = 0; i < modelData.colors.length; i++) {
-      const cName = modelData.colors[i]
-      const cInfo = getColorInfo(cName)
+    for (const [index, colorName] of modelData.colors.entries()) {
+      const info = getColorInfo(colorName)
       const color = await prisma.color.create({
         data: {
-          name: cName,
-          rgbCode: cInfo.rgb,
-          textWhite: cInfo.textWhite,
-          sortOrder: i,
+          userId: seedUserId,
           modelId: model.id,
+          name: colorName,
+          rgbCode: info.rgb,
+          textWhite: info.textWhite,
+          sortOrder: index,
         },
       })
-      colorMap2.get(model.name)!.set(color.name, color.id)
+      colorMap.get(model.name)!.set(color.name, color.id)
     }
 
-    // Create inventory records for both warehouses
     const modelSizes = sizeMap.get(model.name)!
-    const modelColors = colorMap2.get(model.name)!
+    const modelColors = colorMap.get(model.name)!
 
-    for (const invItem of modelData.inventory) {
-      const colorId = modelColors.get(invItem.color)
-      if (!colorId) {
-        console.warn(`Color not found: ${invItem.color} in model ${model.name}`)
-        continue
-      }
+    for (const item of modelData.inventory) {
+      const colorId = modelColors.get(item.color)
+      if (!colorId) continue
 
       for (const [sizeName, sizeId] of modelSizes) {
-        const ogeumQty = invItem.ogeumdog[sizeName] ?? 0
-        const daejaQty = invItem.daejadong[sizeName] ?? 0
+        const ogeumQty = item.ogeumdog[sizeName] ?? 0
+        const daejaQty = item.daejadong[sizeName] ?? 0
 
         await prisma.inventory.create({
           data: {
+            userId: seedUserId,
             modelId: model.id,
             sizeId,
             colorId,
-            warehouse: '오금동',
+            warehouse: 'OGEUMDONG',
             quantity: ogeumQty,
           },
         })
+
         await prisma.inventory.create({
           data: {
+            userId: seedUserId,
             modelId: model.id,
             sizeId,
             colorId,
-            warehouse: '대자동',
+            warehouse: 'DAEJADONG',
             quantity: daejaQty,
           },
         })
@@ -186,35 +266,30 @@ async function main() {
     }
   }
 
-  console.log(`Seeding ${data.transactions.length} transactions...`)
-
-  let skipped = 0
+  let skippedTransactions = 0
   for (const tx of data.transactions) {
     const modelId = modelMap.get(tx.model)
-    if (!modelId) {
-      console.warn(`Transaction model not found: ${tx.model}`)
-      skipped++
+    const modelSizes = sizeMap.get(tx.model)
+    const modelColors = colorMap.get(tx.model)
+
+    if (!modelId || !modelSizes || !modelColors) {
+      skippedTransactions += 1
       continue
     }
 
-    const modelSizes = sizeMap.get(tx.model)!
-    const modelColors = colorMap2.get(tx.model)!
-
-    // Find sizeId - exact match first, then normalized match
     let sizeId = modelSizes.get(tx.size)
     if (!sizeId) {
-      const normalizedTx = normalizeSizeName(tx.size)
-      for (const [sName, sId] of modelSizes) {
-        if (normalizeSizeName(sName) === normalizedTx) {
-          sizeId = sId
+      const normalizedTxSize = normalizeSizeName(tx.size)
+      for (const [sizeName, candidateId] of modelSizes) {
+        if (normalizeSizeName(sizeName) === normalizedTxSize) {
+          sizeId = candidateId
           break
         }
       }
-      // Also try matching "단일사이즈" to "단일"
       if (!sizeId && tx.size === '단일사이즈') {
-        for (const [sName, sId] of modelSizes) {
-          if (sName.startsWith('단일')) {
-            sizeId = sId
+        for (const [sizeName, candidateId] of modelSizes) {
+          if (sizeName.startsWith('단일')) {
+            sizeId = candidateId
             break
           }
         }
@@ -222,36 +297,51 @@ async function main() {
     }
 
     const colorId = modelColors.get(tx.color)
-
     if (!sizeId || !colorId) {
-      console.warn(`Transaction lookup failed: model=${tx.model} size=${tx.size}(${sizeId ? 'ok' : 'NOT FOUND'}) color=${tx.color}(${colorId ? 'ok' : 'NOT FOUND'})`)
-      skipped++
+      skippedTransactions += 1
       continue
     }
 
     await prisma.transaction.create({
       data: {
-        date: tx.date,
+        userId: seedUserId,
+        date: new Date(tx.date),
         modelId,
         sizeId,
         colorId,
-        type: tx.type,
+        type: parseTransactionType(tx.type),
         quantity: tx.quantity,
-        warehouse: tx.warehouse,
+        warehouse: parseWarehouse(tx.warehouse),
       },
     })
   }
 
-  console.log(`Done! Skipped ${skipped} transactions.`)
-  const modelCount = await prisma.model.count()
-  const invCount = await prisma.inventory.count()
-  const txCount = await prisma.transaction.count()
-  console.log(`Final counts - Models: ${modelCount}, Inventory: ${invCount}, Transactions: ${txCount}`)
+  const [modelCount, inventoryCount, transactionCount] = await Promise.all([
+    prisma.model.count({ where: { userId: seedUserId } }),
+    prisma.inventory.count({ where: { userId: seedUserId } }),
+    prisma.transaction.count({ where: { userId: seedUserId } }),
+  ])
+
+  console.log(
+    JSON.stringify(
+      {
+        seedUserId,
+        models: modelCount,
+        inventory: inventoryCount,
+        transactions: transactionCount,
+        skippedTransactions,
+      },
+      null,
+      2
+    )
+  )
 }
 
 main()
-  .catch((e) => {
-    console.error(e)
+  .catch((error) => {
+    console.error(error)
     process.exit(1)
   })
-  .finally(() => prisma.$disconnect())
+  .finally(async () => {
+    await prisma.$disconnect()
+  })
