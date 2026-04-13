@@ -4,7 +4,7 @@ import { parseTransactionType, transactionTypeLabels } from '@/lib/inventory'
 describe('inventory utility constants', () => {
   it('defines Korean transaction labels', () => {
     expect(transactionTypeLabels.INBOUND).toBe('입고')
-    expect(transactionTypeLabels.OUTBOUND).toBe('반출')
+    expect(transactionTypeLabels.OUTBOUND).toBe('출고')
     expect(transactionTypeLabels.ADJUSTMENT).toBe('재고조정')
   })
 

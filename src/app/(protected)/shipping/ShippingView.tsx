@@ -61,6 +61,24 @@ function formatUpdatedAt(value?: string | null) {
   }).format(new Date(value));
 }
 
+type ExcelRow = Record<string, unknown>;
+
+function isSupportedExcelFile(file: File) {
+  const extension = file.name.toLowerCase().split('.').pop();
+  const allowedExtensions = ['xlsx', 'xls'];
+  const allowedMimeTypes = new Set([
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+  ]);
+
+  return (extension && allowedExtensions.includes(extension)) || allowedMimeTypes.has(file.type);
+}
+
+function formatCellValue(value: unknown) {
+  if (value === null || value === undefined) return '';
+  return typeof value === 'string' ? value : String(value);
+}
+
 function ProviderStatusCard({
   label,
   configured,
@@ -141,6 +159,10 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
 
   const [courierRows, setCourierRows] = useState<CourierRow[]>([]);
   const [fileName, setFileName] = useState('');
+  const [excelRows, setExcelRows] = useState<ExcelRow[]>([]);
+  const [excelColumns, setExcelColumns] = useState<string[]>([]);
+  const [uploadError, setUploadError] = useState('');
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // 네이버
   const [naverOrders, setNaverOrders] = useState<MatchedNaverOrder[]>([]);
@@ -162,9 +184,16 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
   const hasAllProviderConfig = hasNaverConfig && hasCoupangConfig;
 
   const handleFileUpload = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file || !hasAnyProviderConfig) return;
+    (file: File) => {
+      setUploadError('');
+
+      if (!isSupportedExcelFile(file)) {
+        setUploadError('엑셀 파일(.xlsx, .xls)만 업로드할 수 있습니다.');
+        setCourierRows([]);
+        setExcelRows([]);
+        setExcelColumns([]);
+        return;
+      }
 
       setFileName(file.name);
       setNaverSentMessage('');
@@ -173,48 +202,109 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
       const reader = new FileReader();
       reader.onload = (evt) => {
         const data = evt.target?.result;
-        if (!data) return;
+        if (!data) {
+          setUploadError('엑셀 파일을 읽을 수 없습니다.');
+          setCourierRows([]);
+          setExcelRows([]);
+          setExcelColumns([]);
+          return;
+        }
 
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
-        const parsed = jsonRows.map(parseExcelRow).filter((r) => r.trackingNumber);
-        setCourierRows(parsed);
+        try {
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
 
-        if (hasNaverConfig) {
-          startNaverTransition(async () => {
+          if (!sheetName) {
+            setUploadError('엑셀 파일에 시트가 없습니다.');
+            setCourierRows([]);
+            setExcelRows([]);
+            setExcelColumns([]);
+            return;
+          }
+
+          const sheet = workbook.Sheets[sheetName];
+          const jsonRows = XLSX.utils.sheet_to_json<ExcelRow>(sheet, { defval: '' });
+          const nonEmptyRows = jsonRows.filter((row) => Object.keys(row).length > 0);
+
+          setExcelRows(nonEmptyRows);
+          setExcelColumns(nonEmptyRows.length > 0 ? Object.keys(nonEmptyRows[0]) : []);
+
+          const parsed = nonEmptyRows.map(parseExcelRow).filter((r) => r.trackingNumber);
+          setCourierRows(parsed);
+
+          if (hasNaverConfig) {
+            startNaverTransition(async () => {
+              setNaverError('');
+              const result = await fetchNaverOrders();
+              if (result.success) {
+                setNaverOrders(matchOrders(result.orders, parsed) as MatchedNaverOrder[]);
+              } else {
+                setNaverError(result.error ?? '네이버 주문 조회 실패');
+              }
+            });
+          } else {
+            setNaverOrders([]);
             setNaverError('');
-            const result = await fetchNaverOrders();
-            if (result.success) {
-              setNaverOrders(matchOrders(result.orders, parsed) as MatchedNaverOrder[]);
-            } else {
-              setNaverError(result.error ?? '네이버 주문 조회 실패');
-            }
-          });
-        } else {
-          setNaverOrders([]);
-          setNaverError('');
-        }
+          }
 
-        if (hasCoupangConfig) {
-          startCoupangTransition(async () => {
+          if (hasCoupangConfig) {
+            startCoupangTransition(async () => {
+              setCoupangError('');
+              const result = await fetchCoupangOrders();
+              if (result.success) {
+                setCoupangOrders(matchOrders(result.orders, parsed) as MatchedCoupangOrder[]);
+              } else {
+                setCoupangError(result.error ?? '쿠팡 주문 조회 실패');
+              }
+            });
+          } else {
+            setCoupangOrders([]);
             setCoupangError('');
-            const result = await fetchCoupangOrders();
-            if (result.success) {
-              setCoupangOrders(matchOrders(result.orders, parsed) as MatchedCoupangOrder[]);
-            } else {
-              setCoupangError(result.error ?? '쿠팡 주문 조회 실패');
-            }
-          });
-        } else {
-          setCoupangOrders([]);
-          setCoupangError('');
+          }
+        } catch {
+          setUploadError('엑셀 파일을 처리하지 못했습니다.');
+          setCourierRows([]);
+          setExcelRows([]);
+          setExcelColumns([]);
         }
+      };
+      reader.onerror = () => {
+        setUploadError('엑셀 파일을 읽는 중 오류가 발생했습니다.');
+        setCourierRows([]);
+        setExcelRows([]);
+        setExcelColumns([]);
       };
       reader.readAsArrayBuffer(file);
     },
-    [fetchCoupangOrders, fetchNaverOrders, hasAnyProviderConfig, hasCoupangConfig, hasNaverConfig]
+    [fetchCoupangOrders, fetchNaverOrders, hasCoupangConfig, hasNaverConfig]
   );
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    handleFileUpload(file);
+    e.currentTarget.value = '';
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    handleFileUpload(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
 
   const toggleNaverExclude = (idx: number) => {
     setNaverOrders((prev) =>
@@ -298,6 +388,124 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
   return (
     <div className="space-y-5">
       <section className={cx(ui.panel, ui.panelBody, 'space-y-4')}>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Excel Upload</p>
+            <h2 className="text-xl font-semibold tracking-tight text-slate-950">운송장 엑셀 업로드</h2>
+            <p className="max-w-3xl text-sm leading-6 text-slate-500">
+              파일을 올리면 네이버와 쿠팡 주문을 한 번에 조회해 운송장 번호를 매칭합니다. 설정된 채널만 바로 처리되고, 미설정 채널은 아래 상태 카드에서 확인할 수 있습니다.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <span className={cx(ui.pill, hasNaverConfig ? '' : 'bg-slate-50')}>
+              <span
+                aria-hidden="true"
+                className={cx('h-2 w-2 rounded-full', hasNaverConfig ? 'bg-emerald-500' : 'bg-amber-500')}
+              />
+              네이버 {hasNaverConfig ? '연결됨' : '미연결'}
+            </span>
+            <span className={cx(ui.pill, hasCoupangConfig ? '' : 'bg-slate-50')}>
+              <span
+                aria-hidden="true"
+                className={cx('h-2 w-2 rounded-full', hasCoupangConfig ? 'bg-emerald-500' : 'bg-amber-500')}
+              />
+              쿠팡 {hasCoupangConfig ? '연결됨' : '미연결'}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+            <div
+              className={cx(
+                'relative rounded-2xl border-2 border-dashed px-6 py-10 text-center',
+                isDragOver ? 'border-slate-500 bg-slate-100' : 'border-slate-300'
+              )}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragEnter={handleDragOver}
+              onDragLeave={handleDragLeave}
+              aria-label="운송장 엑셀 업로드 영역"
+            >
+              <label
+                htmlFor="shipping-excel-upload"
+                className="mx-auto flex h-16 w-16 cursor-pointer items-center justify-center rounded-xl bg-slate-200/80 transition hover:scale-105"
+              >
+                <span className="sr-only">엑셀 업로드</span>
+                <input
+                  id="shipping-excel-upload"
+                  name="shipping-excel-upload"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="sr-only"
+                  aria-label="운송장 엑셀 업로드"
+                  onChange={handleFileChange}
+                />
+                <svg className="h-7 w-7 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <path d="M17 8l-5-5-5 5" />
+                  <path d="M12 3v12" />
+                  <path d="M8 14H5a2 2 0 0 0-2 2v3" />
+                </svg>
+              </label>
+
+              <p className="mt-4 text-sm text-slate-600">엑셀 파일을 드래그하거나 클릭해 업로드하세요.</p>
+              <p className="mt-1 text-xs text-slate-500">업로드 형식: .xlsx, .xls</p>
+              {fileName ? (
+                <p className="mt-3 text-sm font-medium text-slate-800">{fileName}</p>
+              ) : null}
+              {uploadError ? <p className="mt-3 text-sm text-red-500">{uploadError}</p> : null}
+            </div>
+
+            {excelRows.length > 0 ? (
+              <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-slate-500 ui-table-head">
+                      {excelColumns.map((col) => (
+                        <th key={col} className="px-3 py-2 font-semibold">
+                          {col}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {excelRows.map((row, rowIndex) => (
+                      <tr key={`excel-row-${rowIndex}`} className="border-t border-slate-100">
+                        {excelColumns.map((col) => (
+                          <td key={`${rowIndex}-${col}`} className="px-3 py-2 text-slate-700">
+                            {formatCellValue(row[col])}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+
+            {!excelRows.length ? (
+              <p className="mt-4 text-sm text-slate-500">
+                {hasAnyProviderConfig
+                  ? '업로드 즉시 두 채널의 미발송 주문을 조회합니다.'
+                  : '엑셀만 업로드해 먼저 형식을 확인할 수 있습니다.'}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-sm font-semibold text-slate-900">엑셀 사용 팁</p>
+            <ul className="mt-3 space-y-3 text-sm leading-6 text-slate-600">
+              <li>받는분 이름과 주소가 일치해야 자동 매칭됩니다.</li>
+              <li>네이버와 쿠팡을 동시에 관리하더라도 한 번 업로드로 처리합니다.</li>
+              <li>매칭 후에는 발송 제외 체크로 발송 대상만 추릴 수 있습니다.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className={cx(ui.panel, ui.panelBody, 'space-y-4')}>
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div className="space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Setup</p>
@@ -306,7 +514,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
               엑셀 파일은 운송장 번호를 매칭하는 재료일 뿐입니다. 네이버와 쿠팡 주문 목록은 사용자별 API 키가 있어야만 조회할 수 있습니다.
             </p>
           </div>
-          <Link href="/settings" className={ui.buttonSecondary}>
+          <Link href="/settings" className={`${ui.buttonSecondary} whitespace-nowrap`}>
             설정으로 이동
           </Link>
         </div>
@@ -330,19 +538,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
           />
         </div>
 
-        {!hasAnyProviderConfig ? (
-          <div className={ui.emptyState}>
-            <p className="text-base font-semibold text-slate-900">API 연동 설정이 필요합니다.</p>
-            <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-              엑셀 업로드만으로는 주문 목록을 불러올 수 없습니다. 먼저 설정 화면에서 네이버 또는 쿠팡 API 키를 저장한 뒤 다시 시도하세요.
-            </p>
-            <div className="mt-5">
-              <Link href="/settings" className={ui.buttonPrimary}>
-                설정으로 이동
-              </Link>
-            </div>
-          </div>
-        ) : !hasAllProviderConfig ? (
+        {hasNaverConfig !== hasCoupangConfig ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-4">
             <p className="text-base font-semibold text-slate-900">일부 연동만 완료되었습니다.</p>
             <p className="mt-1 text-sm leading-6 text-slate-600">
@@ -352,7 +548,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
               {!hasNaverConfig ? (
                 <>
                   <p className="self-center text-sm font-medium text-slate-800">네이버 API 키를 먼저 설정하세요.</p>
-                  <Link href="/settings" className={ui.buttonSecondary}>
+                  <Link href="/settings" className={`${ui.buttonSecondary} whitespace-nowrap`}>
                     네이버 설정하기
                   </Link>
                 </>
@@ -360,7 +556,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
               {!hasCoupangConfig ? (
                 <>
                   <p className="self-center text-sm font-medium text-slate-800">쿠팡 API 키를 먼저 설정하세요.</p>
-                  <Link href="/settings" className={ui.buttonSecondary}>
+                  <Link href="/settings" className={`${ui.buttonSecondary} whitespace-nowrap`}>
                     쿠팡 설정하기
                   </Link>
                 </>
@@ -376,36 +572,6 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
           </div>
         )}
       </section>
-
-      {hasAnyProviderConfig ? (
-        <div className={cx(ui.panel, ui.panelBody)}>
-          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-            <label htmlFor="shipping-excel-upload" className={cx(ui.buttonPrimary, 'cursor-pointer')}>
-              <span>엑셀 업로드</span>
-            </label>
-            <input
-              id="shipping-excel-upload"
-              name="shipping-excel-upload"
-              type="file"
-              accept=".xlsx,.xls"
-              className="sr-only"
-              onChange={handleFileUpload}
-            />
-            {fileName ? (
-              <div className="text-sm text-slate-600">
-                <span className="font-medium">{fileName}</span>
-                <span className="ml-2 text-slate-400">({courierRows.length}건 운송장 로드됨)</span>
-              </div>
-            ) : (
-              <p className="text-sm text-slate-500">
-                {hasAllProviderConfig
-                  ? '업로드 즉시 두 채널의 미발송 주문을 조회합니다.'
-                  : '업로드 후 설정된 채널만 주문을 조회합니다.'}
-              </p>
-            )}
-          </div>
-        </div>
-      ) : null}
 
       {courierRows.length > 0 && (
         <>
@@ -429,7 +595,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
                 <button
                   onClick={handleNaverSend}
                   disabled={naverSending || naverSendableCount === 0}
-                  className={cx(ui.buttonPrimary, 'px-4 py-2 text-sm')}
+                  className={cx(ui.buttonPrimary, 'whitespace-nowrap px-4 py-2 text-sm')}
                 >
                   {naverSending ? '발송 중…' : '보내기'}
                 </button>
@@ -574,7 +740,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
                 <button
                   onClick={handleCoupangSend}
                   disabled={coupangSending || coupangSendableCount === 0}
-                  className={cx(ui.buttonPrimary, 'px-4 py-2 text-sm')}
+                  className={cx(ui.buttonPrimary, 'whitespace-nowrap px-4 py-2 text-sm')}
                 >
                   {coupangSending ? '발송 중…' : '보내기'}
                 </button>

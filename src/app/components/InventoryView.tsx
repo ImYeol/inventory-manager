@@ -46,6 +46,13 @@ type WarehouseLookup = {
 type InventoryViewProps = {
   models: ModelWithRelations[]
   warehouses: WarehouseLookup[]
+  recentMovements?: Array<{
+    modelName: string
+    colorName: string
+    sizeName: string
+    type: '입고' | '출고'
+    quantity: number
+  }>
 }
 
 function todayText() {
@@ -57,7 +64,7 @@ function makeEditKey(colorId: number, sizeId: number) {
   return `${colorId}:${sizeId}`
 }
 
-export default function InventoryView({ models, warehouses }: InventoryViewProps) {
+export default function InventoryView({ models, warehouses, recentMovements = [] }: InventoryViewProps) {
   const [expanded, setExpanded] = useState<number | null>(models.length === 1 ? models[0].id : null)
   const [viewByModel, setViewByModel] = useState<Record<number, number | 'all'>>({})
   const [adjustModelId, setAdjustModelId] = useState<number | null>(null)
@@ -67,11 +74,21 @@ export default function InventoryView({ models, warehouses }: InventoryViewProps
   const hasWarehouses = warehouses.length > 0
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
+  const movementMap = useMemo(() => {
+    const next = new Map<string, { type: '입고' | '출고'; quantity: number }>()
 
-  const warehouseNameById = useMemo(
-    () => new Map(warehouses.map((warehouse) => [warehouse.id, warehouse.name])),
-    [warehouses],
-  )
+    for (const movement of recentMovements ?? []) {
+      const key = `${movement.modelName}::${movement.colorName}::${movement.sizeName}`
+      if (!next.has(key)) {
+        next.set(key, { type: movement.type, quantity: movement.quantity })
+      }
+    }
+
+    return next
+  }, [recentMovements])
+
+  const getMovement = (modelName: string, colorName: string, sizeName: string) =>
+    movementMap.get(`${modelName}::${colorName}::${sizeName}`)
 
   const getView = (modelId: number) => viewByModel[modelId] ?? 'all'
 
@@ -221,7 +238,7 @@ export default function InventoryView({ models, warehouses }: InventoryViewProps
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {message && (
         <div
           className={`rounded-xl px-4 py-3 text-center text-sm border ${
@@ -229,6 +246,8 @@ export default function InventoryView({ models, warehouses }: InventoryViewProps
               ? 'bg-slate-50 border-slate-200 text-slate-700'
               : 'bg-red-50 border-red-200 text-red-700'
           }`}
+          role="status"
+          aria-live="polite"
         >
           {message.text}
         </div>
@@ -245,7 +264,7 @@ export default function InventoryView({ models, warehouses }: InventoryViewProps
         const currentEditValues = adjustEdits[model.id] || {}
 
         return (
-          <div key={model.id} className={ui.panel}>
+          <div key={model.id} className={cx(ui.panel, 'overflow-hidden')}>
             <button
               onClick={() => setExpanded(isOpen ? null : model.id)}
               className="flex w-full items-center justify-between px-4 py-4 text-left transition-colors hover:bg-slate-50 md:px-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-inset"
@@ -287,7 +306,7 @@ export default function InventoryView({ models, warehouses }: InventoryViewProps
                     disabled={hasWarehouses === false}
                     className={cx(
                       ui.buttonSecondary,
-                      'text-sm h-9 px-3',
+                      'text-sm h-9 px-3 whitespace-nowrap',
                       hasWarehouses ? '' : 'opacity-50 cursor-not-allowed',
                     )}
                   >
@@ -301,7 +320,7 @@ export default function InventoryView({ models, warehouses }: InventoryViewProps
                       사이즈 또는 색상 데이터가 없습니다.
                     </div>
                   ) : (
-                    <div className="overflow-x-auto scrollbar-thin">
+                    <div className="overflow-x-auto scrollbar-thin rounded-2xl border border-slate-200 bg-white">
                       <table className="w-full border-collapse min-w-max">
                         <thead>
                           <tr>
@@ -316,38 +335,86 @@ export default function InventoryView({ models, warehouses }: InventoryViewProps
                             <th className="ui-table-head px-3 py-2.5 text-center min-w-[70px]">소계</th>
                           </tr>
                         </thead>
-                        <tbody>
-                          {rowData.map((row) => (
-                            <tr key={row.color.id} className="hover:bg-slate-50/70">
-                              <td className="ui-table-cell sticky left-0 z-10 bg-white font-medium text-sm text-slate-700">
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className="inline-block w-4 h-4 rounded-full border border-slate-200 flex-shrink-0"
-                                    style={{ backgroundColor: row.color.rgbCode }}
-                                  />
-                                  <span>{row.color.name}</span>
-                                </div>
-                              </td>
-                              {row.cells.map((cell) => {
-                                const qty = cell.quantity
-                                return (
+                          <tbody>
+                            {rowData.map((row) => {
+                              const rowMovement =
+                                row.cells
+                                  .map((cell) => getMovement(model.name, row.color.name, cell.size.name))
+                                  .find(Boolean) ?? null
+
+                              return (
+                                <tr
+                                  key={row.color.id}
+                                  className={cx(
+                                    'transition-colors hover:bg-slate-50/70',
+                                    rowMovement?.type === '입고'
+                                      ? 'border-l-4 border-emerald-400 bg-emerald-50/20'
+                                      : rowMovement?.type === '출고'
+                                        ? 'border-l-4 border-rose-400 bg-rose-50/20'
+                                        : '',
+                                  )}
+                                >
                                   <td
-                                    key={cell.size.id}
                                     className={cx(
-                                      'ui-table-cell text-center text-base font-semibold',
-                                      qty === 0 ? 'text-slate-300' : 'text-slate-900',
+                                      'ui-table-cell sticky left-0 z-10 bg-white text-sm text-slate-700',
+                                      row.total === 0
+                                        ? 'font-medium text-slate-400'
+                                        : row.total <= 10
+                                          ? 'font-medium text-amber-700'
+                                          : 'font-medium',
                                     )}
                                   >
-                                    {qty}
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className="inline-block h-4 w-4 flex-shrink-0 rounded-full border border-slate-200"
+                                        style={{ backgroundColor: row.color.rgbCode }}
+                                      />
+                                      <span>{row.color.name}</span>
+                                    </div>
                                   </td>
-                                )
-                              })}
-                              <td className="ui-table-cell text-center text-base font-semibold text-slate-950 bg-slate-50">
-                                {row.total}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
+                                  {row.cells.map((cell) => {
+                                    const qty = cell.quantity
+                                    const movement = getMovement(model.name, row.color.name, cell.size.name)
+
+                                    return (
+                                      <td
+                                        key={cell.size.id}
+                                        className={cx(
+                                          'ui-table-cell text-center text-base font-semibold',
+                                          qty === 0 ? 'text-slate-300' : 'text-slate-900',
+                                          movement?.type === '입고'
+                                            ? 'bg-emerald-50/40 text-emerald-700'
+                                            : movement?.type === '출고'
+                                              ? 'bg-rose-50/40 text-rose-700'
+                                              : '',
+                                        )}
+                                      >
+                                        <span>{qty}</span>
+                                        {movement ? (
+                                          <span className="mt-0.5 block text-xs font-bold">
+                                            {movement.type === '입고' ? '↗' : '↙'}
+                                            {movement.quantity}
+                                          </span>
+                                        ) : null}
+                                      </td>
+                                    )
+                                  })}
+                                  <td
+                                    className={cx(
+                                      'ui-table-cell bg-slate-50 text-center text-base font-semibold text-slate-950',
+                                      rowMovement?.type === '입고'
+                                        ? 'bg-emerald-50/50'
+                                        : rowMovement?.type === '출고'
+                                          ? 'bg-rose-50/50'
+                                          : '',
+                                    )}
+                                  >
+                                    {row.total}
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
                       </table>
                     </div>
                   )}
@@ -452,7 +519,7 @@ export default function InventoryView({ models, warehouses }: InventoryViewProps
                         type="button"
                         onClick={() => handleSaveAdjust(model)}
                         disabled={submitting || editCount === 0}
-                        className={cx(ui.buttonPrimary, 'h-11 px-5 text-sm')}
+                        className={cx(ui.buttonPrimary, 'h-11 px-5 text-sm whitespace-nowrap')}
                       >
                         {submitting ? '저장 중...' : '조정 저장'}
                       </button>

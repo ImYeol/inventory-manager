@@ -49,7 +49,7 @@ export default function TransactionBarChart({ data }: Props) {
           />
           <Legend />
           <Bar dataKey="inbound" name="입고" fill="#334155" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="outbound" name="반출" fill="#94a3b8" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="outbound" name="출고" fill="#94a3b8" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

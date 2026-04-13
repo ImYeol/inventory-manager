@@ -49,7 +49,7 @@ export function PageHeader({ kicker, title, description, actions, className }: P
         <h1 className={ui.pageTitle}>{title}</h1>
         {description ? <p className={ui.pageLead}>{description}</p> : null}
       </div>
-      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1">{actions}</div> : null}
     </div>
   )
 }

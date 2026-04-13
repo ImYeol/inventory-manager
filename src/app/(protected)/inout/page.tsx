@@ -1,7 +1,8 @@
 import { getCatalogData } from '@/lib/data';
+import { enforceSetupComplete } from '@/lib/setup-guard';
+import Link from 'next/link';
 import InOutForm from './InOutForm';
 import { PageHeader, ui } from '../../components/ui';
-import { enforceSetupComplete } from '@/lib/setup-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,11 @@ export default async function InOutPage() {
         kicker="Entry"
         title="입출고 입력"
         description="선택한 모델과 색상, 사이즈 기준으로 거래를 빠르게 등록합니다."
+        actions={
+          <Link href="/inventory" className={ui.buttonGhost + ' whitespace-nowrap'}>
+            재고현황으로 돌아가기
+          </Link>
+        }
       />
       <InOutForm models={normalizedModels} warehouses={warehouses} />
     </div>

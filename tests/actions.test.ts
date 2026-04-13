@@ -102,7 +102,7 @@ describe('server action wrappers', () => {
     mocks.getTransactionsWithRelations.mockResolvedValue({
       transactions: [
         { id: 1, type: '입고', warehouseId: 1 },
-        { id: 2, type: '반출', warehouseId: 1 },
+        { id: 2, type: '출고', warehouseId: 1 },
         { id: 3, type: '입고', warehouseId: 2 },
       ],
     })

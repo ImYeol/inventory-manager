@@ -136,6 +136,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    white-space: nowrap;
+    flex-shrink: 0;
     gap: 0.5rem;
     border-radius: 0.9rem;
     border: 1px solid transparent;

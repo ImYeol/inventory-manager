@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createTransactions, getCurrentStock } from '@/lib/actions'
 import { cx, ui } from '../../components/ui'
@@ -91,7 +91,7 @@ export default function InOutForm({ models, warehouses }: { models: ModelType[];
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
-  const [type, setType] = useState<'입고' | '반출'>('입고')
+  const [type, setType] = useState<'입고' | '출고'>('입고')
   const [date, setDate] = useState(todayString())
   const [warehouseId, setWarehouseId] = useState<number>(warehouses[0]?.id ?? -1)
   const [rows, setRows] = useState<RowData[]>(() => Array.from({ length: INITIAL_ROW_COUNT }, emptyRow))
@@ -99,23 +99,14 @@ export default function InOutForm({ models, warehouses }: { models: ModelType[];
 
   const [overrides, setOverrides] = useState<Record<string, { model?: boolean; size?: boolean }>>({})
 
-  useEffect(() => {
-    if (warehouses.length === 0) {
-      setWarehouseId(-1)
-      return
-    }
-
-    setWarehouseId((current) => {
-      if (current > 0 && warehouses.some((item) => item.id === current)) return current
-      return warehouses[0]?.id ?? -1
-    })
-  }, [warehouses])
-
   const [overriddenWarehouseId, setOverriddenWarehouseId] = useState<number | null>(
     null,
   )
-
-  const selectedWarehouseId = overriddenWarehouseId ?? warehouseId
+  const fallbackWarehouseId =
+    warehouseId > 0 && warehouses.some((item) => item.id === warehouseId)
+      ? warehouseId
+      : (warehouses[0]?.id ?? -1)
+  const selectedWarehouseId = overriddenWarehouseId ?? fallbackWarehouseId
 
   const modelMap = useMemo(() => {
     const map = new Map<number, ModelType>()
@@ -354,13 +345,13 @@ export default function InOutForm({ models, warehouses }: { models: ModelType[];
           </button>
           <button
             type="button"
-            onClick={() => setType('반출')}
+            onClick={() => setType('출고')}
             className={cx(
               'h-11 rounded-xl text-[15px] font-semibold tracking-tight transition-colors',
-              type === '반출' ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200',
+              type === '출고' ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200',
             )}
           >
-            ▲ 반출
+            ▲ 출고
           </button>
         </div>
 
@@ -691,7 +682,7 @@ export default function InOutForm({ models, warehouses }: { models: ModelType[];
           {isPending
             ? '등록 중…'
             : filledRows.length > 0
-              ? `${type === '입고' ? '입고' : '반출'} 일괄 등록 (${filledRows.length}건)`
+              ? `${type === '입고' ? '입고' : '출고'} 일괄 등록 (${filledRows.length}건)`
               : '항목을 입력하세요'}
         </button>
       </div>

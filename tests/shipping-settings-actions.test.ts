@@ -85,6 +85,34 @@ describe('shipping settings server actions', () => {
     })
   })
 
+  it('treats missing masked values as not configured even when a credential row exists', async () => {
+    const { from } = createSupabaseMock([
+      {
+        provider: 'naver',
+        masked_summary: {},
+        updated_at: '2026-04-12T09:00:00.000Z',
+      },
+    ])
+
+    mocks.getSupabaseWithUser.mockResolvedValue({
+      supabase: { from },
+      user: { id: 'user-1' },
+    })
+
+    await expect(getShippingSettingsSummary()).resolves.toEqual({
+      naver: {
+        configured: false,
+        masked: {},
+        updatedAt: null,
+      },
+      coupang: {
+        configured: false,
+        masked: {},
+        updatedAt: null,
+      },
+    })
+  })
+
   it('validates, encrypts, and stores naver credentials from typed input', async () => {
     const supabase = createSupabaseMock()
 

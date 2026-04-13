@@ -56,6 +56,24 @@ function getMissingCredentialsMessage(provider: ShippingProvider) {
     : '쿠팡 API 설정이 필요합니다. 설정에서 API 키를 먼저 저장해주세요.'
 }
 
+function hasConfiguredMaskedValue(
+  maskedSummary: Record<string, string> | null | undefined,
+  provider: ShippingProvider,
+) {
+  const summary = maskedSummary ?? {}
+
+  if (provider === 'naver') {
+    return typeof summary.clientId === 'string' && summary.clientId.length > 0
+  }
+
+  return (
+    typeof summary.accessKey === 'string' &&
+    summary.accessKey.length > 0 &&
+    typeof summary.vendorId === 'string' &&
+    summary.vendorId.length > 0
+  )
+}
+
 function getEncryptionKey(): Buffer {
   const secret = process.env.SHIPPING_CREDENTIALS_ENCRYPTION_KEY?.trim()
 
@@ -117,19 +135,16 @@ function maskValue(value: string, visibleStart = 2, visibleEnd = 2) {
   )}${value.slice(-visibleEnd)}`
 }
 
-function toSummaryItem(row?: Pick<StoredCredentialRow, 'masked_summary' | 'updated_at'>): ShippingSettingsSummaryItem {
-  if (!row) {
-    return {
-      configured: false,
-      masked: {},
-      updatedAt: null,
-    }
-  }
+function toSummaryItem(
+  provider: ShippingProvider,
+  row?: Pick<StoredCredentialRow, 'masked_summary' | 'updated_at'>,
+): ShippingSettingsSummaryItem {
+  const configured = hasConfiguredMaskedValue(row?.masked_summary, provider)
 
   return {
-    configured: true,
-    masked: row.masked_summary ?? {},
-    updatedAt: row.updated_at,
+    configured,
+    masked: configured ? row?.masked_summary ?? {} : {},
+    updatedAt: configured ? row?.updated_at ?? null : null,
   }
 }
 
@@ -161,8 +176,8 @@ export async function getShippingSettingsSummaryForCurrentUser(): Promise<Shippi
   >
 
   return {
-    naver: toSummaryItem(rows.find((row) => row.provider === 'naver')),
-    coupang: toSummaryItem(rows.find((row) => row.provider === 'coupang')),
+    naver: toSummaryItem('naver', rows.find((row) => row.provider === 'naver')),
+    coupang: toSummaryItem('coupang', rows.find((row) => row.provider === 'coupang')),
   }
 }
 

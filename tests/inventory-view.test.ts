@@ -35,6 +35,9 @@ describe('InventoryView', () => {
             ],
           },
         ],
+        recentMovements: [
+          { modelName: 'LP01', colorName: '네이비', sizeName: 'S', type: '입고', quantity: 2 },
+        ],
       })
     )
 
@@ -44,6 +47,8 @@ describe('InventoryView', () => {
     const row = screen.getByText('네이비').closest('tr')
     expect(row).not.toBeNull()
     expect(within(row as HTMLTableRowElement).getByText('14')).toBeTruthy()
+    expect((row as HTMLTableRowElement).className).toContain('bg-emerald-50/20')
+    expect(within(row as HTMLTableRowElement).getByText('↗2')).toBeTruthy()
   })
 
   it('updates quantities when switching warehouse filter', () => {
@@ -66,6 +71,9 @@ describe('InventoryView', () => {
               { id: 102, modelId: 1, sizeId: 10, colorId: 20, warehouseId: 2, warehouseName: '대자동', quantity: 7 },
             ],
           },
+        ],
+        recentMovements: [
+          { modelName: 'LP01', colorName: '네이비', sizeName: 'S', type: '출고', quantity: 1 },
         ],
       })
     )

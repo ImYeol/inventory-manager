@@ -5,6 +5,6 @@ export async function enforceSetupComplete() {
   const setupState = await getSetupState()
 
   if (setupState.needsSetup) {
-    redirect('/setup')
+    redirect('/master-data')
   }
 }

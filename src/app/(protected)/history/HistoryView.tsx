@@ -24,7 +24,7 @@ const PAGE_SIZE = 20;
 
 const typeStyle: Record<string, string> = {
   '입고': 'bg-slate-100 text-slate-700',
-  '반출': 'bg-slate-200 text-slate-800',
+  '출고': 'bg-slate-200 text-slate-800',
   '재고조정': 'bg-slate-100 text-slate-600',
 };
 
@@ -40,6 +40,8 @@ export default function HistoryView({
   const [filterModel, setFilterModel] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterWarehouseId, setFilterWarehouseId] = useState<number | ''>('');
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
@@ -47,28 +49,47 @@ export default function HistoryView({
     if (filterModel) result = result.filter((t) => t.modelName === filterModel);
     if (filterType) result = result.filter((t) => t.type === filterType);
     if (filterWarehouseId) result = result.filter((t) => t.warehouseId === filterWarehouseId);
+    if (dateFrom) result = result.filter((t) => t.createdAt.slice(0, 10) >= dateFrom)
+    if (dateTo) result = result.filter((t) => t.createdAt.slice(0, 10) <= dateTo)
     return result;
-  }, [transactions, filterModel, filterType, filterWarehouseId]);
+  }, [transactions, filterModel, filterType, filterWarehouseId, dateFrom, dateTo]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paged = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-    const resetFilters = () => {
+  const resetFilters = () => {
     setFilterModel('');
     setFilterType('');
     setFilterWarehouseId('');
+    setDateFrom('')
+    setDateTo('')
     setPage(1);
   };
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      <div className={cx(ui.panel, ui.panelBody)}>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className={cx(ui.panel, ui.panelBody, 'space-y-3')}>
+        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div>
-            <label className={ui.label}>모델</label>
+            <h2 className="text-sm font-semibold text-slate-900">조회 가이드</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+              모델, 창고, 기간 조건을 조합해 특정 입고·출고 이력을 좁혀 보세요. 재고조정도 같은 목록에서 확인할 수 있습니다.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className={ui.pill}>조건별 필터</span>
+            <span className={ui.pillMuted}>최근순 정렬</span>
+          </div>
+        </div>
+      </div>
+
+      <div className={cx(ui.panel, ui.panelBody)}>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div>
+            <label htmlFor="history-model" className={ui.label}>모델</label>
             <select
+              id="history-model"
               value={filterModel}
               onChange={(e) => { setFilterModel(e.target.value); setPage(1); }}
               className={ui.controlSm}
@@ -80,21 +101,23 @@ export default function HistoryView({
             </select>
           </div>
           <div>
-            <label className={ui.label}>구분</label>
+            <label htmlFor="history-type" className={ui.label}>구분</label>
             <select
+              id="history-type"
               value={filterType}
               onChange={(e) => { setFilterType(e.target.value); setPage(1); }}
               className={ui.controlSm}
             >
               <option value="">전체</option>
               <option value="입고">입고</option>
-              <option value="반출">반출</option>
+              <option value="출고">출고</option>
               <option value="재고조정">재고조정</option>
             </select>
           </div>
           <div>
-            <label className={ui.label}>창고</label>
+            <label htmlFor="history-warehouse" className={ui.label}>창고</label>
             <select
+              id="history-warehouse"
               value={filterWarehouseId}
               onChange={(e) => {
                 setFilterWarehouseId(e.target.value ? Number(e.target.value) : '');
@@ -110,8 +133,28 @@ export default function HistoryView({
               ))}
             </select>
           </div>
+          <div>
+            <label htmlFor="history-date-from" className={ui.label}>시작일</label>
+            <input
+              id="history-date-from"
+              type="date"
+              value={dateFrom}
+              onChange={(e) => { setDateFrom(e.target.value); setPage(1) }}
+              className={ui.controlSm}
+            />
+          </div>
+          <div>
+            <label htmlFor="history-date-to" className={ui.label}>종료일</label>
+            <input
+              id="history-date-to"
+              type="date"
+              value={dateTo}
+              onChange={(e) => { setDateTo(e.target.value); setPage(1) }}
+              className={ui.controlSm}
+            />
+          </div>
         </div>
-        {(filterModel || filterType || filterWarehouseId) && (
+        {(filterModel || filterType || filterWarehouseId || dateFrom || dateTo) && (
           <button
             onClick={resetFilters}
             className="mt-3 text-sm font-medium text-slate-600 hover:text-slate-950"

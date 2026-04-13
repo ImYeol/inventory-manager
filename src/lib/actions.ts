@@ -14,7 +14,13 @@ import { getSupabaseWithUser } from './db'
 
 export async function getModels() {
   const { models } = await getCatalogData()
-  return models.map(({ inventory, ...model }) => model)
+  return models.map((model) => ({
+    id: model.id,
+    name: model.name,
+    createdAt: model.createdAt,
+    sizes: model.sizes,
+    colors: model.colors,
+  }))
 }
 
 export async function getCatalogState() {
@@ -158,7 +164,7 @@ export async function getModelDetails(modelId: number) {
 
 export async function createTransactions(
   items: {
-    type: '입고' | '반출'
+    type: '입고' | '출고'
     date: string
     warehouseId: number
     modelId: number
@@ -198,7 +204,22 @@ export async function createWarehouse(name: string) {
 
   revalidateInventoryPaths()
   revalidatePath('/master-data')
-  revalidatePath('/setup')
+  return { success: true }
+}
+
+export async function deleteWarehouse(warehouseId: number) {
+  if (!warehouseId) {
+    throw new Error('삭제할 창고를 찾을 수 없습니다.')
+  }
+
+  const { supabase } = await getSupabaseWithUser()
+  const { error } = await supabase.from('warehouses').delete().eq('id', warehouseId)
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidateInventoryPaths()
+  revalidatePath('/master-data')
   return { success: true }
 }
 
@@ -215,8 +236,114 @@ export async function createModel(name: string) {
   }
 
   revalidatePath('/master-data')
-  revalidatePath('/setup')
   revalidatePath('/')
+  revalidatePath('/inventory')
+  return { success: true }
+}
+
+export async function createModelsWithSpecs(
+  items: Array<{
+    name: string
+    sizes: string[]
+    colors: Array<{ name: string; rgbCode: string; textWhite: boolean }>
+  }>,
+) {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error('등록할 모델이 없습니다.')
+  }
+
+  const normalized = items
+    .map((item) => {
+      const name = item.name.trim()
+      const sizes = [...new Set(item.sizes.map((size) => size.trim()).filter(Boolean))]
+      const colors = item.colors
+        .map((color) => ({
+          name: color.name.trim(),
+          rgbCode: /^#?[0-9a-fA-F]{6}$/.test(color.rgbCode.trim())
+            ? color.rgbCode.trim().startsWith('#')
+              ? color.rgbCode.trim()
+              : `#${color.rgbCode.trim()}`
+            : '#000000',
+          textWhite: color.textWhite === true,
+        }))
+        .filter((color) => color.name.length > 0)
+
+      return { name, sizes, colors }
+    })
+    .filter((item) => item.name.length > 0)
+
+  if (normalized.length === 0) {
+    throw new Error('모델명을 입력해주세요.')
+  }
+
+  const { supabase } = await getSupabaseWithUser()
+  const createdModelIds: number[] = []
+
+  try {
+    for (const item of normalized) {
+      const { data, error: modelError } = await supabase
+        .from('models')
+        .insert({ name: item.name })
+        .select('id')
+        .single()
+
+      if (modelError || !data?.id) {
+        throw new Error(modelError?.message ?? '모델 등록에 실패했습니다.')
+      }
+
+      createdModelIds.push(data.id)
+
+      if (item.sizes.length > 0) {
+        const sizeRows = item.sizes.map((size) => ({ model_id: data.id, name: size }))
+        const { error: sizeError } = await supabase.from('sizes').insert(sizeRows)
+
+        if (sizeError) {
+          throw new Error(sizeError.message)
+        }
+      }
+
+      if (item.colors.length > 0) {
+        const colorRows = item.colors.map((color) => ({
+          model_id: data.id,
+          name: color.name,
+          rgb_code: color.rgbCode,
+          text_white: color.textWhite,
+        }))
+        const { error: colorError } = await supabase.from('colors').insert(colorRows)
+
+        if (colorError) {
+          throw new Error(colorError.message)
+        }
+      }
+    }
+  } catch (error) {
+    if (createdModelIds.length > 0) {
+      await supabase.from('models').delete().in('id', createdModelIds)
+    }
+
+    throw error instanceof Error ? error : new Error('모델 일괄 등록에 실패했습니다.')
+  }
+
+  revalidatePath('/master-data')
+  revalidatePath('/')
+  revalidatePath('/inventory')
+  revalidateInventoryPaths()
+  return { success: true, count: normalized.length }
+}
+
+export async function deleteModel(modelId: number) {
+  if (!modelId) {
+    throw new Error('삭제할 모델을 찾을 수 없습니다.')
+  }
+
+  const { supabase } = await getSupabaseWithUser()
+  const { error } = await supabase.from('models').delete().eq('id', modelId)
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidateInventoryPaths()
+  revalidatePath('/master-data')
   return { success: true }
 }
 
@@ -237,7 +364,23 @@ export async function createModelSize(modelId: number, sizeName: string) {
   }
 
   revalidatePath('/master-data')
-  revalidatePath('/setup')
+  revalidateInventoryPaths()
+  return { success: true }
+}
+
+export async function deleteModelSize(sizeId: number) {
+  if (!sizeId) {
+    throw new Error('삭제할 사이즈를 찾을 수 없습니다.')
+  }
+
+  const { supabase } = await getSupabaseWithUser()
+  const { error } = await supabase.from('sizes').delete().eq('id', sizeId)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/master-data')
   revalidateInventoryPaths()
   return { success: true }
 }
@@ -265,13 +408,30 @@ export async function createModelColor(
   }
 
   revalidatePath('/master-data')
-  revalidatePath('/setup')
+  revalidateInventoryPaths()
+  return { success: true }
+}
+
+export async function deleteModelColor(colorId: number) {
+  if (!colorId) {
+    throw new Error('삭제할 색상을 찾을 수 없습니다.')
+  }
+
+  const { supabase } = await getSupabaseWithUser()
+  const { error } = await supabase.from('colors').delete().eq('id', colorId)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/master-data')
   revalidateInventoryPaths()
   return { success: true }
 }
 
 function revalidateInventoryPaths() {
   revalidatePath('/')
+  revalidatePath('/inventory')
   revalidatePath('/inout')
   revalidatePath('/history')
   revalidatePath('/analytics')

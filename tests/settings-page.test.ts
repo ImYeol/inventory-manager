@@ -5,7 +5,6 @@ import { cleanup, render, screen } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
   getShippingSettingsSummary: vi.fn(),
-  enforceSetupComplete: vi.fn(),
   settingsView: vi.fn(),
 }))
 
@@ -25,10 +24,6 @@ vi.mock('@/lib/actions/shipping-settings', () => ({
   getShippingSettingsSummary: mocks.getShippingSettingsSummary,
 }))
 
-vi.mock('@/lib/setup-guard', () => ({
-  enforceSetupComplete: mocks.enforceSetupComplete,
-}))
-
 vi.mock('@/app/(protected)/settings/SettingsView', () => ({
   default: (props: { summary: unknown }) => {
     mocks.settingsView(props)
@@ -44,9 +39,7 @@ import SettingsPage from '@/app/(protected)/settings/page'
 afterEach(() => {
   cleanup()
   mocks.getShippingSettingsSummary.mockReset()
-  mocks.enforceSetupComplete.mockReset()
   mocks.settingsView.mockReset()
-  mocks.enforceSetupComplete.mockResolvedValue(undefined)
 })
 
 describe('SettingsPage', () => {
@@ -68,10 +61,10 @@ describe('SettingsPage', () => {
 
     render(await SettingsPage())
 
-    expect(mocks.enforceSetupComplete).toHaveBeenCalledTimes(1)
     expect(mocks.getShippingSettingsSummary).toHaveBeenCalledTimes(1)
     expect(mocks.settingsView).toHaveBeenCalledWith(expect.objectContaining({ summary }))
     expect(screen.getByRole('link', { name: '운송장으로 돌아가기' }).getAttribute('href')).toBe('/shipping')
+    expect(screen.getByRole('button', { name: '로그아웃' })).toBeTruthy()
     expect(screen.getByTestId('settings-view').getAttribute('data-summary')).toBe(JSON.stringify(summary))
   })
 })

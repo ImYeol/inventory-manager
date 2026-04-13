@@ -21,13 +21,13 @@ beforeEach(() => {
 })
 
 describe('enforceSetupComplete', () => {
-  it('redirects to setup when setup is incomplete', async () => {
+  it('redirects to master-data when setup is incomplete', async () => {
     mocks.getSetupState.mockResolvedValue({ needsSetup: true })
 
     await enforceSetupComplete()
 
     expect(mocks.getSetupState).toHaveBeenCalledTimes(1)
-    expect(mocks.redirect).toHaveBeenCalledWith('/setup')
+    expect(mocks.redirect).toHaveBeenCalledWith('/master-data')
   })
 
   it('does not redirect when setup is complete', async () => {
