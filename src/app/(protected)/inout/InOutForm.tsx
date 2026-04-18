@@ -428,7 +428,7 @@ export default function InOutForm({
         </div>
       ) : null}
 
-      <div className={cx(ui.panel, ui.panelBody, 'md:p-5')}>
+      <div className={cx(ui.panel, ui.panelBody, 'space-y-4 p-4 md:p-5')}>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className={ui.label}>날짜</label>
@@ -468,40 +468,30 @@ export default function InOutForm({
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2.5">
-          <button
-            type="button"
-            onClick={() => setType('입고')}
-            className={cx(
-              'h-11 rounded-xl text-[15px] font-semibold tracking-tight transition-colors',
-              type === '입고' ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200',
-            )}
-          >
-            ▼ 입고
-          </button>
-          <button
-            type="button"
-            onClick={() => setType('출고')}
-            className={cx(
-              'h-11 rounded-xl text-[15px] font-semibold tracking-tight transition-colors',
-              type === '출고' ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200',
-            )}
-          >
-            ▲ 출고
-          </button>
-        </div>
-
-        {!canInput ? <p className="mt-4 text-sm text-slate-500">입출고 등록은 창고 등록 후 이용할 수 있습니다.</p> : null}
-      </div>
-
-      <div className={cx(ui.panel, ui.panelBody, 'space-y-3 md:p-5')}>
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-900">{entryMode === 'csv' ? 'CSV/표 가져오기' : '표 붙여넣기'}</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              `모델, 사이즈, 색상, 수량` 순서의 CSV 또는 탭 구분 텍스트를 붙여넣거나 파일로 가져올 수 있습니다.
-            </p>
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              onClick={() => setType('입고')}
+              className={cx(
+                'h-11 rounded-xl text-[15px] font-semibold tracking-tight transition-colors',
+                type === '입고' ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200',
+              )}
+            >
+              ▼ 입고
+            </button>
+            <button
+              type="button"
+              onClick={() => setType('출고')}
+              className={cx(
+                'h-11 rounded-xl text-[15px] font-semibold tracking-tight transition-colors',
+                type === '출고' ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200',
+              )}
+            >
+              ▲ 출고
+            </button>
           </div>
+
           {entryMode === 'manual' ? (
             <button type="button" onClick={() => setBulkImportOpen((current) => !current)} className={ui.buttonSecondary}>
               {bulkImportOpen ? '가져오기 닫기' : '표 붙여넣기'}
@@ -509,42 +499,55 @@ export default function InOutForm({
           ) : null}
         </div>
 
-        {bulkImportOpen ? (
-          <div className="space-y-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-3 md:p-4">
-            <label className="text-sm font-medium text-slate-700" htmlFor="bulk-import-text">
-              붙여넣기
-            </label>
-            <textarea
-              id="bulk-import-text"
-              value={importText}
-              onChange={(event) => setImportText(event.target.value)}
-              placeholder={'모델,사이즈,색상,수량\nLP01,S,네이비,12'}
-              className={cx(ui.control, 'min-h-28 resize-y font-mono text-sm')}
-            />
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <label className={cx(ui.buttonSecondary, 'cursor-pointer justify-center')}>
-                파일 선택
-                <input
-                  type="file"
-                  accept=".csv,text/csv,.txt,.tsv"
-                  className="sr-only"
-                  onChange={(event) => {
-                    void handleImportFile(event.target.files?.[0] ?? null)
-                    event.currentTarget.value = ''
-                  }}
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => importRowsFromText(importText)}
-                className={ui.buttonPrimary}
-                disabled={importText.trim().length === 0}
-              >
-                행으로 가져오기
-              </button>
+        {!canInput ? <p className="text-sm text-slate-500">입출고 등록은 창고 등록 후 이용할 수 있습니다.</p> : null}
+
+        <div className="border-t border-slate-200 pt-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">{entryMode === 'csv' ? 'CSV/표 가져오기' : '표 붙여넣기'}</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                `모델, 사이즈, 색상, 수량` 순서의 CSV 또는 탭 구분 텍스트를 붙여넣거나 파일로 가져올 수 있습니다.
+              </p>
             </div>
           </div>
-        ) : null}
+
+          {bulkImportOpen ? (
+            <div className="mt-3 space-y-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-3 md:p-4">
+              <label className="text-sm font-medium text-slate-700" htmlFor="bulk-import-text">
+                붙여넣기
+              </label>
+              <textarea
+                id="bulk-import-text"
+                value={importText}
+                onChange={(event) => setImportText(event.target.value)}
+                placeholder={'모델,사이즈,색상,수량\nLP01,S,네이비,12'}
+                className={cx(ui.control, 'min-h-28 resize-y font-mono text-sm')}
+              />
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <label className={cx(ui.buttonSecondary, 'cursor-pointer justify-center')}>
+                  파일 선택
+                  <input
+                    type="file"
+                    accept=".csv,text/csv,.txt,.tsv"
+                    className="sr-only"
+                    onChange={(event) => {
+                      void handleImportFile(event.target.files?.[0] ?? null)
+                      event.currentTarget.value = ''
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => importRowsFromText(importText)}
+                  className={ui.buttonPrimary}
+                  disabled={importText.trim().length === 0}
+                >
+                  행으로 가져오기
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
           <span className={ui.pill}>유효 {filledRows.length}건</span>

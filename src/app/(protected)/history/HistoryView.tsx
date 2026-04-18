@@ -1,6 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { StatusBadge } from '@/components/ui/badge-1'
+import { BasicDataTable } from '@/components/ui/basic-data-table'
 import { cx, ui } from '../../components/ui'
 
 type TransactionItem = {
@@ -25,12 +27,6 @@ type ModelItem = { id: number; name: string }
 type WarehouseItem = { id: number; name: string }
 
 const PAGE_SIZE = 20
-
-const typeStyle: Record<string, string> = {
-  입고: 'bg-slate-100 text-slate-700',
-  출고: 'bg-slate-200 text-slate-800',
-  재고조정: 'bg-slate-100 text-slate-600',
-}
 
 function formatSourceChannel(sourceChannel?: string | null) {
   if (sourceChannel === 'manual') return '수동'
@@ -98,6 +94,16 @@ export default function HistoryView({
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
   const paged = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const tableColumns = [
+    { key: 'date', label: '날짜' },
+    { key: 'model', label: '모델' },
+    { key: 'color', label: '색상' },
+    { key: 'size', label: '사이즈' },
+    { key: 'type', label: '구분' },
+    { key: 'source', label: '출처 / 참조' },
+    { key: 'quantity', label: '수량', align: 'right' as const },
+    { key: 'warehouse', label: '창고' },
+  ]
 
   const resetFilters = () => {
     setFilterModel('')
@@ -113,13 +119,13 @@ export default function HistoryView({
 
   return (
     <div className="space-y-4">
-      {!embedded ? (
-        <div className={cx(ui.panel, ui.panelBody, 'space-y-3')}>
-          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+      <div className={cx(ui.panel, ui.panelBody)}>
+        {!embedded ? (
+          <div className="flex flex-col gap-2 border-b border-slate-100 pb-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">조회 가이드</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-500">
-                모델, 창고, 기간 조건을 조합해 특정 입고·출고 이력을 좁혀 보세요. 재고조정도 같은 목록에서 확인할 수 있습니다.
+              <h2 className="text-sm font-semibold text-slate-900">이력 필터</h2>
+              <p className="text-sm leading-6 text-slate-500">
+                모델, 창고, 기간을 좁혀 입고·출고·재고조정 이력을 빠르게 확인하세요.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -127,10 +133,8 @@ export default function HistoryView({
               <span className={ui.pillMuted}>최근순 정렬</span>
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      <div className={cx(ui.panel, ui.panelBody)}>
         <div className={cx('grid grid-cols-1 gap-3', controlledWarehouseId === undefined ? 'sm:grid-cols-2 lg:grid-cols-6' : 'sm:grid-cols-2 lg:grid-cols-5')}>
           <div>
             <label htmlFor="history-model" className={ui.label}>
@@ -217,11 +221,11 @@ export default function HistoryView({
               </select>
             </div>
           ) : (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-              <p className="text-xs font-medium text-slate-500">창고 컨텍스트</p>
-              <p className="mt-1 text-sm font-semibold text-slate-950">
+            <div className={cx(ui.controlSm, 'pointer-events-none flex flex-col justify-center bg-slate-50 text-slate-700')}>
+              <span className="text-xs font-medium text-slate-500">창고 컨텍스트</span>
+              <span className="text-sm font-semibold text-slate-950">
                 {warehouses.find((warehouse) => warehouse.id === controlledWarehouseId)?.name ?? '전체 창고'}
-              </p>
+              </span>
             </div>
           )}
 
@@ -258,75 +262,59 @@ export default function HistoryView({
           </div>
         </div>
 
-        {(filterModel || filterType || filterSourceChannel || filterWarehouseId || dateFrom || dateTo) && (
-          <button onClick={resetFilters} className="mt-3 text-sm font-medium text-slate-600 hover:text-slate-950">
-            필터 초기화
-          </button>
-        )}
-
-        <div className="mt-2 text-sm text-slate-500">{filtered.length}건 조회됨</div>
-      </div>
-
-      <div className={cx('hidden md:block', ui.tableShell)}>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="ui-table-head text-left">
-                <th className="px-4 py-3">날짜</th>
-                <th className="px-4 py-3">모델</th>
-                <th className="px-4 py-3">색상</th>
-                <th className="px-4 py-3">사이즈</th>
-                <th className="px-4 py-3">구분</th>
-                <th className="px-4 py-3">출처 / 참조</th>
-                <th className="px-4 py-3 text-right">수량</th>
-                <th className="px-4 py-3">창고</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paged.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-slate-400">
-                    이력이 없습니다.
-                  </td>
-                </tr>
-              ) : (
-                paged.map((item) => (
-                  <tr key={item.id} className="transition-colors hover:bg-slate-50">
-                    <td className="ui-table-cell text-sm text-slate-700">{item.date}</td>
-                    <td className="ui-table-cell text-sm font-medium text-slate-800">{item.modelName}</td>
-                    <td className="ui-table-cell text-sm text-slate-700">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className="inline-block h-3 w-3 flex-shrink-0 rounded-full border border-slate-200"
-                          style={{ backgroundColor: item.colorRgb }}
-                        />
-                        {item.colorName}
-                      </div>
-                    </td>
-                    <td className="ui-table-cell text-sm text-slate-700">{item.sizeName}</td>
-                    <td className="ui-table-cell">
-                      <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${typeStyle[item.type] || 'bg-slate-100 text-slate-600'}`}>
-                        {item.type}
-                      </span>
-                    </td>
-                    <td className="ui-table-cell text-sm text-slate-600">
-                      <div className="space-y-1">
-                        <p>{formatSourceChannel(item.sourceChannel)}</p>
-                        {formatSourceReference(item.referenceType, item.referenceId) ? (
-                          <p className="text-xs text-slate-400">{formatSourceReference(item.referenceType, item.referenceId)}</p>
-                        ) : null}
-                        {item.memo ? <p className="text-xs text-slate-500">{item.memo}</p> : null}
-                      </div>
-                    </td>
-                    <td className="ui-table-cell text-right text-sm font-semibold text-slate-800">{item.quantity}</td>
-                    <td className="ui-table-cell text-sm text-slate-600">{item.warehouse}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+          {(filterModel || filterType || filterSourceChannel || filterWarehouseId || dateFrom || dateTo) ? (
+            <button onClick={resetFilters} className="text-sm font-medium text-slate-600 hover:text-slate-950">
+              필터 초기화
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="text-sm text-slate-500">{filtered.length}건 조회됨</div>
         </div>
       </div>
+
+      <BasicDataTable
+        className="hidden md:block"
+        columns={tableColumns}
+        rows={paged}
+        rowKey={(item) => item.id}
+        emptyState="이력이 없습니다."
+        renderCell={(item, columnKey) => {
+          if (columnKey === 'date') return <span className="text-sm text-slate-700">{item.date}</span>
+          if (columnKey === 'model') return <span className="text-sm font-medium text-slate-800">{item.modelName}</span>
+          if (columnKey === 'color') {
+            return (
+              <div className="flex items-center gap-1.5 text-sm text-slate-700">
+                <span
+                  className="inline-block h-3 w-3 flex-shrink-0 rounded-full border border-slate-200"
+                  style={{ backgroundColor: item.colorRgb }}
+                />
+                {item.colorName}
+              </div>
+            )
+          }
+          if (columnKey === 'size') return <span className="text-sm text-slate-700">{item.sizeName}</span>
+          if (columnKey === 'type') {
+            const tone = item.type === '입고' ? 'success' : item.type === '출고' ? 'danger' : 'neutral'
+            return <StatusBadge tone={tone}>{item.type}</StatusBadge>
+          }
+          if (columnKey === 'source') {
+            return (
+              <div className="space-y-1 text-sm text-slate-600">
+                <p>{formatSourceChannel(item.sourceChannel)}</p>
+                {formatSourceReference(item.referenceType, item.referenceId) ? (
+                  <p className="text-xs text-slate-400">{formatSourceReference(item.referenceType, item.referenceId)}</p>
+                ) : null}
+                {item.memo ? <p className="text-xs text-slate-500">{item.memo}</p> : null}
+              </div>
+            )
+          }
+          if (columnKey === 'quantity') return <span className="text-sm font-semibold text-slate-800">{item.quantity}</span>
+          if (columnKey === 'warehouse') return <span className="text-sm text-slate-600">{item.warehouse}</span>
+          return null
+        }}
+      />
 
       <div className="space-y-2 md:hidden">
         {paged.length === 0 ? (
@@ -336,9 +324,9 @@ export default function HistoryView({
             <div key={item.id} className="surface px-4 py-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-sm text-slate-500">{item.date}</span>
-                <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${typeStyle[item.type] || 'bg-slate-100 text-slate-600'}`}>
+                <StatusBadge tone={item.type === '입고' ? 'success' : item.type === '출고' ? 'danger' : 'neutral'}>
                   {item.type}
-                </span>
+                </StatusBadge>
               </div>
               <div className="flex items-center justify-between">
                 <div>

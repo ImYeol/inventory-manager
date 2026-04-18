@@ -1,10 +1,11 @@
 'use client'
 
-import Link from 'next/link'
 import type { ReactNode } from 'react'
-import { useDeferredValue, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import InOutForm from '@/app/(protected)/inout/InOutForm'
 import HistoryView from '@/app/(protected)/history/HistoryView'
+import { StatusBadge } from '@/components/ui/badge-1'
+import { BasicDataTable } from '@/components/ui/basic-data-table'
 import { PageHeader, cx, ui } from '@/app/components/ui'
 
 type InventoryItem = {
@@ -72,38 +73,56 @@ type InventoryRow = {
 }
 
 type InventoryOverviewRow = InventoryRow & {
-  expectedInboundQuantity: number
   latestInbound: string
   latestOutbound: string
-  status: { label: string; tone: 'normal' | 'warning' | 'danger' }
+  status: { label: string; tone: 'neutral' | 'success' | 'warning' | 'danger' }
 }
 
 type WorkspaceTab = 'overview' | 'inbound' | 'outbound' | 'csv' | 'history'
 
-const tabs: Array<{ id: WorkspaceTab; label: string; description: string }> = [
-  { id: 'overview', label: '개요', description: '현재 재고와 상태를 창고 기준으로 확인합니다.' },
-  { id: 'inbound', label: '입고', description: '빠른 다건 입력으로 입고를 반영합니다.' },
-  { id: 'outbound', label: '출고', description: '출고를 창고 컨텍스트 안에서 처리합니다.' },
-  { id: 'csv', label: 'CSV', description: '붙여넣기 또는 파일 가져오기로 일괄 반영합니다.' },
-  { id: 'history', label: '이력', description: '선택한 창고의 변동 이력을 같은 허브 안에서 조회합니다.' },
+const tabs: Array<{ id: WorkspaceTab; label: string }> = [
+  { id: 'overview', label: '개요' },
+  { id: 'inbound', label: '입고' },
+  { id: 'outbound', label: '출고' },
+  { id: 'csv', label: 'CSV' },
+  { id: 'history', label: '이력' },
 ]
 
 function inventoryStatus(quantity: number) {
   if (quantity <= 0) return { label: '품절', tone: 'danger' as const }
   if (quantity <= 5) return { label: '주의', tone: 'warning' as const }
-  return { label: '정상', tone: 'normal' as const }
-}
-
-function statusPillClass(tone: 'normal' | 'warning' | 'danger') {
-  if (tone === 'danger') return 'border-red-200 bg-red-50 text-red-700'
-  if (tone === 'warning') return 'border-amber-200 bg-amber-50 text-amber-700'
-  return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  return { label: '정상', tone: 'success' as const }
 }
 
 function movementTone(type: string) {
-  if (type === '입고') return 'border-emerald-200 bg-emerald-50 text-emerald-700'
-  if (type === '출고') return 'border-rose-200 bg-rose-50 text-rose-700'
-  return 'border-slate-200 bg-slate-100 text-slate-700'
+  if (type === '입고') return 'success' as const
+  if (type === '출고') return 'danger' as const
+  return 'neutral' as const
+}
+
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="h-4 w-4">
+      <path d="M10 4v12M4 10h12" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
+function MinusIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="h-4 w-4">
+      <path d="M4 10h12" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
+function UploadIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="h-4 w-4">
+      <path d="M10 13V4M6.5 7.5 10 4l3.5 3.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+      <path d="M4 15.5h12" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  )
 }
 
 function EntryOverlay({
@@ -160,11 +179,8 @@ export default function InventoryWorkspace({
 }) {
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | 'all'>(warehouses[0]?.id ?? 'all')
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('overview')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'normal' | 'warning' | 'danger'>('all')
-  const [search, setSearch] = useState('')
   const [overlayMode, setOverlayMode] = useState<'입고' | '출고' | null>(null)
   const [csvType, setCsvType] = useState<'입고' | '출고'>('입고')
-  const deferredSearch = useDeferredValue(search)
 
   const normalizedModels = useMemo(
     () =>
@@ -213,7 +229,6 @@ export default function InventoryWorkspace({
   }, [transactions])
 
   const overviewRows = useMemo(() => {
-    const searchTerm = deferredSearch.trim().toLowerCase()
     const scopedRows: InventoryOverviewRow[] = rows
       .filter((row) => selectedWarehouseId === 'all' || row.warehouseId === selectedWarehouseId)
       .map((row) => {
@@ -222,7 +237,6 @@ export default function InventoryWorkspace({
 
         return {
           ...row,
-          expectedInboundQuantity: 0,
           latestInbound: movement?.latestInbound ?? '없음',
           latestOutbound: movement?.latestOutbound ?? '없음',
           status,
@@ -230,28 +244,16 @@ export default function InventoryWorkspace({
       })
 
     return scopedRows
-      .filter((row) => {
-        if (statusFilter !== 'all' && row.status.tone !== statusFilter) return false
-        if (!searchTerm) return true
-        const target = `${row.modelName} ${row.colorName} ${row.sizeName} ${row.warehouseName}`.toLowerCase()
-        return target.includes(searchTerm)
-      })
       .sort((left, right) => right.quantity - left.quantity || left.modelName.localeCompare(right.modelName))
-  }, [deferredSearch, rows, selectedWarehouseId, statusFilter, transactionLookup])
+  }, [rows, selectedWarehouseId, transactionLookup])
 
   const summary = useMemo(() => {
-    const relevantTransactions = transactions.filter(
-      (tx) => selectedWarehouseId === 'all' || tx.warehouseId === selectedWarehouseId,
-    )
-
     return {
       totalQuantity: overviewRows.reduce((sum, row) => sum + row.quantity, 0),
       skuCount: overviewRows.length,
-      lowStockCount: overviewRows.filter((row) => row.status.tone !== 'normal').length,
-      todayInbound: relevantTransactions.filter((tx) => tx.type === '입고').slice(0, 20).reduce((sum, tx) => sum + tx.quantity, 0),
-      todayOutbound: relevantTransactions.filter((tx) => tx.type === '출고').slice(0, 20).reduce((sum, tx) => sum + tx.quantity, 0),
+      lowStockCount: overviewRows.filter((row) => row.status.tone !== 'success').length,
     }
-  }, [overviewRows, selectedWarehouseId, transactions])
+  }, [overviewRows])
 
   const recentMovements = useMemo(
     () =>
@@ -269,29 +271,15 @@ export default function InventoryWorkspace({
   return (
     <div className={ui.shell}>
       <PageHeader
-        kicker="Warehouse Operations"
         title="재고 운영"
-        description="창고 컨텍스트 하나로 개요, 입고, 출고, CSV, 이력을 이어서 다루는 운영 허브입니다."
-        actions={
-          <>
-            <button type="button" onClick={() => setOverlayMode('입고')} className={ui.buttonPrimary}>
-              빠른 입고
-            </button>
-            <button type="button" onClick={() => setOverlayMode('출고')} className={ui.buttonSecondary}>
-              빠른 출고
-            </button>
-            <button type="button" onClick={() => setActiveTab('csv')} className={ui.buttonGhost}>
-              CSV 이동
-            </button>
-          </>
-        }
+        description="선택한 창고를 기준으로 개요, 입고, 출고, CSV, 이력을 한 화면에서 다룹니다."
       />
 
-      <div className={cx(ui.panel, ui.panelBody, 'space-y-4 md:p-5')}>
-        <div className="grid gap-3 md:grid-cols-[minmax(0,16rem)_1fr]">
-          <div>
-            <label htmlFor="inventory-warehouse" className={ui.label}>
-              창고 컨텍스트
+      <div className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-3 shadow-sm backdrop-blur">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor="inventory-warehouse" className="sr-only">
+              창고 선택
             </label>
             <select
               id="inventory-warehouse"
@@ -299,7 +287,7 @@ export default function InventoryWorkspace({
               onChange={(event) =>
                 setSelectedWarehouseId(event.target.value === 'all' ? 'all' : Number(event.target.value))
               }
-              className={ui.controlSm}
+              className={cx(ui.controlSm, 'min-w-[11rem] bg-white')}
             >
               <option value="all">전체 창고</option>
               {warehouses.map((warehouse) => (
@@ -308,9 +296,10 @@ export default function InventoryWorkspace({
                 </option>
               ))}
             </select>
+            <span className="text-xs text-slate-500">{selectedWarehouseName}</span>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="flex flex-wrap gap-1">
             {tabs.map((tab) => {
               const active = activeTab === tab.id
               return (
@@ -318,184 +307,200 @@ export default function InventoryWorkspace({
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={cx(
-                    active ? ui.tabActive : ui.tab,
-                    'min-h-11 justify-start rounded-2xl px-4 py-3 text-left',
-                  )}
+                  className={cx(active ? ui.tabActive : ui.tab, 'min-h-0 px-2.5')}
                 >
-                  <span className="block text-sm font-semibold">{tab.label}</span>
-                  <span className="mt-1 block text-xs text-slate-500">{tab.description}</span>
+                  {tab.label}
                 </button>
               )
             })}
           </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setOverlayMode('입고')}
+              className={cx(ui.buttonPrimary, 'h-9 gap-1.5 px-3 text-sm')}
+            >
+              <PlusIcon />
+              <span>입고</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setOverlayMode('출고')}
+              className={cx(ui.buttonSecondary, 'h-9 gap-1.5 px-3 text-sm')}
+            >
+              <MinusIcon />
+              <span>출고</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('csv')}
+              className={cx(ui.buttonGhost, 'h-9 gap-1.5 px-3 text-sm')}
+            >
+              <UploadIcon />
+              <span>CSV</span>
+            </button>
+          </div>
         </div>
+
+        {activeTab === 'overview' ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3 text-xs">
+            <StatusBadge tone="info" className="px-2.5 py-1">
+              재고 {summary.totalQuantity.toLocaleString()}개
+            </StatusBadge>
+            <StatusBadge tone="neutral" className="px-2.5 py-1">
+              SKU {summary.skuCount.toLocaleString()}개
+            </StatusBadge>
+            <StatusBadge tone={summary.lowStockCount > 0 ? 'warning' : 'success'} className="px-2.5 py-1">
+              주의 {summary.lowStockCount.toLocaleString()}개
+            </StatusBadge>
+          </div>
+        ) : null}
       </div>
 
       {activeTab === 'overview' ? (
-        <div className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {[
-              { label: '현재 재고', value: summary.totalQuantity, detail: `${selectedWarehouseName} 기준 수량 합계` },
-              { label: '운영 SKU', value: summary.skuCount, detail: '현재 조회 조건에 포함된 조합 수' },
-              { label: '주의 항목', value: summary.lowStockCount, detail: '품절 또는 낮은 재고' },
-              { label: '금일 흐름', value: `${summary.todayInbound} / ${summary.todayOutbound}`, detail: '입고 / 출고 수량' },
-            ].map((card) => (
-              <div key={card.label} className={cx(ui.panel, ui.panelBody, 'overflow-hidden')}>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{card.label}</p>
-                <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{card.value}</p>
-                <p className="mt-2 text-sm text-slate-500">{card.detail}</p>
+        <div className="mt-4 space-y-3">
+          <BasicDataTable
+            className="hidden md:block"
+            columns={[
+              { key: 'model', label: '상품' },
+              { key: 'variant', label: '옵션' },
+              { key: 'warehouse', label: '창고' },
+              { key: 'quantity', label: '현재 재고', align: 'right' },
+              { key: 'latestInbound', label: '최근 입고' },
+              { key: 'latestOutbound', label: '최근 출고' },
+              { key: 'status', label: '상태' },
+            ]}
+            rows={overviewRows}
+            rowKey={(row) => row.key}
+            emptyState="조회 조건에 맞는 재고가 없습니다."
+            renderCell={(row, columnKey) => {
+              if (columnKey === 'model') {
+                return <div className="font-semibold text-slate-950">{row.modelName}</div>
+              }
+              if (columnKey === 'variant') {
+                return (
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <span
+                      className="inline-block h-3.5 w-3.5 rounded-full border border-slate-200"
+                      style={{ backgroundColor: row.colorRgb }}
+                    />
+                    <span>
+                      {row.colorName} / {row.sizeName}
+                    </span>
+                  </div>
+                )
+              }
+              if (columnKey === 'warehouse') {
+                return row.warehouseName
+              }
+              if (columnKey === 'quantity') {
+                return <span className="font-semibold text-slate-950">{row.quantity}</span>
+              }
+              if (columnKey === 'latestInbound') {
+                return row.latestInbound
+              }
+              if (columnKey === 'latestOutbound') {
+                return row.latestOutbound
+              }
+              if (columnKey === 'status') {
+                return (
+                  <StatusBadge tone={row.status.tone} className="px-2.5 py-1">
+                    {row.status.label}
+                  </StatusBadge>
+                )
+              }
+              return null
+            }}
+          />
+
+          <div className="space-y-3 md:hidden">
+            {overviewRows.length === 0 ? (
+              <div className={ui.emptyState}>조회 조건에 맞는 재고가 없습니다.</div>
+            ) : (
+              overviewRows.map((row) => (
+                <div key={row.key} className="surface space-y-3 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-base font-semibold text-slate-950">{row.modelName}</p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {row.colorName} / {row.sizeName}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">{row.warehouseName}</p>
+                    </div>
+                    <StatusBadge tone={row.status.tone} className="px-2.5 py-1">
+                      {row.status.label}
+                    </StatusBadge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm text-slate-600">
+                    <div>
+                      <p className="text-xs text-slate-400">현재 재고</p>
+                      <p className="mt-1 text-lg font-semibold text-slate-950">{row.quantity}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">최근 입고</p>
+                      <p className="mt-1">{row.latestInbound}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">최근 출고</p>
+                      <p className="mt-1">{row.latestOutbound}</p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === 'inbound' || activeTab === 'outbound' ? (
+        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className={cx(ui.panel, ui.panelBody, 'space-y-4 p-4 md:p-5')}>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-base font-semibold tracking-tight text-slate-950">
+                  {activeTab === 'inbound' ? '빠른 입고' : '빠른 출고'}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">선택한 창고 기준으로 여러 SKU를 한 번에 입력합니다.</p>
               </div>
-            ))}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600">
+              다건 입력, 행 복제, 붙여넣기를 기본으로 유지합니다.
+            </div>
+
+            <InOutForm
+              models={normalizedModels}
+              warehouses={warehouses}
+              initialType={activeTab === 'inbound' ? '입고' : '출고'}
+              initialWarehouseId={typeof selectedWarehouseId === 'number' ? selectedWarehouseId : warehouses[0]?.id}
+              lockedWarehouseId={typeof selectedWarehouseId === 'number' ? selectedWarehouseId : null}
+              entryMode={activeTab}
+            />
           </div>
 
-          <div className={cx(ui.panel, ui.panelBody, 'space-y-4 md:p-5')}>
-            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-              <div className="grid gap-3 md:grid-cols-[minmax(0,20rem)_minmax(0,10rem)]">
-                <div>
-                  <label htmlFor="inventory-search" className={ui.label}>
-                    검색
-                  </label>
-                  <input
-                    id="inventory-search"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="모델, 색상, 사이즈, 창고 검색"
-                    className={ui.controlSm}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="inventory-status" className={ui.label}>
-                    상태
-                  </label>
-                  <select
-                    id="inventory-status"
-                    value={statusFilter}
-                    onChange={(event) =>
-                      setStatusFilter(event.target.value as 'all' | 'normal' | 'warning' | 'danger')
-                    }
-                    className={ui.controlSm}
-                  >
-                    <option value="all">전체</option>
-                    <option value="normal">정상</option>
-                    <option value="warning">주의</option>
-                    <option value="danger">품절</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => setOverlayMode('입고')} className={ui.buttonPrimary}>
-                  빠른 입고
-                </button>
-                <button type="button" onClick={() => setOverlayMode('출고')} className={ui.buttonSecondary}>
-                  빠른 출고
-                </button>
-                <button type="button" onClick={() => setActiveTab('csv')} className={ui.buttonGhost}>
-                  CSV 등록
-                </button>
-                <Link href="/settings/master-data" className={ui.buttonGhost}>
-                  기준 데이터
-                </Link>
-              </div>
+          <div className={cx(ui.panel, ui.panelBody, 'p-4')}>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-slate-900">최근 변동</h3>
+              <span className="text-xs text-slate-500">{recentMovements.length}건</span>
             </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 text-sm text-slate-600">
-              선택된 창고: <span className="font-semibold text-slate-950">{selectedWarehouseName}</span>
-            </div>
-
-            <div className={cx('hidden md:block', ui.tableShell)}>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="ui-table-head text-left">
-                      <th className={ui.tableHeadCell}>상품</th>
-                      <th className={ui.tableHeadCell}>옵션</th>
-                      <th className={ui.tableHeadCell}>창고</th>
-                      <th className={cx(ui.tableHeadCell, 'text-right')}>현재 재고</th>
-                      <th className={cx(ui.tableHeadCell, 'text-right')}>예정 입고</th>
-                      <th className={ui.tableHeadCell}>최근 입고</th>
-                      <th className={ui.tableHeadCell}>최근 출고</th>
-                      <th className={ui.tableHeadCell}>상태</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {overviewRows.length === 0 ? (
-                      <tr>
-                        <td colSpan={8} className="px-4 py-12 text-center text-sm text-slate-400">
-                          조회 조건에 맞는 재고가 없습니다.
-                        </td>
-                      </tr>
-                    ) : (
-                      overviewRows.map((row) => (
-                        <tr key={row.key} className="border-t border-slate-100 hover:bg-slate-50/70">
-                          <td className={ui.tableCell}>
-                            <div className="font-semibold text-slate-950">{row.modelName}</div>
-                          </td>
-                          <td className={ui.tableCell}>
-                            <div className="flex items-center gap-2 text-slate-600">
-                              <span
-                                className="inline-block h-3.5 w-3.5 rounded-full border border-slate-200"
-                                style={{ backgroundColor: row.colorRgb }}
-                              />
-                              <span>
-                                {row.colorName} / {row.sizeName}
-                              </span>
-                            </div>
-                          </td>
-                          <td className={ui.tableCell}>{row.warehouseName}</td>
-                          <td className={cx(ui.tableCell, 'text-right font-semibold text-slate-950')}>{row.quantity}</td>
-                          <td className={cx(ui.tableCell, 'text-right text-slate-500')}>{row.expectedInboundQuantity}</td>
-                          <td className={ui.tableCell}>{row.latestInbound}</td>
-                          <td className={ui.tableCell}>{row.latestOutbound}</td>
-                          <td className={ui.tableCell}>
-                            <span className={cx('inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold', statusPillClass(row.status.tone))}>
-                              {row.status.label}
-                            </span>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="space-y-3 md:hidden">
-              {overviewRows.length === 0 ? (
-                <div className={ui.emptyState}>조회 조건에 맞는 재고가 없습니다.</div>
+            <div className="mt-3 space-y-2">
+              {recentMovements.length === 0 ? (
+                <p className="text-sm text-slate-500">최근 변동 내역이 없습니다.</p>
               ) : (
-                overviewRows.map((row) => (
-                  <div key={row.key} className="surface space-y-3 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-base font-semibold text-slate-950">{row.modelName}</p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {row.colorName} / {row.sizeName}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-500">{row.warehouseName}</p>
-                      </div>
-                      <span className={cx('inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold', statusPillClass(row.status.tone))}>
-                        {row.status.label}
-                      </span>
+                recentMovements.map((movement) => (
+                  <div key={movement.id} className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-950">{movement.modelName}</p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {movement.colorName} / {movement.sizeName}
+                      </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 text-sm text-slate-600">
-                      <div>
-                        <p className="text-xs text-slate-400">현재 재고</p>
-                        <p className="mt-1 text-lg font-semibold text-slate-950">{row.quantity}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-400">예정 입고</p>
-                        <p className="mt-1 text-lg font-semibold text-slate-950">{row.expectedInboundQuantity}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-400">최근 입고</p>
-                        <p className="mt-1">{row.latestInbound}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-400">최근 출고</p>
-                        <p className="mt-1">{row.latestOutbound}</p>
-                      </div>
+                    <div className="text-right">
+                      <StatusBadge tone={movementTone(movement.type)} className="px-2.5 py-1">
+                        {movement.type}
+                      </StatusBadge>
+                      <p className="mt-1 text-sm font-semibold text-slate-950">{movement.quantity}</p>
                     </div>
                   </div>
                 ))
@@ -505,122 +510,57 @@ export default function InventoryWorkspace({
         </div>
       ) : null}
 
-      {activeTab === 'inbound' || activeTab === 'outbound' ? (
-        <div className="space-y-4">
-          <div className={cx(ui.panel, ui.panelBody, 'space-y-4 md:p-5')}>
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold tracking-tight text-slate-950">
-                  {activeTab === 'inbound' ? '빠른 입고 workspace' : '빠른 출고 workspace'}
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  {selectedWarehouseName} 컨텍스트를 유지한 채 여러 행을 한 번에 등록합니다. 데스크톱은 dialog, 모바일은 full-height sheet로 열립니다.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setOverlayMode(activeTab === 'inbound' ? '입고' : '출고')}
-                className={activeTab === 'inbound' ? ui.buttonPrimary : ui.buttonSecondary}
-              >
-                {activeTab === 'inbound' ? '입고 입력 열기' : '출고 입력 열기'}
-              </button>
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                <h3 className="text-sm font-semibold text-slate-900">입력 원칙</h3>
-                <ul className="mt-3 space-y-2 text-sm text-slate-600">
-                  <li>2개 이상 SKU를 빠르게 등록할 때는 overlay 안에서 다건 입력을 유지합니다.</li>
-                  <li>행 복제와 표 붙여넣기로 반복 입력을 줄입니다.</li>
-                  <li>창고 컨텍스트는 허브와 동일하게 고정됩니다.</li>
-                </ul>
-              </div>
-
-              <div className="surface p-4">
-                <h3 className="text-sm font-semibold text-slate-900">최근 변동</h3>
-                <div className="mt-3 space-y-2">
-                  {recentMovements.length === 0 ? (
-                    <p className="text-sm text-slate-500">최근 변동 내역이 없습니다.</p>
-                  ) : (
-                    recentMovements.map((movement) => (
-                      <div key={movement.id} className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-950">{movement.modelName}</p>
-                          <p className="mt-1 text-sm text-slate-500">
-                            {movement.colorName} / {movement.sizeName}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <span className={cx('inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold', movementTone(movement.type))}>
-                            {movement.type}
-                          </span>
-                          <p className="mt-1 text-sm font-semibold text-slate-950">{movement.quantity}</p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       {activeTab === 'csv' ? (
-        <div className={cx(ui.panel, ui.panelBody, 'space-y-4 md:p-5')}>
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold tracking-tight text-slate-950">CSV workspace</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                선택된 창고에 대해 파일 업로드 또는 복사/붙여넣기 데이터로 일괄 반영합니다. 실제 저장은 기존 트랜잭션 경로를 그대로 사용합니다.
-              </p>
+        <div className="mt-4 space-y-4">
+          <div className={cx(ui.panel, ui.panelBody, 'space-y-4 p-4 md:p-5')}>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-base font-semibold tracking-tight text-slate-950">CSV</h2>
+                <p className="mt-1 text-sm text-slate-500">선택한 창고에 대해 파일 또는 붙여넣기로 일괄 반영합니다.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCsvType('입고')}
+                  className={cx(csvType === '입고' ? ui.tabActive : ui.tab, 'min-h-0 rounded-full px-3')}
+                >
+                  입고 CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCsvType('출고')}
+                  className={cx(csvType === '출고' ? ui.tabActive : ui.tab, 'min-h-0 rounded-full px-3')}
+                >
+                  출고 CSV
+                </button>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setCsvType('입고')}
-                className={cx(csvType === '입고' ? ui.tabActive : ui.tab, 'min-h-11 rounded-2xl px-4')}
-              >
-                입고 CSV
-              </button>
-              <button
-                type="button"
-                onClick={() => setCsvType('출고')}
-                className={cx(csvType === '출고' ? ui.tabActive : ui.tab, 'min-h-11 rounded-2xl px-4')}
-              >
-                출고 CSV
-              </button>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600">
+              <p className="font-semibold text-slate-900">지원 컬럼</p>
+              <p className="mt-1">`모델, 사이즈, 색상, 수량` 순서의 CSV 또는 탭 구분 표를 지원합니다.</p>
             </div>
-          </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-600">
-            <p className="font-semibold text-slate-900">지원 컬럼</p>
-            <p className="mt-1">`모델, 사이즈, 색상, 수량` 순서의 CSV 또는 탭 구분 표 데이터를 지원합니다.</p>
+            <InOutForm
+              models={normalizedModels}
+              warehouses={warehouses}
+              initialType={csvType}
+              initialWarehouseId={typeof selectedWarehouseId === 'number' ? selectedWarehouseId : warehouses[0]?.id}
+              lockedWarehouseId={typeof selectedWarehouseId === 'number' ? selectedWarehouseId : null}
+              entryMode="csv"
+            />
           </div>
-
-          <InOutForm
-            models={normalizedModels}
-            warehouses={warehouses}
-            initialType={csvType}
-            initialWarehouseId={typeof selectedWarehouseId === 'number' ? selectedWarehouseId : warehouses[0]?.id}
-            lockedWarehouseId={typeof selectedWarehouseId === 'number' ? selectedWarehouseId : null}
-            entryMode="csv"
-          />
         </div>
       ) : null}
 
       {activeTab === 'history' ? (
-        <div className="space-y-4">
-          <div className={cx(ui.panel, ui.panelBody, 'md:p-5')}>
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold tracking-tight text-slate-950">이력 workspace</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  선택된 창고 컨텍스트를 유지한 채 입고, 출고, 재고조정 흐름을 이어서 추적합니다.
-                </p>
-              </div>
-              <span className={ui.pill}>현재 컨텍스트: {selectedWarehouseName}</span>
+        <div className="mt-4 space-y-4">
+          <div className={cx(ui.panel, ui.panelBody, 'flex items-center justify-between gap-3 px-4 py-3 md:px-5')}>
+            <div>
+              <h2 className="text-base font-semibold tracking-tight text-slate-950">이력</h2>
+              <p className="mt-1 text-sm text-slate-500">선택한 창고의 변동 흐름을 이어서 추적합니다.</p>
             </div>
+            <span className={ui.pill}>{selectedWarehouseName}</span>
           </div>
           <HistoryView
             transactions={transactions.map((tx) => ({ ...tx, warehouse: tx.warehouseName }))}
@@ -635,7 +575,7 @@ export default function InventoryWorkspace({
       <EntryOverlay
         open={overlayMode !== null}
         title={overlayMode === '입고' ? '빠른 입고 등록' : '빠른 출고 등록'}
-        description={`${selectedWarehouseName} 컨텍스트에 맞춰 여러 SKU를 한 번에 입력합니다.`}
+        description={`선택한 창고 기준으로 여러 SKU를 한 번에 입력합니다.`}
         onClose={() => setOverlayMode(null)}
       >
         <InOutForm
