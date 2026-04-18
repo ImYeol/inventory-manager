@@ -29,7 +29,7 @@ export default async function ProtectedLayout({
           email: user.email ?? '',
         }}
       />
-      <main id="main-content" className="md:ml-60 min-h-screen pb-24 md:pb-10">
+      <main id="main-content" className="min-h-screen pb-10 pt-16 md:ml-72 md:pt-0">
         {children}
       </main>
     </>

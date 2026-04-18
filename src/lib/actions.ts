@@ -9,6 +9,7 @@ import {
   getTransactionsWithRelations,
   runBulkTransaction,
   runInventoryAdjustment,
+  runReceiveFactoryArrival,
 } from './data'
 import { getSupabaseWithUser } from './db'
 
@@ -203,7 +204,7 @@ export async function createWarehouse(name: string) {
   }
 
   revalidateInventoryPaths()
-  revalidatePath('/master-data')
+  revalidatePath('/settings/master-data')
   return { success: true }
 }
 
@@ -219,7 +220,7 @@ export async function deleteWarehouse(warehouseId: number) {
   }
 
   revalidateInventoryPaths()
-  revalidatePath('/master-data')
+  revalidatePath('/settings/master-data')
   return { success: true }
 }
 
@@ -235,7 +236,7 @@ export async function createModel(name: string) {
     throw new Error(error.message)
   }
 
-  revalidatePath('/master-data')
+  revalidatePath('/settings/master-data')
   revalidatePath('/')
   revalidatePath('/inventory')
   return { success: true }
@@ -324,7 +325,7 @@ export async function createModelsWithSpecs(
     throw error instanceof Error ? error : new Error('모델 일괄 등록에 실패했습니다.')
   }
 
-  revalidatePath('/master-data')
+  revalidatePath('/settings/master-data')
   revalidatePath('/')
   revalidatePath('/inventory')
   revalidateInventoryPaths()
@@ -343,7 +344,7 @@ export async function deleteModel(modelId: number) {
   }
 
   revalidateInventoryPaths()
-  revalidatePath('/master-data')
+  revalidatePath('/settings/master-data')
   return { success: true }
 }
 
@@ -363,7 +364,7 @@ export async function createModelSize(modelId: number, sizeName: string) {
     throw new Error(error.message)
   }
 
-  revalidatePath('/master-data')
+  revalidatePath('/settings/master-data')
   revalidateInventoryPaths()
   return { success: true }
 }
@@ -380,7 +381,7 @@ export async function deleteModelSize(sizeId: number) {
     throw new Error(error.message)
   }
 
-  revalidatePath('/master-data')
+  revalidatePath('/settings/master-data')
   revalidateInventoryPaths()
   return { success: true }
 }
@@ -407,7 +408,7 @@ export async function createModelColor(
     throw new Error(error.message)
   }
 
-  revalidatePath('/master-data')
+  revalidatePath('/settings/master-data')
   revalidateInventoryPaths()
   return { success: true }
 }
@@ -424,8 +425,143 @@ export async function deleteModelColor(colorId: number) {
     throw new Error(error.message)
   }
 
-  revalidatePath('/master-data')
+  revalidatePath('/settings/master-data')
   revalidateInventoryPaths()
+  return { success: true }
+}
+
+export async function createFactory(input: {
+  name: string
+  contactName?: string
+  phone?: string
+  email?: string
+  notes?: string
+}) {
+  const name = input.name.trim()
+  if (!name) {
+    throw new Error('공장 이름을 입력해주세요.')
+  }
+
+  const { supabase } = await getSupabaseWithUser()
+  const { error } = await supabase.from('factories').insert({
+    name,
+    contact_name: input.contactName?.trim() || null,
+    phone: input.phone?.trim() || null,
+    email: input.email?.trim() || null,
+    notes: input.notes?.trim() || null,
+  })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/sourcing/factories')
+  revalidatePath('/sourcing/arrivals')
+  return { success: true }
+}
+
+export async function setFactoryActive(factoryId: number, isActive: boolean) {
+  if (!factoryId) {
+    throw new Error('공장을 찾을 수 없습니다.')
+  }
+
+  const { supabase } = await getSupabaseWithUser()
+  const { error } = await supabase.from('factories').update({ is_active: isActive }).eq('id', factoryId)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/sourcing/factories')
+  revalidatePath('/sourcing/arrivals')
+  return { success: true }
+}
+
+export async function createFactoryArrivalBatch(input: {
+  factoryId: number
+  expectedDate: string
+  memo?: string
+  sourceChannel: 'manual' | 'csv'
+  items: Array<{
+    modelId: number
+    sizeId: number
+    colorId: number
+    orderedQuantity: number
+  }>
+}) {
+  if (!input.factoryId) {
+    throw new Error('공장을 선택해주세요.')
+  }
+
+  if (!input.expectedDate) {
+    throw new Error('예정 입고일을 입력해주세요.')
+  }
+
+  if (!Array.isArray(input.items) || input.items.length === 0) {
+    throw new Error('등록할 예정 입고 항목이 없습니다.')
+  }
+
+  const normalizedItems = input.items
+    .filter((item) => item.modelId && item.sizeId && item.colorId && item.orderedQuantity > 0)
+    .map((item) => ({
+      model_id: item.modelId,
+      size_id: item.sizeId,
+      color_id: item.colorId,
+      ordered_quantity: item.orderedQuantity,
+    }))
+
+  if (normalizedItems.length === 0) {
+    throw new Error('유효한 예정 입고 항목이 없습니다.')
+  }
+
+  const { supabase } = await getSupabaseWithUser()
+  const { data: arrival, error: arrivalError } = await supabase
+    .from('factory_arrivals')
+    .insert({
+      factory_id: input.factoryId,
+      expected_date: input.expectedDate,
+      status: '예정',
+      source_channel: input.sourceChannel,
+      memo: input.memo?.trim() || null,
+    })
+    .select('id')
+    .single()
+
+  if (arrivalError || !arrival?.id) {
+    throw new Error(arrivalError?.message ?? '예정 입고 등록에 실패했습니다.')
+  }
+
+  const { error: itemsError } = await supabase.from('factory_arrival_items').insert(
+    normalizedItems.map((item) => ({
+      factory_arrival_id: arrival.id,
+      ...item,
+    })),
+  )
+
+  if (itemsError) {
+    await supabase.from('factory_arrivals').delete().eq('id', arrival.id)
+    throw new Error(itemsError.message)
+  }
+
+  revalidatePath('/sourcing/arrivals')
+  revalidatePath('/sourcing/factories')
+  return { success: true, count: normalizedItems.length }
+}
+
+export async function receiveFactoryArrival(input: {
+  arrivalId: number
+  warehouseId: number
+  items: Array<{ arrivalItemId: number; quantity: number }>
+}) {
+  if (!input.arrivalId || !input.warehouseId || input.items.length === 0) {
+    throw new Error('입고 반영 정보가 올바르지 않습니다.')
+  }
+
+  await runReceiveFactoryArrival(input.arrivalId, input.warehouseId, input.items)
+
+  revalidateInventoryPaths()
+  revalidatePath('/sourcing/arrivals')
+  revalidatePath('/sourcing/factories')
   return { success: true }
 }
 
@@ -435,5 +571,5 @@ function revalidateInventoryPaths() {
   revalidatePath('/inout')
   revalidatePath('/history')
   revalidatePath('/analytics')
-  revalidatePath('/master-data')
+  revalidatePath('/settings/master-data')
 }

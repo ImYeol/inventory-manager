@@ -49,7 +49,7 @@ const quickStart = [
   {
     title: '품목 준비',
     description: '새 모델, 색상, 사이즈, 창고가 필요하면 기준 데이터에서 먼저 등록합니다.',
-    href: '/master-data',
+    href: '/settings/master-data',
     label: '기준 데이터 관리',
   },
   {

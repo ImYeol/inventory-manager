@@ -98,6 +98,6 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('link', { name: '운영 포인트: 재고현황' }).getAttribute('href')).toBe('/inventory')
     expect(screen.getByRole('link', { name: /최근 처리 이력/ }).getAttribute('href')).toBe('/history')
     expect(screen.getByRole('link', { name: '재고현황 보기' }).getAttribute('href')).toBe('/inventory')
-    expect(screen.getByRole('link', { name: '기준 데이터 관리' }).getAttribute('href')).toBe('/master-data')
+    expect(screen.getByRole('link', { name: '기준 데이터 관리' }).getAttribute('href')).toBe('/settings/master-data')
   })
 })

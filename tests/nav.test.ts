@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
   pathname: '/analytics',
@@ -40,30 +40,29 @@ afterEach(() => {
 })
 
 describe('Nav', () => {
-  it('renders the requested primary navigation labels for desktop and mobile', () => {
+  it('renders the requested primary navigation labels for the mixed sidebar', () => {
     render(React.createElement(Nav))
 
-    expect(screen.getAllByRole('link', { name: '대시보드' })).toHaveLength(2)
-    expect(screen.getAllByRole('link', { name: '재고현황' })).toHaveLength(2)
-    expect(screen.getAllByRole('link', { name: '이력조회' })).toHaveLength(2)
-    expect(screen.getAllByRole('link', { name: '기준 데이터' })).toHaveLength(2)
-    expect(screen.getAllByText('운송장').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('분석').length).toBeGreaterThan(0)
-    expect(screen.queryByText('입출고')).toBeNull()
-    expect(screen.queryByText('기초정보')).toBeNull()
-    expect(screen.queryByText('재고')).toBeNull()
-    expect(screen.queryByText('이력')).toBeNull()
-    expect(screen.queryByText('프로필')).toBeNull()
-    expect(screen.getAllByRole('link', { name: '설정' })).toHaveLength(2)
+    expect(screen.getByRole('link', { name: '대시보드' }).getAttribute('href')).toBe('/')
+    expect(screen.getByRole('link', { name: '재고 운영' }).getAttribute('href')).toBe('/inventory')
+    expect(screen.getByRole('button', { name: '소싱' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: '외부 공장' }).getAttribute('href')).toBe('/sourcing/factories')
+    expect(screen.getByRole('link', { name: '입고 예정' }).getAttribute('href')).toBe('/sourcing/arrivals')
+    expect(screen.getByRole('link', { name: '운송장' }).getAttribute('href')).toBe('/shipping')
+    expect(screen.getByRole('link', { name: '분석' }).getAttribute('href')).toBe('/analytics')
+    expect(screen.getByRole('link', { name: '스토어 연결' }).getAttribute('href')).toBe('/integrations')
+    expect(screen.getAllByRole('link', { name: '설정' })[0].getAttribute('href')).toBe('/settings')
   })
 
-  it('uses the requested href contract for the new information architecture', () => {
+  it('opens the mobile drawer and renders the same information architecture', () => {
     render(React.createElement(Nav))
 
-    expect(screen.getAllByRole('link', { name: '대시보드' })[0].getAttribute('href')).toBe('/')
-    expect(screen.getAllByRole('link', { name: '재고현황' })[0].getAttribute('href')).toBe('/inventory')
-    expect(screen.getAllByRole('link', { name: '이력조회' })[0].getAttribute('href')).toBe('/history')
-    expect(screen.getAllByRole('link', { name: '기준 데이터' })[0].getAttribute('href')).toBe('/master-data')
+    fireEvent.click(screen.getByRole('button', { name: '메뉴 열기' }))
+
+    expect(screen.getByRole('dialog', { name: '모바일 메뉴' })).toBeTruthy()
+    expect(screen.getAllByRole('link', { name: '재고 운영' })).toHaveLength(2)
+    expect(screen.getAllByRole('link', { name: '스토어 연결' })).toHaveLength(2)
+    expect(screen.getAllByRole('link', { name: '외부 공장' })).toHaveLength(2)
   })
 
   it('marks the active analytics route with the highlighted styles', () => {
@@ -74,13 +73,15 @@ describe('Nav', () => {
     expect(activeLink.className).toContain('text-slate-950')
   })
 
-  it('marks master data as active on the master data route', () => {
-    mocks.pathname = '/master-data'
+  it('marks sourcing as active on the sourcing child route', () => {
+    mocks.pathname = '/sourcing/arrivals'
 
     render(React.createElement(Nav))
 
-    const activeLink = screen.getAllByRole('link', { name: '기준 데이터' })[0]
-    expect(activeLink.getAttribute('aria-current')).toBe('page')
+    const activeChildLink = screen.getByRole('link', { name: '입고 예정' })
+    const sourcingButton = screen.getByRole('button', { name: '소싱' })
+    expect(activeChildLink.getAttribute('aria-current')).toBe('page')
+    expect(sourcingButton.getAttribute('aria-expanded')).toBe('true')
   })
 
   it('marks settings as active when the settings route is open', () => {
@@ -89,11 +90,13 @@ describe('Nav', () => {
     render(React.createElement(Nav))
 
     const activeLinks = screen.getAllByRole('link', { name: '설정' })
-    expect(activeLinks.every((link) => link.getAttribute('aria-current') === 'page')).toBe(true)
+    expect(activeLinks.some((link) => link.getAttribute('aria-current') === 'page')).toBe(true)
   })
 
   it('shows the logged-in user profile summary when user data is provided', () => {
     render(React.createElement(Nav, { user: { name: '홍길동', email: 'hong@example.com' } }))
+
+    fireEvent.click(screen.getByRole('button', { name: '메뉴 열기' }))
 
     expect(screen.getAllByText('홍길동')).toHaveLength(2)
     expect(screen.getAllByText('hong@example.com')).toHaveLength(2)

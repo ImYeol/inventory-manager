@@ -21,6 +21,12 @@ describe('schema contract', () => {
         'utf8',
       ),
     )
+    const sourcingMigrationSql = normalizedSql(
+      fs.readFileSync(
+        path.join(root, 'prisma/migrations/20260419034500_sourcing_schema_and_arrivals/migration.sql'),
+        'utf8',
+      ),
+    )
 
     expect(prismaSchema).toMatch(/model\s+warehouse\b/)
     expect(prismaSchema).toMatch(/\bwarehouseid\b/)
@@ -33,5 +39,14 @@ describe('schema contract', () => {
     expect(migrationSql).toMatch(/\balter table public\.transactions add column if not exists warehouse_id bigint\b/)
     expect(migrationSql).toMatch(/\balter table public\.inventory drop column(?: if exists)? warehouse\b/)
     expect(migrationSql).toMatch(/\balter table public\.transactions drop column(?: if exists)? warehouse\b/)
+    expect(prismaSchema).toMatch(/model\s+factory\b/)
+    expect(prismaSchema).toMatch(/model\s+factoryarrival\b/)
+    expect(prismaSchema).toMatch(/model\s+factoryarrivalitem\b/)
+    expect(schemaSql).toMatch(/create table if not exists public\.factories\b/)
+    expect(schemaSql).toMatch(/create table if not exists public\.factory_arrivals\b/)
+    expect(schemaSql).toMatch(/create table if not exists public\.factory_arrival_items\b/)
+    expect(sourcingMigrationSql).toMatch(/create table if not exists public\.factories\b/)
+    expect(sourcingMigrationSql).toMatch(/create table if not exists public\.factory_arrivals\b/)
+    expect(sourcingMigrationSql).toMatch(/create table if not exists public\.factory_arrival_items\b/)
   })
 })

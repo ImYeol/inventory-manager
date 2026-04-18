@@ -1,0 +1,7 @@
+{
+  "step": 3,
+  "name": "sourcing-schema-and-arrivals",
+  "status": "completed",
+  "summary": "Added staging factories and factory arrivals schema, sourcing CRUD and CSV/manual arrival registration, and regression coverage without changing inventory ledger behavior.",
+  "completed_at": "2026-04-19T03:48:03+0900"
+}

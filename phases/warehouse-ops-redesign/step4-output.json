@@ -1,0 +1,7 @@
+{
+  "step": 4,
+  "name": "receive-to-warehouse-and-history",
+  "status": "completed",
+  "summary": "Added one-click factory-arrival receive-to-warehouse flow with partial receipt support and source metadata in history; tests passed, build blocked by external Geist font fetch.",
+  "completed_at": "2026-04-19T04:06:26+0900"
+}

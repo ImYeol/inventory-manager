@@ -31,6 +31,19 @@ export const ui = {
   pageLead: 'max-w-2xl text-sm leading-6 text-slate-500 md:text-base',
   number: 'font-mono tabular-nums',
   helpText: 'text-xs text-slate-500',
+  navSectionButton:
+    'group flex w-full items-center justify-between gap-3 rounded-2xl border border-transparent px-3 py-3 text-left text-sm font-medium text-slate-600 transition-colors hover:border-slate-200 hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+  navItem:
+    'group flex items-center gap-3 rounded-2xl border border-transparent px-3 py-3 text-sm font-medium text-slate-600 transition-colors hover:border-slate-200 hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+  navItemActive:
+    'border-slate-200 bg-slate-50 text-slate-950 shadow-[0_1px_1px_rgba(15,23,42,0.03)]',
+  navSubItem:
+    'group flex items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium text-slate-500 transition-colors hover:border-slate-200 hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+  mobileTopbar:
+    'fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur md:hidden',
+  mobileDrawerScrim: 'fixed inset-0 z-40 bg-slate-950/35 md:hidden',
+  mobileDrawer:
+    'fixed inset-y-0 left-0 z-50 flex w-[min(88vw,22rem)] flex-col border-r border-slate-200 bg-white shadow-xl md:hidden',
 }
 
 type PageHeaderProps = {

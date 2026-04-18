@@ -139,7 +139,7 @@ function ProviderMissingState({
   return (
     <div className="px-4 py-10">
       <div className={ui.emptyState}>
-        <p className="text-base font-semibold text-slate-900">{provider} API 키를 먼저 설정하세요.</p>
+        <p className="text-base font-semibold text-slate-900">{provider} API 키를 먼저 연결하세요.</p>
         <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">{message}</p>
         <div className="mt-5">
           <Link href="/settings" className={ui.buttonSecondary}>
@@ -511,11 +511,11 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Setup</p>
             <h2 className="text-xl font-semibold tracking-tight text-slate-950">배송 채널 연동 상태</h2>
             <p className="max-w-3xl text-sm leading-6 text-slate-500">
-              엑셀 파일은 운송장 번호를 매칭하는 재료일 뿐입니다. 네이버와 쿠팡 주문 목록은 사용자별 API 키가 있어야만 조회할 수 있습니다.
+              엑셀 파일은 운송장 번호를 매칭하는 재료일 뿐입니다. 네이버와 쿠팡 주문 목록은 사용자별 API 키가 있어야만 조회할 수 있으며, 연결 준비는 스토어 연결에서 관리합니다.
             </p>
           </div>
           <Link href="/settings" className={`${ui.buttonSecondary} whitespace-nowrap`}>
-            설정으로 이동
+            스토어 연결로 이동
           </Link>
         </div>
 
@@ -538,7 +538,14 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
           />
         </div>
 
-        {hasNaverConfig !== hasCoupangConfig ? (
+        {!hasAnyProviderConfig ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-4">
+            <p className="text-base font-semibold text-slate-900">API 연동 준비가 필요합니다.</p>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              엑셀 업로드만으로는 주문 목록을 불러올 수 없습니다. 스토어 연결에서 네이버와 쿠팡 API 키를 저장한 뒤 다시 업로드하세요.
+            </p>
+          </div>
+        ) : !hasAllProviderConfig ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-4">
             <p className="text-base font-semibold text-slate-900">일부 연동만 완료되었습니다.</p>
             <p className="mt-1 text-sm leading-6 text-slate-600">
@@ -547,17 +554,17 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
             <div className="mt-4 flex flex-wrap gap-2">
               {!hasNaverConfig ? (
                 <>
-                  <p className="self-center text-sm font-medium text-slate-800">네이버 API 키를 먼저 설정하세요.</p>
-                  <Link href="/settings" className={`${ui.buttonSecondary} whitespace-nowrap`}>
-                    네이버 설정하기
+                  <p className="self-center text-sm font-medium text-slate-800">네이버 API 키를 먼저 연결하세요.</p>
+                  <Link href="/integrations" className={`${ui.buttonSecondary} whitespace-nowrap`}>
+                    네이버 연결하기
                   </Link>
                 </>
               ) : null}
               {!hasCoupangConfig ? (
                 <>
-                  <p className="self-center text-sm font-medium text-slate-800">쿠팡 API 키를 먼저 설정하세요.</p>
-                  <Link href="/settings" className={`${ui.buttonSecondary} whitespace-nowrap`}>
-                    쿠팡 설정하기
+                  <p className="self-center text-sm font-medium text-slate-800">쿠팡 API 키를 먼저 연결하세요.</p>
+                  <Link href="/integrations" className={`${ui.buttonSecondary} whitespace-nowrap`}>
+                    쿠팡 연결하기
                   </Link>
                 </>
               ) : null}
@@ -605,8 +612,8 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
             {!hasNaverConfig ? (
               <ProviderMissingState
                 provider="네이버"
-                message="이 채널은 설정 전이라 엑셀을 올려도 주문 목록을 확인할 수 없습니다. 설정 화면에서 API 키를 저장한 뒤 다시 업로드하세요."
-                ctaLabel="네이버 설정하기"
+                message="이 채널은 연결 전이라 엑셀을 올려도 주문 목록을 확인할 수 없습니다. 스토어 연결에서 API 키를 저장한 뒤 다시 업로드하세요."
+                ctaLabel="네이버 연결하기"
               />
             ) : naverError ? (
               <div className="px-4 py-3 text-sm text-red-600">{naverError}</div>
@@ -750,8 +757,8 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
             {!hasCoupangConfig ? (
               <ProviderMissingState
                 provider="쿠팡"
-                message="이 채널은 설정 전이라 엑셀을 올려도 주문 목록을 확인할 수 없습니다. 설정 화면에서 API 키를 저장한 뒤 다시 업로드하세요."
-                ctaLabel="쿠팡 설정하기"
+                message="이 채널은 연결 전이라 엑셀을 올려도 주문 목록을 확인할 수 없습니다. 스토어 연결에서 API 키를 저장한 뒤 다시 업로드하세요."
+                ctaLabel="쿠팡 연결하기"
               />
             ) : coupangError ? (
               <div className="px-4 py-3 text-sm text-red-600">{coupangError}</div>

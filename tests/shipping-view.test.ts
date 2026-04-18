@@ -67,11 +67,11 @@ describe('ShippingView', () => {
     )
 
     expect(screen.getByText('운송장 엑셀 업로드')).toBeTruthy()
-    expect(screen.getByText('API 연동 설정이 필요합니다.')).toBeTruthy()
-    expect(screen.getByText(/엑셀 업로드만으로는 주문 목록을 불러올 수 없습니다/)).toBeTruthy()
+    expect(screen.getByText('API 연동 준비가 필요합니다.')).toBeTruthy()
+    expect(screen.getByText(/스토어 연결에서 네이버와 쿠팡 API 키를 저장한 뒤 다시 업로드하세요/)).toBeTruthy()
     expect(screen.getByText('엑셀 업로드')).toBeTruthy()
     expect(screen.getByLabelText('운송장 엑셀 업로드')).toBeTruthy()
-    expect(screen.getAllByRole('link', { name: '설정으로 이동' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: '스토어 연결로 이동' }).length).toBeGreaterThan(0)
   })
 
   it('keeps the upload flow available for configured providers while surfacing partial setup gaps', () => {
@@ -91,8 +91,8 @@ describe('ShippingView', () => {
     expect(screen.getByText('일부 연동만 완료되었습니다.')).toBeTruthy()
     expect(screen.getByText(/설정된 채널만 주문을 조회할 수 있습니다/)).toBeTruthy()
     expect(screen.getByText('엑셀 업로드')).toBeTruthy()
-    expect(screen.getByText('쿠팡 API 키를 먼저 설정하세요.')).toBeTruthy()
-    expect(screen.getByRole('link', { name: '쿠팡 설정하기' })).toBeTruthy()
+    expect(screen.getByText('쿠팡 API 키를 먼저 연결하세요.')).toBeTruthy()
+    expect(screen.getByRole('link', { name: '쿠팡 연결하기' })).toBeTruthy()
   })
 
   it('handles drag-and-drop upload and renders 엑셀뷰 table from uploaded sheet', async () => {

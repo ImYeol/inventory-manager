@@ -12,6 +12,8 @@ import {
   getAnalyticsData,
   getCatalogData,
   getCurrentStockRow,
+  getFactoriesData,
+  getFactoryArrivalsData,
   getModelLookups,
   getRawTransactions,
   getTransactionsWithRelations,
@@ -135,6 +137,10 @@ describe('Supabase data mappers', () => {
             type: 'INBOUND',
             quantity: 3,
             warehouse_id: 1,
+            source_channel: 'factory-arrival',
+            reference_type: 'factory_arrival',
+            reference_id: 10,
+            memo: '공장 예정 입고 반영',
             created_at: '2026-04-12T03:00:00.000Z',
           },
         ],
@@ -157,6 +163,98 @@ describe('Supabase data mappers', () => {
           warehouseId: 1,
           warehouse: '오금동',
           warehouseName: '오금동',
+          sourceChannel: 'factory-arrival',
+          referenceType: 'factory_arrival',
+          referenceId: 10,
+          memo: '공장 예정 입고 반영',
+          createdAt: '2026-04-12T03:00:00.000Z',
+          modelName: 'LP01',
+          sizeName: 'S',
+          colorName: '네이비',
+          colorRgb: '#0f172a',
+        },
+      ],
+      models: [{ id: 1, name: 'LP01' }],
+      warehouses: [{ id: 1, name: '오금동' }],
+    })
+  })
+
+  it('falls back to the legacy transactions select when metadata columns are missing', async () => {
+    const legacyRows = [
+      {
+        id: 1,
+        date: '2026-04-12T00:00:00.000Z',
+        model_id: 1,
+        size_id: 10,
+        color_id: 20,
+        type: 'INBOUND',
+        quantity: 3,
+        warehouse_id: 1,
+        created_at: '2026-04-12T03:00:00.000Z',
+      },
+    ]
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table !== 'transactions') {
+          return createQuery(
+            {
+              models: { data: [{ id: 1, name: 'LP01' }], error: null },
+              sizes: { data: [{ id: 10, name: 'S' }], error: null },
+              colors: { data: [{ id: 20, name: '네이비', rgb_code: '#0f172a' }], error: null },
+              warehouses: { data: [{ id: 1, name: '오금동' }], error: null },
+            }[table] as QueryResult,
+          )
+        }
+
+        const builder: Record<string, unknown> = {}
+        Object.assign(builder, {
+          select: vi.fn((columns: string) => {
+            if (columns.includes('source_channel')) {
+              return {
+                order: vi.fn(() => ({
+                  order: vi.fn(async () => ({
+                    data: null,
+                    error: {
+                      message: "Could not find the column 'source_channel' of 'transactions' in the schema cache",
+                    },
+                  })),
+                })),
+              }
+            }
+
+            return {
+              order: vi.fn(() => ({
+                order: vi.fn(async () => ({
+                  data: legacyRows,
+                  error: null,
+                })),
+              })),
+            }
+          }),
+        })
+
+        return builder
+      }),
+      rpc: vi.fn(async () => ({ error: null })),
+      auth: { getUser: vi.fn() },
+    }
+
+    mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
+
+    await expect(getTransactionsWithRelations()).resolves.toEqual({
+      transactions: [
+        {
+          id: 1,
+          date: '26.04.12',
+          type: '입고',
+          quantity: 3,
+          warehouseId: 1,
+          warehouse: '오금동',
+          warehouseName: '오금동',
+          sourceChannel: null,
+          referenceType: null,
+          referenceId: null,
+          memo: null,
           createdAt: '2026-04-12T03:00:00.000Z',
           modelName: 'LP01',
           sizeName: 'S',
@@ -183,6 +281,130 @@ describe('Supabase data mappers', () => {
     mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
 
     await expect(getCurrentStockRow(1, 10, 20, 1)).resolves.toBe(7)
+  })
+
+  it('aggregates factory cards and staging arrivals without touching inventory', async () => {
+    const supabase = createSupabaseMock({
+      factories: {
+        data: [
+          {
+            id: 1,
+            name: '광주 협력사',
+            contact_name: '홍길동',
+            phone: '010-1111-2222',
+            email: 'factory@example.com',
+            notes: '메인 협력 공장',
+            is_active: true,
+            created_at: '2026-04-19T00:00:00.000Z',
+            updated_at: '2026-04-19T00:00:00.000Z',
+          },
+        ],
+        error: null,
+      },
+      factory_arrivals: {
+        data: [
+          {
+            id: 10,
+            factory_id: 1,
+            reference_code: null,
+            expected_date: '2026-04-21',
+            status: '예정',
+            source_channel: 'manual',
+            memo: '1차 납품',
+            created_at: '2026-04-19T00:00:00.000Z',
+            updated_at: '2026-04-19T00:00:00.000Z',
+          },
+        ],
+        error: null,
+      },
+      factory_arrival_items: {
+        data: [
+          {
+            id: 100,
+            factory_arrival_id: 10,
+            model_id: 1,
+            size_id: 10,
+            color_id: 20,
+            ordered_quantity: 12,
+            received_quantity: 0,
+            created_at: '2026-04-19T00:00:00.000Z',
+            updated_at: '2026-04-19T00:00:00.000Z',
+          },
+        ],
+        error: null,
+      },
+      models: { data: [{ id: 1, name: 'LP01' }], error: null },
+      sizes: { data: [{ id: 10, name: 'S' }], error: null },
+      colors: { data: [{ id: 20, name: '네이비', rgb_code: '#0f172a' }], error: null },
+    })
+
+    mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
+
+    await expect(getFactoriesData()).resolves.toEqual([
+      {
+        id: 1,
+        name: '광주 협력사',
+        contactName: '홍길동',
+        phone: '010-1111-2222',
+        email: 'factory@example.com',
+        notes: '메인 협력 공장',
+        isActive: true,
+        createdAt: '2026-04-19T00:00:00.000Z',
+        updatedAt: '2026-04-19T00:00:00.000Z',
+        arrivalCount: 1,
+        pendingQuantity: 12,
+      },
+    ])
+
+    await expect(getFactoryArrivalsData()).resolves.toEqual([
+      {
+        id: 10,
+        factoryId: 1,
+        factoryName: '광주 협력사',
+        referenceCode: null,
+        expectedDate: '2026-04-21',
+        status: '예정',
+        sourceChannel: 'manual',
+        memo: '1차 납품',
+        createdAt: '2026-04-19T00:00:00.000Z',
+        updatedAt: '2026-04-19T00:00:00.000Z',
+        totalOrderedQuantity: 12,
+        totalReceivedQuantity: 0,
+        remainingQuantity: 12,
+        items: [
+          {
+            id: 100,
+            modelId: 1,
+            modelName: 'LP01',
+            sizeId: 10,
+            sizeName: 'S',
+            colorId: 20,
+            colorName: '네이비',
+            colorRgb: '#0f172a',
+            orderedQuantity: 12,
+            receivedQuantity: 0,
+            remainingQuantity: 12,
+          },
+        ],
+      },
+    ])
+  })
+
+  it('returns empty sourcing data when factory tables are not deployed yet', async () => {
+    const missingTableError = { message: "relation 'public.factory_arrivals' does not exist" }
+    const supabase = createSupabaseMock({
+      factories: { data: null, error: missingTableError },
+      factory_arrivals: { data: null, error: missingTableError },
+      factory_arrival_items: { data: null, error: missingTableError },
+      models: { data: [{ id: 1, name: 'LP01' }], error: null },
+      sizes: { data: [{ id: 10, name: 'S' }], error: null },
+      colors: { data: [{ id: 20, name: '네이비', rgb_code: '#0f172a' }], error: null },
+    })
+
+    mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
+
+    await expect(getFactoriesData()).resolves.toEqual([])
+    await expect(getFactoryArrivalsData()).resolves.toEqual([])
   })
 
   it('maps bulk transaction payloads into Supabase RPC enums', async () => {

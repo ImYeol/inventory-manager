@@ -63,6 +63,7 @@ describe('SettingsPage', () => {
 
     expect(mocks.getShippingSettingsSummary).toHaveBeenCalledTimes(1)
     expect(mocks.settingsView).toHaveBeenCalledWith(expect.objectContaining({ summary }))
+    expect(screen.getByRole('link', { name: '기준 데이터' }).getAttribute('href')).toBe('/settings/master-data')
     expect(screen.getByRole('link', { name: '운송장으로 돌아가기' }).getAttribute('href')).toBe('/shipping')
     expect(screen.getByRole('button', { name: '로그아웃' })).toBeTruthy()
     expect(screen.getByTestId('settings-view').getAttribute('data-summary')).toBe(JSON.stringify(summary))

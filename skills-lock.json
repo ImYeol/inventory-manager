@@ -1,6 +1,16 @@
 {
   "version": 1,
   "skills": {
+    "seleccase-harness": {
+      "source": ".agents/skills/seleccase-harness",
+      "sourceType": "local",
+      "computedHash": "3b55887eb2b7bc33325c31209ac339c8929c7ce37aa88f419a4e0d624790669e"
+    },
+    "seleccase-review": {
+      "source": ".agents/skills/seleccase-review",
+      "sourceType": "local",
+      "computedHash": "ab3d808540213fb6c212503bad2f404a0a4eb9ab2c4e0e5637140fc7845a39bb"
+    },
     "supabase": {
       "source": "supabase/agent-skills",
       "sourceType": "github",

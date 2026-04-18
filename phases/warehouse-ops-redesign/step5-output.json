@@ -1,0 +1,7 @@
+{
+  "step": 5,
+  "name": "store-connections-and-shipping-upgrade",
+  "status": "completed",
+  "summary": "Reworked store connections to surface Naver and Coupang credential state with masked values and last-updated timestamps while preserving the existing shipping provider flow.",
+  "completed_at": "2026-04-19T04:26:00+0900"
+}

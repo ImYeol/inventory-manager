@@ -39,7 +39,7 @@ describe('InOutForm', () => {
     )
 
     expect(screen.getByText('창고가 없습니다.')).toBeTruthy()
-    expect(screen.getByRole('link', { name: '창고 등록하러 가기' }).getAttribute('href')).toBe('/master-data')
+    expect(screen.getByRole('link', { name: '창고 등록하러 가기' }).getAttribute('href')).toBe('/settings/master-data')
     expect(screen.getByText('입출고 등록은 창고 등록 후 이용할 수 있습니다.')).toBeTruthy()
   })
 
@@ -70,5 +70,34 @@ describe('InOutForm', () => {
 
     fireEvent.change(warehouseSelect, { target: { value: '9' } })
     expect((warehouseSelect as HTMLSelectElement).value).toBe('9')
+  })
+
+  it('duplicates a row and imports delimited text into the editor', () => {
+    render(
+      React.createElement(InOutForm, {
+        warehouses: [{ id: 7, name: '본사 창고' }],
+        models: [
+          {
+            id: 1,
+            name: 'LP01',
+            sizes: [{ id: 11, name: 'S', sortOrder: 1, modelId: 1 }],
+            colors: [{ id: 21, name: '네이비', rgbCode: '#111111', textWhite: true, sortOrder: 1, modelId: 1 }],
+          },
+        ],
+      }),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '표 붙여넣기' }))
+    fireEvent.change(screen.getByLabelText('붙여넣기'), {
+      target: { value: '모델,사이즈,색상,수량\nLP01,S,네이비,3' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '행으로 가져오기' }))
+
+    expect(screen.getByText('1개 행을 가져왔습니다.')).toBeTruthy()
+    expect(screen.getAllByDisplayValue('3')).toHaveLength(2)
+
+    fireEvent.click(screen.getAllByRole('button', { name: '행 복제' })[0])
+
+    expect(screen.getAllByDisplayValue('3')).toHaveLength(4)
   })
 })

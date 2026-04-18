@@ -33,6 +33,7 @@ model Model {
   sizes        Size[]
   colors       Color[]
   inventory    Inventory[]
+  factoryArrivalItems FactoryArrivalItem[]
   transactions Transaction[]
 
   @@unique([id, userId])
@@ -93,6 +94,66 @@ model Warehouse {
   @@map("warehouses")
 }
 
+model Factory {
+  id        BigInt           @id @default(autoincrement()) @db.BigInt
+  userId    String           @map("user_id") @db.Uuid
+  name      String
+  contactName String?        @map("contact_name")
+  phone     String?
+  email     String?
+  notes     String?
+  isActive  Boolean          @default(true) @map("is_active")
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime         @default(now()) @map("updated_at") @db.Timestamptz(6)
+  arrivals  FactoryArrival[]
+
+  @@unique([id, userId])
+  @@unique([userId, name])
+  @@index([userId, createdAt(sort: Desc)], map: "factories_user_id_created_at_idx")
+  @@map("factories")
+}
+
+model FactoryArrival {
+  id           BigInt               @id @default(autoincrement()) @db.BigInt
+  userId       String               @map("user_id") @db.Uuid
+  factoryId    BigInt               @map("factory_id") @db.BigInt
+  referenceCode String?             @map("reference_code")
+  expectedDate DateTime             @map("expected_date") @db.Date
+  status       String
+  sourceChannel String              @map("source_channel")
+  memo         String?
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime             @default(now()) @map("updated_at") @db.Timestamptz(6)
+  factory      Factory              @relation(fields: [factoryId, userId], references: [id, userId], onDelete: Cascade)
+  items        FactoryArrivalItem[]
+
+  @@unique([id, userId])
+  @@index([userId, expectedDate(sort: Asc), createdAt(sort: Desc)], map: "factory_arrivals_user_expected_date_idx")
+  @@index([factoryId, userId], map: "factory_arrivals_factory_id_user_id_idx")
+  @@map("factory_arrivals")
+}
+
+model FactoryArrivalItem {
+  id               BigInt         @id @default(autoincrement()) @db.BigInt
+  userId           String         @map("user_id") @db.Uuid
+  factoryArrivalId BigInt         @map("factory_arrival_id") @db.BigInt
+  modelId          BigInt         @map("model_id") @db.BigInt
+  sizeId           BigInt         @map("size_id") @db.BigInt
+  colorId          BigInt         @map("color_id") @db.BigInt
+  orderedQuantity  Int            @map("ordered_quantity")
+  receivedQuantity Int            @default(0) @map("received_quantity")
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime       @default(now()) @map("updated_at") @db.Timestamptz(6)
+  arrival          FactoryArrival @relation(fields: [factoryArrivalId, userId], references: [id, userId], onDelete: Cascade)
+  model            Model          @relation(fields: [modelId, userId], references: [id, userId], onDelete: Cascade)
+  size             Size           @relation(fields: [modelId, sizeId, userId], references: [modelId, id, userId], onDelete: Cascade)
+  color            Color          @relation(fields: [modelId, colorId, userId], references: [modelId, id, userId], onDelete: Cascade)
+
+  @@index([factoryArrivalId, userId], map: "factory_arrival_items_arrival_id_user_id_idx")
+  @@index([modelId, userId], map: "factory_arrival_items_model_id_user_id_idx")
+  @@map("factory_arrival_items")
+}
+
 model Inventory {
   id        BigInt         @id @default(autoincrement()) @db.BigInt
   userId    String         @map("user_id") @db.Uuid
@@ -125,6 +186,10 @@ model Transaction {
   type      TransactionTypeValue
   quantity  Int
   warehouseId BigInt             @map("warehouse_id") @db.BigInt
+  sourceChannel String?          @map("source_channel")
+  referenceType String?          @map("reference_type")
+  referenceId BigInt?            @map("reference_id") @db.BigInt
+  memo      String?
   createdAt DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   model     Model                @relation(fields: [modelId, userId], references: [id, userId], onDelete: Cascade)
   size      Size                 @relation(fields: [modelId, sizeId, userId], references: [modelId, id, userId], onDelete: Cascade)

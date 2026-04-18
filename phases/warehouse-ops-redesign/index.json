@@ -1,0 +1,57 @@
+{
+  "project": "Seleccase Inventory",
+  "phase": "warehouse-ops-redesign",
+  "status": "completed",
+  "steps": [
+    {
+      "step": 0,
+      "name": "codex-hooks-and-doc-foundation",
+      "status": "completed",
+      "summary": "Codex hooks, CLAUDE contract, and redesign docs were aligned to the warehouse-ops, sourcing, and store-connections IA."
+    },
+    {
+      "step": 1,
+      "name": "navigation-and-route-simplification",
+      "status": "completed",
+      "summary": "Navigation was simplified to direct primary items plus a sourcing group, with protected routes aligned around /inventory and /integrations."
+    },
+    {
+      "step": 2,
+      "name": "inventory-operations-hub",
+      "status": "completed",
+      "summary": "Converted /inventory into a warehouse-scoped operations hub with overview, quick entry overlays, CSV import workspace, embedded history, and supporting regression coverage.",
+      "completed_at": "2026-04-19T03:37:44+0900"
+    },
+    {
+      "step": 3,
+      "name": "sourcing-schema-and-arrivals",
+      "status": "completed",
+      "started_at": "2026-04-19T03:37:44+0900",
+      "summary": "Added staging factories and factory arrivals schema, sourcing CRUD and CSV/manual arrival registration, and regression coverage without changing inventory ledger behavior.",
+      "completed_at": "2026-04-19T03:48:03+0900"
+    },
+    {
+      "step": 4,
+      "name": "receive-to-warehouse-and-history",
+      "status": "completed",
+      "started_at": "2026-04-19T03:48:03+0900",
+      "summary": "Added one-click factory-arrival receive-to-warehouse flow with partial receipt support and source metadata in history; tests passed, build blocked by external Geist font fetch.",
+      "completed_at": "2026-04-19T04:06:26+0900"
+    },
+    {
+      "step": 5,
+      "name": "store-connections-and-shipping-upgrade",
+      "status": "completed",
+      "started_at": "2026-04-19T04:10:00+0900",
+      "summary": "Reworked store connections to surface Naver and Coupang credential state with masked values and last-updated timestamps while preserving the existing shipping provider flow.",
+      "completed_at": "2026-04-19T04:26:00+0900"
+    },
+    {
+      "step": 6,
+      "name": "settings-consolidation-and-regression",
+      "status": "completed",
+      "summary": "Consolidated master-data style admin surfaces under settings and verified analytics/shipping routes and the overall phase contract with passing test, build, and harness validation runs.",
+      "completed_at": "2026-04-19T04:26:00+0900"
+    }
+  ]
+}

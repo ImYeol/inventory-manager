@@ -13,10 +13,10 @@ export default async function ShippingPage() {
       <PageHeader
         kicker="Shipping"
         title="운송장 관리"
-        description="운송장 파일과 사용자별 API 연동 정보를 함께 사용해 네이버·쿠팡 주문을 조회하고 발송 처리합니다."
+        description="운송장 파일 업로드, 미리보기, 매칭, 발송 실행을 한 흐름으로 유지하고, 연동 준비는 스토어 연결에서 따로 관리합니다."
         actions={
-          <Link href="/settings" className={`${ui.buttonSecondary} whitespace-nowrap`}>
-            배송 연동 설정
+          <Link href="/integrations" className={`${ui.buttonSecondary} whitespace-nowrap`}>
+            스토어 연결로 이동
           </Link>
         }
       />
