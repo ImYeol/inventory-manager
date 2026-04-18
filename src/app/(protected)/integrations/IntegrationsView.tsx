@@ -7,6 +7,7 @@ import {
   saveNaverSettings,
 } from '@/lib/actions/shipping-settings'
 import type { ShippingSettingsSummary } from '@/lib/shipping-credentials'
+import { StatusBadge } from '@/components/ui/badge-1'
 import { cx, ui } from '../../components/ui'
 
 function formatUpdatedAt(value?: string | null) {
@@ -30,34 +31,51 @@ function SummaryCard({
   updatedAt?: string | null
 }) {
   return (
-    <div className="surface p-5">
+    <div className="surface p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
+          <h2 className="text-base font-semibold text-slate-950">{title}</h2>
           <p className="mt-1 text-sm leading-6 text-slate-500">
-            {configured ? '현재 사용자 계정에 저장된 연결 정보입니다.' : '아직 이 사용자에게 저장된 연결 정보가 없습니다.'}
+            {configured ? '현재 계정에 저장된 연결 정보입니다.' : '아직 이 계정에 저장된 연결 정보가 없습니다.'}
           </p>
         </div>
-        <span className={cx(ui.pill, configured ? '' : 'bg-slate-50')}>
-          <span aria-hidden="true" className={cx('h-2 w-2 rounded-full', configured ? 'bg-emerald-500' : 'bg-amber-500')} />
+        <StatusBadge tone={configured ? 'success' : 'warning'}>
           {configured ? '설정 완료' : '설정 필요'}
-        </span>
+        </StatusBadge>
       </div>
 
-      <dl className="mt-4 space-y-2 text-sm">
-        {maskedValues.map((item) => (
-          <div key={item.label} className="flex items-center justify-between gap-4">
-            <dt className="text-slate-500">{item.label}</dt>
-            <dd className="text-right font-medium text-slate-800" translate="no">
-              {item.value ?? '저장된 키 없음'}
-            </dd>
-          </div>
-        ))}
-        <div className="flex items-center justify-between gap-4">
-          <dt className="text-slate-500">최근 변경</dt>
-          <dd className="text-right text-slate-600">{formatUpdatedAt(updatedAt)}</dd>
-        </div>
-      </dl>
+      <div className={cx(ui.tableShell, 'mt-3 overflow-hidden')}>
+        <table className="w-full border-collapse text-sm">
+          <tbody>
+            <tr className="border-b border-slate-100 last:border-b-0">
+              <th scope="row" className={ui.tableHeadCell}>
+                연결 상태
+              </th>
+              <td className={ui.tableCell}>
+                <StatusBadge tone={configured ? 'success' : 'warning'}>
+                  {configured ? '연결됨' : '미연결'}
+                </StatusBadge>
+              </td>
+            </tr>
+            {maskedValues.map((item) => (
+              <tr key={item.label} className="border-b border-slate-100 last:border-b-0">
+                <th scope="row" className={ui.tableHeadCell}>
+                  {item.label}
+                </th>
+                <td className={ui.tableCell} translate="no">
+                  {item.value ?? '저장된 키 없음'}
+                </td>
+              </tr>
+            ))}
+            <tr className="border-b border-slate-100 last:border-b-0">
+              <th scope="row" className={ui.tableHeadCell}>
+                최근 변경
+              </th>
+              <td className={ui.tableCell}>{formatUpdatedAt(updatedAt)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
@@ -160,7 +178,7 @@ export default function IntegrationsView({ summary }: { summary: ShippingSetting
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4">
+      <section className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
         <p className="text-sm font-medium text-slate-800">저장된 값은 다시 표시되지 않습니다.</p>
         <p className="mt-1 text-sm leading-6 text-slate-600">
           네이버와 쿠팡의 연결 준비는 이 화면에서만 처리하고, 운송장 업로드와 발송 실행은 `/shipping`에서 계속합니다.
@@ -176,9 +194,9 @@ export default function IntegrationsView({ summary }: { summary: ShippingSetting
             updatedAt={currentSummary.naver.updatedAt}
           />
 
-          <form className="surface p-5" onSubmit={handleNaverSave}>
+          <form className="surface p-4" onSubmit={handleNaverSave}>
             <div className="space-y-1">
-              <h2 className="text-lg font-semibold text-slate-950">네이버 연결 정보 업데이트</h2>
+              <h2 className="text-base font-semibold text-slate-950">네이버 연결 정보 업데이트</h2>
               <p className="text-sm leading-6 text-slate-500">새 값을 입력하면 해당 사용자 계정의 저장값을 교체합니다.</p>
             </div>
             <div className="mt-5 space-y-4">
@@ -233,9 +251,9 @@ export default function IntegrationsView({ summary }: { summary: ShippingSetting
             updatedAt={currentSummary.coupang.updatedAt}
           />
 
-          <form className="surface p-5" onSubmit={handleCoupangSave}>
+          <form className="surface p-4" onSubmit={handleCoupangSave}>
             <div className="space-y-1">
-              <h2 className="text-lg font-semibold text-slate-950">쿠팡 연결 정보 업데이트</h2>
+              <h2 className="text-base font-semibold text-slate-950">쿠팡 연결 정보 업데이트</h2>
               <p className="text-sm leading-6 text-slate-500">Access Key, Secret Key, Vendor ID를 함께 입력해야 저장됩니다.</p>
             </div>
             <div className="mt-5 space-y-4">

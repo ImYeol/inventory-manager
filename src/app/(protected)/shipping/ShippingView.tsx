@@ -7,6 +7,7 @@ import { parseExcelRow, type CourierRow } from '@/lib/excel';
 import * as shippingActions from '@/lib/actions/shipping';
 import type { NaverOrder, CoupangOrder } from '@/lib/actions/shipping';
 import type { ShippingSettingsSummary } from '@/lib/shipping-credentials';
+import { StatusBadge } from '@/components/ui/badge-1';
 import { cx, ui } from '../../components/ui';
 
 type MatchedNaverOrder = NaverOrder & {
@@ -52,15 +53,6 @@ function matchOrders<T extends { recipientName?: string; receiverName?: string; 
   });
 }
 
-function formatUpdatedAt(value?: string | null) {
-  if (!value) return '아직 저장 이력이 없습니다.';
-
-  return new Intl.DateTimeFormat('ko-KR', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
-}
-
 type ExcelRow = Record<string, unknown>;
 
 function isSupportedExcelFile(file: File) {
@@ -77,78 +69,6 @@ function isSupportedExcelFile(file: File) {
 function formatCellValue(value: unknown) {
   if (value === null || value === undefined) return '';
   return typeof value === 'string' ? value : String(value);
-}
-
-function ProviderStatusCard({
-  label,
-  configured,
-  maskedSummary,
-  updatedAt,
-}: {
-  label: string;
-  configured: boolean;
-  maskedSummary?: string;
-  updatedAt?: string | null;
-}) {
-  return (
-    <div className="surface p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-slate-950">{label}</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            {configured ? 'API 키가 저장되어 주문 조회에 사용할 수 있습니다.' : '아직 API 키가 저장되지 않았습니다.'}
-          </p>
-        </div>
-        <span className={cx(ui.pill, configured ? '' : 'bg-slate-50')}>
-          <span
-            aria-hidden="true"
-            className={cx('h-2 w-2 rounded-full', configured ? 'bg-emerald-500' : 'bg-amber-500')}
-          />
-          {configured ? '설정 완료' : '설정 필요'}
-        </span>
-      </div>
-      <dl className="mt-4 space-y-2 text-sm">
-        <div className="flex items-center justify-between gap-3">
-          <dt className="text-slate-500">저장 상태</dt>
-          <dd className="font-medium text-slate-800">{configured ? '연결됨' : '미연결'}</dd>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <dt className="text-slate-500">저장된 키</dt>
-          <dd className="font-medium text-slate-800" translate="no">
-            {maskedSummary ?? '저장된 키 없음'}
-          </dd>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <dt className="text-slate-500">최근 변경</dt>
-          <dd className="text-right text-slate-600">{formatUpdatedAt(updatedAt)}</dd>
-        </div>
-      </dl>
-    </div>
-  );
-}
-
-function ProviderMissingState({
-  provider,
-  message,
-  ctaLabel,
-}: {
-  provider: string;
-  message: string;
-  ctaLabel: string;
-}) {
-  return (
-    <div className="px-4 py-10">
-      <div className={ui.emptyState}>
-        <p className="text-base font-semibold text-slate-900">{provider} API 키를 먼저 연결하세요.</p>
-        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">{message}</p>
-        <div className="mt-5">
-          <Link href="/settings" className={ui.buttonSecondary}>
-            {ctaLabel}
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export default function ShippingView({ settingsSummary }: { settingsSummary: ShippingSettingsSummary }) {
@@ -181,7 +101,6 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
   const hasNaverConfig = settingsSummary.naver.configured;
   const hasCoupangConfig = settingsSummary.coupang.configured;
   const hasAnyProviderConfig = hasNaverConfig || hasCoupangConfig;
-  const hasAllProviderConfig = hasNaverConfig && hasCoupangConfig;
 
   const handleFileUpload = useCallback(
     (file: File) => {
@@ -389,12 +308,9 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
     <div className="space-y-5">
       <section className={cx(ui.panel, ui.panelBody, 'space-y-4')}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-2">
+          <div className="space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Excel Upload</p>
             <h2 className="text-xl font-semibold tracking-tight text-slate-950">운송장 엑셀 업로드</h2>
-            <p className="max-w-3xl text-sm leading-6 text-slate-500">
-              파일을 올리면 네이버와 쿠팡 주문을 한 번에 조회해 운송장 번호를 매칭합니다. 설정된 채널만 바로 처리되고, 미설정 채널은 아래 상태 카드에서 확인할 수 있습니다.
-            </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -415,7 +331,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
           </div>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
+        <div className="grid gap-4 xl:grid-cols-[1fr]">
           <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
             <div
               className={cx(
@@ -452,6 +368,9 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
 
               <p className="mt-4 text-sm text-slate-600">엑셀 파일을 드래그하거나 클릭해 업로드하세요.</p>
               <p className="mt-1 text-xs text-slate-500">업로드 형식: .xlsx, .xls</p>
+              <p className="mt-3 text-xs leading-5 text-slate-500">
+                받는분 이름과 주소가 일치하면 자동 매칭됩니다. 발송 제외 체크로 전송 대상을 더 줄일 수 있습니다.
+              </p>
               {fileName ? (
                 <p className="mt-3 text-sm font-medium text-slate-800">{fileName}</p>
               ) : null}
@@ -487,97 +406,31 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
 
             {!excelRows.length ? (
               <p className="mt-4 text-sm text-slate-500">
-                {hasAnyProviderConfig
-                  ? '업로드 즉시 두 채널의 미발송 주문을 조회합니다.'
-                  : '엑셀만 업로드해 먼저 형식을 확인할 수 있습니다.'}
+                {hasAnyProviderConfig ? '업로드 즉시 두 채널의 미발송 주문을 조회합니다.' : '엑셀만 업로드해 먼저 형식을 확인할 수 있습니다.'}
               </p>
             ) : null}
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
-            <p className="text-sm font-semibold text-slate-900">엑셀 사용 팁</p>
-            <ul className="mt-3 space-y-3 text-sm leading-6 text-slate-600">
-              <li>받는분 이름과 주소가 일치해야 자동 매칭됩니다.</li>
-              <li>네이버와 쿠팡을 동시에 관리하더라도 한 번 업로드로 처리합니다.</li>
-              <li>매칭 후에는 발송 제외 체크로 발송 대상만 추릴 수 있습니다.</li>
-            </ul>
           </div>
         </div>
       </section>
 
-      <section className={cx(ui.panel, ui.panelBody, 'space-y-4')}>
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div className="space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Setup</p>
-            <h2 className="text-xl font-semibold tracking-tight text-slate-950">배송 채널 연동 상태</h2>
-            <p className="max-w-3xl text-sm leading-6 text-slate-500">
-              엑셀 파일은 운송장 번호를 매칭하는 재료일 뿐입니다. 네이버와 쿠팡 주문 목록은 사용자별 API 키가 있어야만 조회할 수 있으며, 연결 준비는 스토어 연결에서 관리합니다.
-            </p>
-          </div>
-          <Link href="/settings" className={`${ui.buttonSecondary} whitespace-nowrap`}>
+      <section className={cx(ui.panel, ui.panelBody, 'flex flex-col gap-3 md:flex-row md:items-center md:justify-between')}>
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-slate-950">연동 준비 상태</p>
+          <p className="text-sm leading-6 text-slate-500">
+            연결 준비와 키 관리는 스토어 연결에서만 처리합니다. 여기서는 업로드와 발송만 진행합니다.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge tone={hasNaverConfig ? 'success' : 'warning'}>
+            네이버 {hasNaverConfig ? '연결됨' : '미연결'}
+          </StatusBadge>
+          <StatusBadge tone={hasCoupangConfig ? 'success' : 'warning'}>
+            쿠팡 {hasCoupangConfig ? '연결됨' : '미연결'}
+          </StatusBadge>
+          <Link href="/integrations" className={ui.buttonSecondary}>
             스토어 연결로 이동
           </Link>
         </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <ProviderStatusCard
-            label="네이버"
-            configured={hasNaverConfig}
-            maskedSummary={settingsSummary.naver.masked.clientId}
-            updatedAt={settingsSummary.naver.updatedAt}
-          />
-          <ProviderStatusCard
-            label="쿠팡"
-            configured={hasCoupangConfig}
-            maskedSummary={
-              [settingsSummary.coupang.masked.accessKey, settingsSummary.coupang.masked.vendorId]
-                .filter(Boolean)
-                .join(' / ') || undefined
-            }
-            updatedAt={settingsSummary.coupang.updatedAt}
-          />
-        </div>
-
-        {!hasAnyProviderConfig ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-4">
-            <p className="text-base font-semibold text-slate-900">API 연동 준비가 필요합니다.</p>
-            <p className="mt-1 text-sm leading-6 text-slate-600">
-              엑셀 업로드만으로는 주문 목록을 불러올 수 없습니다. 스토어 연결에서 네이버와 쿠팡 API 키를 저장한 뒤 다시 업로드하세요.
-            </p>
-          </div>
-        ) : !hasAllProviderConfig ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-4">
-            <p className="text-base font-semibold text-slate-900">일부 연동만 완료되었습니다.</p>
-            <p className="mt-1 text-sm leading-6 text-slate-600">
-              설정된 채널만 주문을 조회할 수 있습니다. 누락된 채널은 설정을 마친 뒤 같은 엑셀 파일로 함께 처리하세요.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {!hasNaverConfig ? (
-                <>
-                  <p className="self-center text-sm font-medium text-slate-800">네이버 API 키를 먼저 연결하세요.</p>
-                  <Link href="/integrations" className={`${ui.buttonSecondary} whitespace-nowrap`}>
-                    네이버 연결하기
-                  </Link>
-                </>
-              ) : null}
-              {!hasCoupangConfig ? (
-                <>
-                  <p className="self-center text-sm font-medium text-slate-800">쿠팡 API 키를 먼저 연결하세요.</p>
-                  <Link href="/integrations" className={`${ui.buttonSecondary} whitespace-nowrap`}>
-                    쿠팡 연결하기
-                  </Link>
-                </>
-              ) : null}
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-4">
-            <p className="text-base font-semibold text-slate-900">두 채널 모두 연동되었습니다.</p>
-            <p className="mt-1 text-sm leading-6 text-slate-600">
-              엑셀 파일을 업로드하면 네이버와 쿠팡 주문을 동시에 조회해 운송장 번호를 매칭합니다.
-            </p>
-          </div>
-        )}
       </section>
 
       {courierRows.length > 0 && (
@@ -610,11 +463,17 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
             </div>
 
             {!hasNaverConfig ? (
-              <ProviderMissingState
-                provider="네이버"
-                message="이 채널은 연결 전이라 엑셀을 올려도 주문 목록을 확인할 수 없습니다. 스토어 연결에서 API 키를 저장한 뒤 다시 업로드하세요."
-                ctaLabel="네이버 연결하기"
-              />
+              <div className="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between">
+                <div className="space-y-2">
+                  <StatusBadge tone="warning">네이버 미연결</StatusBadge>
+                  <p className="text-sm leading-6 text-slate-600">
+                    스토어 연결에서 네이버 API 키를 저장하면 이 표에서 주문을 조회할 수 있습니다.
+                  </p>
+                </div>
+                <Link href="/integrations" className={ui.buttonSecondary}>
+                  네이버 연결하기
+                </Link>
+              </div>
             ) : naverError ? (
               <div className="px-4 py-3 text-sm text-red-600">{naverError}</div>
             ) : naverLoading ? (
@@ -755,11 +614,17 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
             </div>
 
             {!hasCoupangConfig ? (
-              <ProviderMissingState
-                provider="쿠팡"
-                message="이 채널은 연결 전이라 엑셀을 올려도 주문 목록을 확인할 수 없습니다. 스토어 연결에서 API 키를 저장한 뒤 다시 업로드하세요."
-                ctaLabel="쿠팡 연결하기"
-              />
+              <div className="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between">
+                <div className="space-y-2">
+                  <StatusBadge tone="warning">쿠팡 미연결</StatusBadge>
+                  <p className="text-sm leading-6 text-slate-600">
+                    스토어 연결에서 쿠팡 API 키를 저장하면 이 표에서 주문을 조회할 수 있습니다.
+                  </p>
+                </div>
+                <Link href="/integrations" className={ui.buttonSecondary}>
+                  쿠팡 연결하기
+                </Link>
+              </div>
             ) : coupangError ? (
               <div className="px-4 py-3 text-sm text-red-600">{coupangError}</div>
             ) : coupangLoading ? (
