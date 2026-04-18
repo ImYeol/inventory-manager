@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { createFactory, setFactoryActive } from '@/lib/actions'
+import { StatusBadge } from '@/components/ui/badge-1'
 import { PageHeader, cx, ui } from '@/app/components/ui'
 
 type FactoryData = {
@@ -57,9 +58,8 @@ export default function FactoriesView({ factories }: { factories: FactoryData[] 
   return (
     <div className={ui.shell}>
       <PageHeader
-        kicker="Sourcing"
         title="외부 공장"
-        description="공장 목록 관리와 기본 정보, 예정 입고 연결 상태를 소싱 컨텍스트 안에서 유지합니다."
+        description="공장 목록과 예정 입고 연결 상태를 한 화면에서 관리합니다."
       />
 
       {message ? (
@@ -69,10 +69,10 @@ export default function FactoriesView({ factories }: { factories: FactoryData[] 
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-        <section className={cx(ui.panel, ui.panelBody, 'space-y-4 md:p-5')}>
+        <section className={cx(ui.panel, ui.panelBody, 'space-y-4 md:p-4')}>
           <div>
-            <h2 className="text-lg font-semibold tracking-tight text-slate-950">공장 등록</h2>
-            <p className="mt-1 text-sm text-slate-500">이름, 연락처, 메모를 저장해 예정 입고와 연결합니다.</p>
+            <h2 className="text-base font-semibold tracking-tight text-slate-950">공장 등록</h2>
+            <p className="mt-1 text-sm text-slate-500">이름과 연락처를 저장해 예정 입고와 연결합니다.</p>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
@@ -137,8 +137,7 @@ export default function FactoriesView({ factories }: { factories: FactoryData[] 
           <div className={ui.panelHeader}>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold tracking-tight text-slate-950">공장 목록</h2>
-                <p className="mt-1 text-sm text-slate-500">활성 상태와 예정 입고 연결 건수를 빠르게 확인합니다.</p>
+                <h2 className="text-base font-semibold tracking-tight text-slate-950">공장 목록</h2>
               </div>
               <span className={ui.pill}>총 {factories.length}개</span>
             </div>
@@ -153,16 +152,9 @@ export default function FactoriesView({ factories }: { factories: FactoryData[] 
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="text-base font-semibold text-slate-950">{factory.name}</h3>
-                        <span
-                          className={cx(
-                            'inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold',
-                            factory.isActive
-                              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                              : 'border-slate-200 bg-slate-100 text-slate-600',
-                          )}
-                        >
+                        <StatusBadge tone={factory.isActive ? 'success' : 'neutral'} className="px-2.5 py-1">
                           {factory.isActive ? '활성' : '비활성'}
-                        </span>
+                        </StatusBadge>
                       </div>
                       <p className="mt-1 text-sm text-slate-500">
                         {[factory.contactName, factory.phone, factory.email].filter(Boolean).join(' · ') || '연락처 정보 없음'}
@@ -178,15 +170,13 @@ export default function FactoriesView({ factories }: { factories: FactoryData[] 
                     </button>
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                      <p className="text-xs font-medium text-slate-500">예정 건수</p>
-                      <p className="mt-1 text-lg font-semibold text-slate-950">{factory.arrivalCount}건</p>
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                      <p className="text-xs font-medium text-slate-500">잔여 예정 수량</p>
-                      <p className="mt-1 text-lg font-semibold text-slate-950">{factory.pendingQuantity}개</p>
-                    </div>
+                  <div className="flex flex-wrap gap-2">
+                    <span className={ui.pillMuted}>
+                      예정 {factory.arrivalCount}건
+                    </span>
+                    <span className={ui.pillMuted}>
+                      잔여 {factory.pendingQuantity}개
+                    </span>
                   </div>
                 </div>
               ))

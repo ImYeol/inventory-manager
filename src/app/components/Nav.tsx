@@ -2,8 +2,21 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
+import {
+  Boxes,
+  ChartColumn,
+  Factory,
+  Inbox,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Settings2,
+  Store,
+  Truck,
+} from 'lucide-react'
 import { logout } from '@/app/login/actions'
+import { MenuLink, MenuSection } from '@/components/ui/menu'
 import { cx, ui } from './ui'
 
 type NavProps = {
@@ -16,21 +29,21 @@ type NavProps = {
 type NavItem = {
   href: string
   label: string
-  shortLabel: string
+  icon: ReactNode
 }
 
 const directItems: NavItem[] = [
-  { href: '/', label: '대시보드', shortLabel: '대시' },
-  { href: '/inventory', label: '재고 운영', shortLabel: '재고' },
-  { href: '/shipping', label: '운송장', shortLabel: '운송' },
-  { href: '/analytics', label: '분석', shortLabel: '분석' },
-  { href: '/integrations', label: '스토어 연결', shortLabel: '연결' },
-  { href: '/settings', label: '설정', shortLabel: '설정' },
+  { href: '/', label: '대시보드', icon: <LayoutDashboard className="h-4 w-4" /> },
+  { href: '/inventory', label: '재고 운영', icon: <Boxes className="h-4 w-4" /> },
+  { href: '/shipping', label: '운송장', icon: <Truck className="h-4 w-4" /> },
+  { href: '/analytics', label: '분석', icon: <ChartColumn className="h-4 w-4" /> },
+  { href: '/integrations', label: '스토어 연결', icon: <Store className="h-4 w-4" /> },
+  { href: '/settings', label: '설정', icon: <Settings2 className="h-4 w-4" /> },
 ]
 
 const sourcingItems: NavItem[] = [
-  { href: '/sourcing/factories', label: '외부 공장', shortLabel: '공장' },
-  { href: '/sourcing/arrivals', label: '입고 예정', shortLabel: '예정' },
+  { href: '/sourcing/factories', label: '외부 공장', icon: <Factory className="h-4 w-4" /> },
+  { href: '/sourcing/arrivals', label: '입고 예정', icon: <Inbox className="h-4 w-4" /> },
 ]
 
 function isActivePath(pathname: string, href: string) {
@@ -54,28 +67,7 @@ function NavLink({
 }) {
   const isActive = isActivePath(pathname, item.href)
 
-  return (
-    <Link
-      href={item.href}
-      onClick={onNavigate}
-      aria-current={isActive ? 'page' : undefined}
-      className={cx(
-        compact ? ui.navSubItem : ui.navItem,
-        isActive && ui.navItemActive,
-      )}
-    >
-      <span
-        aria-hidden="true"
-        className={cx(
-          'inline-flex h-7 min-w-7 items-center justify-center rounded-full border px-2 text-[11px] font-semibold',
-          isActive ? 'border-slate-300 bg-white text-slate-950' : 'border-slate-200 bg-slate-50 text-slate-500',
-        )}
-      >
-        {item.shortLabel}
-      </span>
-      <span>{item.label}</span>
-    </Link>
-  )
+  return <MenuLink href={item.href} label={item.label} icon={item.icon} active={isActive} compact={compact} onClick={onNavigate} />
 }
 
 function SourcingSection({
@@ -92,40 +84,13 @@ function SourcingSection({
   const isSectionActive = pathname.startsWith('/sourcing')
 
   return (
-    <div className="space-y-2">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls="sourcing-navigation-group"
-        aria-label="소싱"
-        onClick={onToggle}
-        className={cx(ui.navSectionButton, isSectionActive && ui.navItemActive)}
-      >
-        <span className="flex items-center gap-3">
-          <span
-            aria-hidden="true"
-            className={cx(
-              'inline-flex h-7 min-w-7 items-center justify-center rounded-full border px-2 text-[11px] font-semibold',
-              isSectionActive ? 'border-slate-300 bg-white text-slate-950' : 'border-slate-200 bg-slate-50 text-slate-500',
-            )}
-          >
-            소싱
-          </span>
-          <span>소싱</span>
-        </span>
-        <span aria-hidden="true" className={cx('text-xs transition-transform', open && 'rotate-180')}>
-          ▼
-        </span>
-      </button>
-
-      {open ? (
-        <div id="sourcing-navigation-group" className="space-y-1 border-l border-slate-200 pl-4">
-          {sourcingItems.map((item) => (
-            <NavLink key={item.href} item={item} pathname={pathname} compact onNavigate={onNavigate} />
-          ))}
-        </div>
-      ) : null}
-    </div>
+    <MenuSection title="소싱" icon={<Factory className="h-4 w-4" />} open={open || isSectionActive} onToggle={onToggle}>
+      <div id="sourcing-navigation-group" className="space-y-1">
+        {sourcingItems.map((item) => (
+          <NavLink key={item.href} item={item} pathname={pathname} compact onNavigate={onNavigate} />
+        ))}
+      </div>
+    </MenuSection>
   )
 }
 
@@ -146,13 +111,12 @@ function NavigationContent({
 
   return (
     <>
-      <div className="border-b border-slate-200 px-5 py-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Warehouse Console</p>
-        <h1 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">Seleccase Inventory</h1>
-        <p className="mt-1 text-sm text-slate-500">재고 운영 허브 중심의 운영 콘솔</p>
+      <div className="border-b border-slate-200 px-4 py-4">
+        <h1 className="text-sm font-semibold tracking-tight text-slate-950">Seleccase Inventory</h1>
+        <p className="mt-0.5 text-xs text-slate-500">운영 콘솔</p>
       </div>
 
-      <nav className="flex-1 space-y-2 overflow-y-auto px-3 py-4" aria-label="주요 메뉴">
+      <nav className="flex-1 space-y-1.5 overflow-y-auto px-3 py-3.5" aria-label="주요 메뉴">
         {directItems.slice(0, 2).map((item) => (
           <NavLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />
         ))}
@@ -167,20 +131,21 @@ function NavigationContent({
         ))}
       </nav>
 
-      <div className="mt-auto border-t border-slate-200 px-3 py-4">
-        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white shadow-sm">
-            {userInitial}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-slate-950">{user?.name ?? '사용자'}</p>
+      <div className="mt-auto border-t border-slate-200 px-4 py-3.5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-slate-950">{user?.name ?? '사용자'}</p>
             <p className="truncate text-xs text-slate-500">{user?.email ?? '로그인 정보 없음'}</p>
+          </div>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700">
+            {userInitial}
           </div>
         </div>
 
         <div className="mt-3">
           <form action={logout}>
-            <button type="submit" className={cx(ui.buttonSecondary, 'w-full')}>
+            <button type="submit" className={cx(ui.buttonSecondary, 'h-10 w-full gap-2')}>
+              <LogOut className="h-4 w-4" />
               로그아웃
             </button>
           </form>
@@ -199,7 +164,7 @@ export default function Nav({ user }: NavProps) {
 
   return (
     <>
-      <aside className="fixed left-0 top-0 z-30 hidden h-screen w-72 border-r border-slate-200 bg-white/95 backdrop-blur md:flex md:flex-col">
+      <aside className="fixed left-0 top-0 z-30 hidden h-screen w-[17rem] border-r border-slate-200 bg-white/90 backdrop-blur md:flex md:flex-col">
         <NavigationContent
           pathname={pathname}
           sourcingOpen={sourcingActive || desktopSourcingOpen}
@@ -214,15 +179,16 @@ export default function Nav({ user }: NavProps) {
           aria-label="메뉴 열기"
           aria-expanded={mobileOpen}
           onClick={() => setMobileOpen(true)}
-          className={cx(ui.buttonSecondary, 'h-11 min-w-11 px-3')}
+          className={cx(ui.buttonSecondary, 'h-11 min-w-11 gap-2 px-3')}
         >
+          <Menu className="h-4 w-4" />
           메뉴
         </button>
         <div className="min-w-0 px-3 text-center">
           <p className="truncate text-sm font-semibold text-slate-950">Seleccase Inventory</p>
-          <p className="truncate text-xs text-slate-500">운영 콘솔</p>
         </div>
-        <Link href="/settings" aria-label="설정" className={cx(ui.buttonSecondary, 'h-11 min-w-11 px-3')}>
+        <Link href="/settings" aria-label="설정" className={cx(ui.buttonSecondary, 'h-11 min-w-11 gap-2 px-3')}>
+          <Settings2 className="h-4 w-4" />
           설정
         </Link>
       </div>
@@ -237,10 +203,7 @@ export default function Nav({ user }: NavProps) {
           />
           <div role="dialog" aria-modal="true" aria-label="모바일 메뉴" className={ui.mobileDrawer}>
             <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4">
-              <div>
-                <p className="text-sm font-semibold text-slate-950">메뉴</p>
-                <p className="text-xs text-slate-500">현재 운영 화면으로 이동</p>
-              </div>
+              <p className="text-sm font-semibold text-slate-950">메뉴</p>
               <button
                 type="button"
                 aria-label="메뉴 닫기"

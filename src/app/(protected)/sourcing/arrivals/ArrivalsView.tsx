@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createFactoryArrivalBatch, receiveFactoryArrival } from '@/lib/actions'
+import { StatusBadge } from '@/components/ui/badge-1'
 import { PageHeader, cx, ui } from '@/app/components/ui'
 
 type FactoryLookup = {
@@ -267,9 +268,8 @@ export default function ArrivalsView({
   return (
     <div className={ui.shell}>
       <PageHeader
-        kicker="Sourcing"
         title="입고 예정"
-        description="실제 재고와 분리된 staging 목록에서 공장발 예정 입고를 관리합니다."
+        description="공장 예정 입고를 수동 또는 CSV로 등록하고 잔여 수량만 반영합니다."
       />
 
       {message ? (
@@ -279,7 +279,7 @@ export default function ArrivalsView({
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <section className={cx(ui.panel, ui.panelBody, 'space-y-4 md:p-5')}>
+        <section className={cx(ui.panel, ui.panelBody, 'space-y-4 md:p-4')}>
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => setEntryMode('manual')} className={entryMode === 'manual' ? ui.tabActive : ui.tab}>
               수동 등록
@@ -311,9 +311,9 @@ export default function ArrivalsView({
           </div>
 
           {entryMode === 'csv' ? (
-            <div className="space-y-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-4">
+            <div className="space-y-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-4">
               <label htmlFor="arrival-csv" className="text-sm font-medium text-slate-700">
-                CSV/표 붙여넣기
+                CSV 붙여넣기
               </label>
               <textarea
                 id="arrival-csv"
@@ -330,7 +330,7 @@ export default function ArrivalsView({
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">입고 예정 항목</h2>
+              <h2 className="text-sm font-semibold text-slate-900">등록 항목</h2>
               <button type="button" onClick={() => setRows((current) => [...current, createRow()])} className={ui.buttonSecondary}>
                 행 추가
               </button>
@@ -338,7 +338,7 @@ export default function ArrivalsView({
 
             <div className="space-y-3">
               {normalizedRows.map((row, index) => (
-                <div key={row.key} className={cx('surface space-y-3 p-4', row.error && 'border-amber-200 bg-amber-50/70')}>
+                <div key={row.key} className={cx('space-y-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-3', row.error && 'border-amber-200 bg-amber-50/70')}>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-slate-700">항목 #{index + 1}</span>
                     <button
@@ -441,7 +441,7 @@ export default function ArrivalsView({
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 md:flex-row md:items-center md:justify-between">
             <div className="text-sm text-slate-600">
               유효 항목 <span className="font-semibold text-slate-950">{normalizedRows.filter((row) => row.valid).length}</span>건
             </div>
@@ -460,8 +460,7 @@ export default function ArrivalsView({
           <div className={ui.panelHeader}>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold tracking-tight text-slate-950">예정 목록</h2>
-                <p className="mt-1 text-sm text-slate-500">실제 입고 반영 전 staging 상태를 유지합니다.</p>
+                <h2 className="text-base font-semibold tracking-tight text-slate-950">예정 목록</h2>
               </div>
               <span className={ui.pill}>총 {arrivals.length}건</span>
             </div>
@@ -477,35 +476,40 @@ export default function ArrivalsView({
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="text-base font-semibold text-slate-950">{arrival.factoryName}</h3>
-                        <span className={cx('inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold',
-                          arrival.status === '예정'
-                            ? 'border-blue-200 bg-blue-50 text-blue-700'
-                            : arrival.status === '부분입고'
-                              ? 'border-amber-200 bg-amber-50 text-amber-700'
-                              : arrival.status === '입고완료'
-                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                : 'border-slate-200 bg-slate-100 text-slate-600')}>
+                        <StatusBadge
+                          tone={
+                            arrival.status === '예정'
+                              ? 'info'
+                              : arrival.status === '부분입고'
+                                ? 'warning'
+                                : arrival.status === '입고완료'
+                                  ? 'success'
+                                  : 'neutral'
+                          }
+                          className="px-2.5 py-1"
+                        >
                           {arrival.status}
-                        </span>
+                        </StatusBadge>
                       </div>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {arrival.expectedDate} · {arrival.sourceChannel === 'csv' ? 'CSV 등록' : '수동 등록'}
-                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                        <span>{arrival.expectedDate}</span>
+                        <StatusBadge tone={arrival.sourceChannel === 'csv' ? 'info' : 'neutral'} className="px-2.5 py-1">
+                          {arrival.sourceChannel === 'csv' ? 'CSV 등록' : '수동 등록'}
+                        </StatusBadge>
+                      </div>
                       {arrival.memo ? <p className="mt-2 text-sm text-slate-600">{arrival.memo}</p> : null}
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                        <p className="text-xs text-slate-500">총 수량</p>
-                        <p className="mt-1 font-semibold text-slate-950">{arrival.totalOrderedQuantity}개</p>
-                      </div>
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                        <p className="text-xs text-slate-500">잔여 수량</p>
-                        <p className="mt-1 font-semibold text-slate-950">{arrival.remainingQuantity}개</p>
-                      </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className={ui.pillMuted}>
+                        총 수량 {arrival.totalOrderedQuantity}개
+                      </span>
+                      <span className={ui.pillMuted}>
+                        잔여 수량 {arrival.remainingQuantity}개
+                      </span>
                     </div>
                   </div>
 
-                  <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:p-4">
+                  <div className="space-y-3 border-t border-slate-200 pt-4">
                     <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                       <div>
                         <p className="text-sm font-semibold text-slate-950">입고 반영</p>
@@ -547,7 +551,7 @@ export default function ArrivalsView({
                         return (
                           <div
                             key={item.id}
-                            className="grid gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 md:grid-cols-[minmax(0,1fr)_9rem] md:items-end"
+                            className="grid gap-3 border-t border-slate-200 pt-3 first:border-t-0 first:pt-0 md:grid-cols-[minmax(0,1fr)_9rem] md:items-end"
                           >
                             <div className="space-y-1">
                               <div className="flex items-center justify-between gap-3">
@@ -592,7 +596,7 @@ export default function ArrivalsView({
                       })}
                     </div>
 
-                    <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-col gap-3 border-t border-slate-200 pt-3 md:flex-row md:items-center md:justify-between">
                       <div className="text-sm text-slate-600">
                         선택된 창고로{' '}
                         <span className="font-semibold text-slate-950">
