@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation'
 import { type ReactNode, useState } from 'react'
 import {
   Boxes,
-  ChartColumn,
   Database,
   LayoutDashboard,
   LogOut,
@@ -37,7 +36,6 @@ const directItems: NavItem[] = [
   { href: '/products', label: '상품 관리', icon: <Database className="h-4 w-4" /> },
   { href: '/sourcing', label: '소싱', icon: <PackageSearch className="h-4 w-4" /> },
   { href: '/shipping', label: '운송장', icon: <Truck className="h-4 w-4" /> },
-  { href: '/analytics', label: '분석', icon: <ChartColumn className="h-4 w-4" /> },
   { href: '/settings', label: '설정', icon: <Settings2 className="h-4 w-4" /> },
 ]
 

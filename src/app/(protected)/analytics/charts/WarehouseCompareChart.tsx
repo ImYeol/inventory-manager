@@ -10,8 +10,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { ui } from '../../../components/ui'
-
 const BAR_COLORS = ['#334155', '#94a3b8', '#0ea5e9', '#f59e0b', '#10b981', '#ec4899', '#14b8a6', '#8b5cf6']
 
 type WarehouseTotal = {
@@ -51,22 +49,14 @@ export default function WarehouseCompareChart({ data }: Props) {
 
   if (data.length === 0) {
     return (
-      <div className={ui.panel}>
-        <div className="surface-header px-4 py-3">
-          <h3 className="text-sm font-semibold text-slate-700">창고별 비교</h3>
-        </div>
-        <div className="flex h-[300px] items-center justify-center px-4 text-sm text-slate-400">
-          데이터가 없습니다.
-        </div>
+      <div className="flex h-[300px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 text-sm text-slate-400">
+        데이터가 없습니다.
       </div>
     )
   }
 
   return (
-    <div className={ui.panel}>
-      <div className="surface-header px-4 py-3">
-        <h3 className="text-sm font-semibold text-slate-700">창고별 비교</h3>
-      </div>
+    <div className="h-[300px]">
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={chartRows} layout="vertical">
           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />

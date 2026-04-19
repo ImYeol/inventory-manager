@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
   getAnalyticsData: vi.fn(),
   getTransactionsWithRelations: vi.fn(),
-  enforceSetupComplete: vi.fn(),
+  getInventoryHistory: vi.fn(),
+  getTransactionTrend: vi.fn(),
+  getWarehouseComparison: vi.fn(),
 }))
 
 vi.mock('@/lib/data', () => ({
@@ -14,20 +16,53 @@ vi.mock('@/lib/data', () => ({
   getTransactionsWithRelations: mocks.getTransactionsWithRelations,
 }))
 
-vi.mock('@/lib/setup-guard', () => ({
-  enforceSetupComplete: mocks.enforceSetupComplete,
+vi.mock('@/lib/actions/analytics', () => ({
+  getInventoryHistory: mocks.getInventoryHistory,
+  getTransactionTrend: mocks.getTransactionTrend,
+  getWarehouseComparison: mocks.getWarehouseComparison,
+}))
+
+vi.mock('@/app/(protected)/analytics/charts/InventoryTrendChart', () => ({
+  default: ({ data }: { data: unknown[] }) =>
+    React.createElement('div', {
+      'data-testid': 'inventory-trend-chart',
+      'data-count': data.length,
+    }),
+}))
+
+vi.mock('@/app/(protected)/analytics/charts/TransactionBarChart', () => ({
+  default: ({ data }: { data: unknown[] }) =>
+    React.createElement('div', {
+      'data-testid': 'transaction-bar-chart',
+      'data-count': data.length,
+    }),
+}))
+
+vi.mock('@/app/(protected)/analytics/charts/WarehouseCompareChart', () => ({
+  default: ({ data }: { data: unknown[] }) =>
+    React.createElement('div', {
+      'data-testid': 'warehouse-compare-chart',
+      'data-count': data.length,
+    }),
 }))
 
 import DashboardPage from '@/app/(protected)/page'
 
+async function chooseSelectOption(label: string, optionName: string) {
+  fireEvent.click(screen.getByRole('combobox', { name: label }))
+  fireEvent.click(await screen.findByRole('option', { name: optionName }))
+}
+
 beforeEach(() => {
   mocks.getAnalyticsData.mockReset()
   mocks.getTransactionsWithRelations.mockReset()
-  mocks.enforceSetupComplete.mockReset()
+  mocks.getInventoryHistory.mockReset()
+  mocks.getTransactionTrend.mockReset()
+  mocks.getWarehouseComparison.mockReset()
 })
 
 describe('DashboardPage', () => {
-  it('renders a concise dashboard chrome with the shared metric surface', async () => {
+  it('renders the dashboard shell, omits the old quick-start buttons, and wires three local chart strips', async () => {
     mocks.getAnalyticsData.mockResolvedValue({
       models: [
         { id: 1, name: 'LP01' },
@@ -83,21 +118,49 @@ describe('DashboardPage', () => {
         },
       ],
     })
+    mocks.getInventoryHistory.mockResolvedValue([{ label: '2026-04-01', quantity: 7 }])
+    mocks.getTransactionTrend.mockResolvedValue([{ label: '2026-04-01', inbound: 3, outbound: 1 }])
+    mocks.getWarehouseComparison.mockResolvedValue([
+      {
+        modelName: 'LP01',
+        warehouseTotals: [
+          { id: 1, name: '오금동', quantity: 3 },
+          { id: 2, name: '대자동', quantity: 1 },
+        ],
+      },
+    ])
 
-    const element = await DashboardPage()
-    render(element as React.ReactElement)
+    render((await DashboardPage()) as React.ReactElement)
 
     expect(screen.getByText('대시보드')).toBeTruthy()
-    expect(screen.getByText('재고 운영 상태와 최근 흐름을 한 화면에서 확인합니다.')).toBeTruthy()
-    expect(screen.getByText('전체 재고')).toBeTruthy()
-    expect(screen.getByText('오늘 입고')).toBeTruthy()
-    expect(screen.getByText('오늘 출고')).toBeTruthy()
-    expect(screen.getByRole('heading', { name: '주의 품목' })).toBeTruthy()
-    expect(screen.getByText('17')).toBeTruthy()
-    expect(screen.getByText('최근 처리 이력')).toBeTruthy()
-    expect(screen.getByRole('link', { name: /전체 재고/ }).getAttribute('href')).toBe('/inventory')
-    expect(screen.getByRole('link', { name: /오늘 입고/ }).getAttribute('href')).toBe('/history')
-    expect(screen.getByRole('link', { name: '운영 포인트: 재고현황' }).getAttribute('href')).toBe('/inventory')
-    expect(screen.getByRole('link', { name: '상품 관리' }).getAttribute('href')).toBe('/products')
+    expect(screen.getByText('재고 현황과 최근 흐름을 바로 봅니다.')).toBeTruthy()
+    expect(screen.getByTestId('inventory-trend-chart')).toBeTruthy()
+    expect(screen.getByTestId('transaction-bar-chart')).toBeTruthy()
+    expect(screen.getByTestId('warehouse-compare-chart')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: '재고 운영' })).toBeNull()
+    expect(screen.queryByRole('link', { name: '상품 관리' })).toBeNull()
+    expect(screen.queryByRole('link', { name: '운송장' })).toBeNull()
+    expect(screen.queryByRole('link', { name: '설정' })).toBeNull()
+    const totalInventoryLink = screen.getByRole('link', { name: /전체 재고/ })
+    const inboundLink = screen.getByRole('link', { name: /오늘 입고/ })
+    expect(totalInventoryLink.getAttribute('href')).toBe('/inventory')
+    expect(inboundLink.getAttribute('href')).toBe('/history')
+    expect(totalInventoryLink.className).not.toContain('ui-card')
+    expect(inboundLink.className).not.toContain('ui-card')
+    expect(totalInventoryLink.closest('section')?.className).toContain('ui-card-strong')
+    expect(inboundLink.closest('section')?.className).toContain('ui-card-strong')
+    expect(mocks.getAnalyticsData).toHaveBeenCalledTimes(1)
+    expect(mocks.getTransactionsWithRelations).toHaveBeenCalledTimes(1)
+    expect(mocks.getInventoryHistory).toHaveBeenCalledWith('monthly')
+    expect(mocks.getTransactionTrend).toHaveBeenCalledWith('monthly')
+    expect(mocks.getWarehouseComparison).toHaveBeenCalledWith()
+
+    await chooseSelectOption('재고 추이 모델', 'LP01')
+    fireEvent.change(screen.getByLabelText('재고 추이 시작일'), { target: { value: '2026-04-01' } })
+    fireEvent.change(screen.getByLabelText('재고 추이 종료일'), { target: { value: '2026-04-30' } })
+
+    await waitFor(() => {
+      expect(mocks.getInventoryHistory).toHaveBeenLastCalledWith('monthly', 1, '2026-04-01', '2026-04-30')
+    })
   })
 })

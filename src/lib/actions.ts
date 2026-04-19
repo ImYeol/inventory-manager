@@ -570,6 +570,5 @@ function revalidateInventoryPaths() {
   revalidatePath('/inventory')
   revalidatePath('/inout')
   revalidatePath('/history')
-  revalidatePath('/analytics')
   revalidatePath('/settings/master-data')
 }

@@ -68,6 +68,7 @@ src/
 ## 목표 정보 구조
 ```text
 대시보드 (/)
+└── analytics section
 상품 관리 (/products)
 ├── 상품
 └── 창고
@@ -76,7 +77,6 @@ src/
 ├── 외부 공장 (/sourcing/factories)
 └── 입고 예정 (/sourcing/arrivals)
 운송장 (/shipping)
-분석 (/analytics)
 설정 (/settings)
 └── 스토어 연결
 ```
@@ -84,6 +84,7 @@ src/
 ## 라우트 전략
 
 ### Canonical routes
+- `/`: KPI, 최근 활동, dashboard-owned analytics section
 - `/products`: 상품과 창고 기준정보 canonical owner
 - `/inventory`: 재고 운영 landing
 - `/inventory?tab=list|history|inbound|outbound`: 목록, 이력, 빠른 입력 중심 워크스페이스
@@ -91,11 +92,16 @@ src/
 - `/inventory/history`: 필요 시 분리되는 이력 workspace
 - `/shipping`: 엑셀 업로드, 분류 미리보기, 매칭/발송
 - `/settings`: 스토어 연결
+- `/analytics`: 독립 화면이 아니라 `/`로 보내는 legacy redirect
 - `/integrations`: legacy alias 또는 redirect 후보
 - `/master-data`: legacy alias, redirect to `/products`
 - `/settings/master-data`: legacy alias, redirect to `/products`
 
 ### Ownership matrix
+- `/`
+  - KPI summary
+  - dashboard-owned analytics section
+  - recent activity / attention tables
 - `/products`
   - 상품 속성 관리
   - 창고 속성 관리
@@ -116,10 +122,25 @@ src/
   - 채널별 매칭/발송
 - `/settings`
   - 네이버/쿠팡 연결 상태, 연결/변경 폼
+- `/analytics`
+  - standalone owner 없음
+  - redirect only
 - `/integrations`
   - 별도 owner가 아니라 `/settings`로 보내는 호환 경로
 
 같은 provider summary나 credential form이 두 route 이상에 존재하면 component reuse 문제가 아니라 ownership 오류로 본다.
+
+## Dashboard-Owned Analytics Architecture
+
+- dashboard는 KPI 섹션과 분석 차트 섹션을 함께 소유한다.
+- 유지 차트는 `거래 추이`, `재고 추이`, `창고별 변동 비교` 3개다.
+- 각 차트는 자신만의 local control strip를 가진다.
+  - `modelId`
+  - `dateFrom`
+  - `dateTo`
+  - 필요 시 `period`
+- `ModelPieChart`와 모델 요약 표는 dashboard-owned analytics에서 제거한다.
+- `src/lib/actions/analytics.ts`는 차트별로 독립적으로 다시 계산할 수 있게 날짜 범위 인자를 받는다.
 
 ## Inventory Architecture
 
@@ -230,6 +251,10 @@ shipping_preview_rows
 ### Canonical primitive ownership
 ```text
 src/components/ui/
+├── card.tsx
+├── select.tsx
+├── tabs.tsx
+├── modal.tsx
 ├── basic-data-table.tsx
 ├── table.tsx
 ├── badge-1.tsx
@@ -237,12 +262,40 @@ src/components/ui/
 ├── filter-toolbar.tsx
 ├── column-visibility-menu.tsx
 ├── shipping-classification-badge.tsx
+├── store-connection-status.tsx
 └── store-connection-row.tsx
 ```
 
 - `product-management-table`이 필요해지면 `inventory-data-table`과 같은 규칙으로 `src/components/ui` 아래에 둔다.
 - `src/app/components/ui.tsx`는 class preset bridge 역할만 유지한다.
 - 새 shared component는 root `/components/ui`에 만들지 않는다.
+- 상단 tabs는 같은 route 내부의 view switch에만 쓰고, toolbar는 filter/action cluster만 맡는다.
+- bordered container의 canonical language는 shared surface/card variants다. 설명용 카드와 상태 카드의 중첩은 구조 오류로 본다.
+- 선택형 dropdown은 `src/components/ui/select.tsx`만 canonical owner다.
+- console 내부 새 선택 입력은 native `<select>`를 추가하지 않는다.
+
+## Product Management Architecture
+
+### Table-first workspace
+- `/products`는 `상품`과 `창고`를 tabs로 나누되, 두 탭 모두 `toolbar + table + modal action` 구조를 공유한다.
+- `상품` 탭은 `createModel -> createModelSize/createModelColor` 조합 액션으로 최소 modal 생성 흐름을 갖는다.
+- 신규 색상 생성은 공통 기본값을 적용한다.
+  - `rgbCode='#111827'`
+  - `textWhite=true`
+- `BasicDataTable`는 table-first workspace에서 재사용되며 선택적으로 다음 row interaction API를 가진다.
+  - `onRowClick`
+  - `rowAriaLabel`
+  - `getRowClassName`
+
+## Sourcing Architecture
+
+### Factories
+- `/sourcing/factories`는 `toolbar + factories table + detail modal + register modal` 구조다.
+- 테이블은 검색/상태 필터를 기준으로 행을 좁히고, 상세 modal에서 활성/비활성 토글을 수행한다.
+
+### Arrivals
+- `/sourcing/arrivals`는 staged arrival 등록과 remaining quantity receive flow를 한 화면에서 처리한다.
+- 공장/모델/사이즈/색상/창고 선택은 shared select primitive를 사용한다.
 
 ## Validation impact
 - product management redirect / deep-link tests가 필요하다.

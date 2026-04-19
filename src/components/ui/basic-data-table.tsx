@@ -14,6 +14,9 @@ type BasicDataTableProps<Row> = {
   rowKey: (row: Row) => string | number
   renderCell: (row: Row, columnKey: string) => ReactNode
   emptyState: ReactNode
+  onRowClick?: (row: Row) => void
+  rowAriaLabel?: (row: Row) => string
+  getRowClassName?: (row: Row) => string | undefined
   className?: string
 }
 
@@ -23,6 +26,9 @@ export function BasicDataTable<Row>({
   rowKey,
   renderCell,
   emptyState,
+  onRowClick,
+  rowAriaLabel,
+  getRowClassName,
   className,
 }: BasicDataTableProps<Row>) {
   return (
@@ -52,7 +58,29 @@ export function BasicDataTable<Row>({
               </TableRow>
             ) : (
               rows.map((row) => (
-                <TableRow key={rowKey(row)}>
+                <TableRow
+                  key={rowKey(row)}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  aria-label={rowAriaLabel?.(row)}
+                  className={cn(
+                    onRowClick &&
+                      'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+                    getRowClassName?.(row),
+                  )}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  onKeyDown={
+                    onRowClick
+                      ? (event) => {
+                          if (event.key !== 'Enter' && event.key !== ' ') {
+                            return
+                          }
+
+                          event.preventDefault()
+                          onRowClick(row)
+                        }
+                      : undefined
+                  }
+                >
                   {columns.map((column) => (
                     <TableCell
                       key={column.key}

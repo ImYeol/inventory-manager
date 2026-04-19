@@ -6,7 +6,14 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import HistoryView from '@/app/(protected)/history/HistoryView'
 
 describe('HistoryView', () => {
-  it('shows source metadata and keeps the filter chrome compact', () => {
+async function openComboboxAndPick(label: string, option: string) {
+  const trigger = screen.getByRole('combobox', { name: label })
+  fireEvent.click(trigger)
+  fireEvent.click(await screen.findByRole('option', { name: option }))
+  return trigger
+}
+
+  it('shows source metadata and keeps the filter chrome compact', async () => {
     render(
       React.createElement(HistoryView, {
         models: [{ id: 1, name: 'LP01' }],
@@ -56,7 +63,7 @@ describe('HistoryView', () => {
     expect(screen.getAllByRole('heading', { name: '이력 필터' })).toHaveLength(1)
     expect(screen.getAllByText('모델, 창고, 기간을 좁혀 입고·출고·재고조정 이력을 빠르게 확인하세요.')).toHaveLength(1)
 
-    fireEvent.change(screen.getByLabelText('등록 방식'), { target: { value: 'factory-arrival' } })
+    await openComboboxAndPick('등록 방식', '예정입고 반영')
 
     expect(screen.getByText('1건 조회됨')).toBeTruthy()
 

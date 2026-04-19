@@ -1,4 +1,4 @@
-'use client';
+'use client'
 
 import {
   BarChart,
@@ -10,31 +10,21 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import { ui } from '../../../components/ui';
-
 type Props = {
-  data: { label: string; inbound: number; outbound: number }[];
-};
+  data: { label: string; inbound: number; outbound: number }[]
+}
 
 export default function TransactionBarChart({ data }: Props) {
   if (data.length === 0) {
     return (
-      <div className={ui.panel}>
-        <div className="surface-header px-4 py-3">
-          <h3 className="text-sm font-semibold text-slate-700">입출고 현황</h3>
-        </div>
-        <div className="flex h-[300px] items-center justify-center px-4 text-sm text-slate-400">
-          데이터가 없습니다.
-        </div>
+      <div className="flex h-[300px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 text-sm text-slate-400">
+        데이터가 없습니다.
       </div>
     );
   }
 
   return (
-    <div className={ui.panel}>
-      <div className="surface-header px-4 py-3">
-        <h3 className="text-sm font-semibold text-slate-700">입출고 현황</h3>
-      </div>
+    <div className="h-[300px]">
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -53,5 +43,5 @@ export default function TransactionBarChart({ data }: Props) {
         </BarChart>
       </ResponsiveContainer>
     </div>
-  );
+  )
 }

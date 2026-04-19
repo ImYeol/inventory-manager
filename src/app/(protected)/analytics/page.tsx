@@ -1,22 +1,7 @@
-import { getAnalyticsData } from '@/lib/data';
-import AnalyticsView from './AnalyticsView';
-import { PageHeader, ui } from '../../components/ui';
+import { redirect } from 'next/navigation'
 
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic'
 
 export default async function AnalyticsPage() {
-  const { models, inventorySummary } = await getAnalyticsData();
-
-  return (
-    <div className={ui.shell}>
-      <PageHeader
-        title="재고 분석"
-        description="기간, 모델, 창고 단위로 재고 흐름을 정리합니다."
-      />
-      <AnalyticsView
-        models={models}
-        initialSummary={inventorySummary}
-      />
-    </div>
-  );
+  redirect('/')
 }

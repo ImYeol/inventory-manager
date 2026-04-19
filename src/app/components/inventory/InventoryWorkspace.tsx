@@ -3,10 +3,11 @@
 import { useMemo, useState } from 'react'
 import InOutForm from '@/app/(protected)/inout/InOutForm'
 import HistoryView from '@/app/(protected)/history/HistoryView'
-import { PageHeader, cx, ui } from '@/app/components/ui'
+import { PageHeader, ui } from '@/app/components/ui'
 import { FixedSheet } from '@/components/ui/fixed-sheet'
 import { InventoryDataTable, type InventoryColumnKey, type InventoryDataRow } from '@/components/ui/inventory-data-table'
 import { InventoryTableToolbar } from '@/components/ui/inventory-table-toolbar'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 type InventoryItem = {
   id: number
@@ -193,35 +194,32 @@ export default function InventoryWorkspace({
     <div className={ui.shell}>
       <PageHeader title="재고 운영" description="재고를 조회하고 바로 입고/출고 처리합니다." />
 
-      <InventoryTableToolbar
-        warehouses={warehouses}
-        selectedWarehouseId={selectedWarehouseId}
-        onWarehouseChange={setSelectedWarehouseId}
-        search={search}
-        onSearchChange={setSearch}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-        columns={ALL_COLUMNS}
-        visibleColumns={visibleColumns}
-        onToggleColumn={toggleColumn}
-        onInbound={() => setOverlayMode('입고')}
-        onOutbound={() => setOverlayMode('출고')}
-        historyAction={
-          <div className="flex items-center gap-1">
-            <button type="button" onClick={() => setActiveView('list')} className={cx(activeView === 'list' ? ui.tabActive : ui.tab, 'h-10 px-3')}>
-              목록
-            </button>
-            <button type="button" onClick={() => setActiveView('history')} className={cx(activeView === 'history' ? ui.tabActive : ui.tab, 'h-10 px-3')}>
-              이력
-            </button>
-          </div>
-        }
-      />
+      <Tabs value={activeView} onValueChange={(value) => setActiveView(value as ViewMode)} className="mt-4 space-y-4">
+        <TabsList aria-label="재고 운영 보기 전환">
+          <TabsTrigger value="list">목록</TabsTrigger>
+          <TabsTrigger value="history">이력</TabsTrigger>
+        </TabsList>
 
-      <div className="mt-4">
-        {activeView === 'list' ? (
+        <InventoryTableToolbar
+          warehouses={warehouses}
+          selectedWarehouseId={selectedWarehouseId}
+          onWarehouseChange={setSelectedWarehouseId}
+          search={search}
+          onSearchChange={setSearch}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          columns={ALL_COLUMNS}
+          visibleColumns={visibleColumns}
+          onToggleColumn={toggleColumn}
+          onInbound={() => setOverlayMode('입고')}
+          onOutbound={() => setOverlayMode('출고')}
+        />
+
+        <TabsContent value="list" className="m-0">
           <InventoryDataTable rows={filteredRows} visibleColumns={visibleColumns} />
-        ) : (
+        </TabsContent>
+
+        <TabsContent value="history" className="m-0">
           <HistoryView
             transactions={transactions.map((tx) => ({ ...tx, warehouse: tx.warehouseName }))}
             models={models.map((model) => ({ id: model.id, name: model.name }))}
@@ -229,8 +227,8 @@ export default function InventoryWorkspace({
             controlledWarehouseId={selectedWarehouseId === 'all' ? '' : selectedWarehouseId}
             embedded
           />
-        )}
-      </div>
+        </TabsContent>
+      </Tabs>
 
       <FixedSheet
         open={overlayMode !== null}

@@ -8,6 +8,8 @@ import * as shippingActions from '@/lib/actions/shipping'
 import type { NaverOrder, CoupangOrder } from '@/lib/actions/shipping'
 import type { ShippingSettingsSummary } from '@/lib/shipping-credentials'
 import { ShippingClassificationBadge, type ShippingClassification } from '@/components/ui/shipping-classification-badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { StoreConnectionStatus } from '@/components/ui/store-connection-status'
 import { cx, ui } from '../../components/ui'
 
 type ShippingPreviewRow = {
@@ -220,6 +222,18 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
 
   const naverMatches = previewRows.filter((row) => row.classification === 'naver' && row.matchedOrder?.provider === 'naver')
   const coupangMatches = previewRows.filter((row) => row.classification === 'coupang' && row.matchedOrder?.provider === 'coupang')
+  const providerActions = [
+    {
+      provider: 'naver' as const,
+      label: '네이버',
+      configured: hasNaverConfig,
+    },
+    {
+      provider: 'coupang' as const,
+      label: '쿠팡',
+      configured: hasCoupangConfig,
+    },
+  ]
 
   const handleNaverSend = () => {
     const targets = naverMatches.flatMap((row) =>
@@ -252,9 +266,31 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
   return (
     <div className="space-y-4">
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-4 border-b border-slate-100 px-2 pb-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <h2 className="text-base font-semibold text-slate-950">운송장 업로드</h2>
+            <p className="text-sm leading-6 text-slate-500">엑셀을 넣고, 연결 상태를 확인한 뒤, 바로 분류 결과를 확인합니다.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {providerActions.map((provider) => (
+              <Link
+                key={provider.provider}
+                href={`/settings?section=store-connections&provider=${provider.provider}`}
+                aria-label={`${provider.label} ${provider.configured ? '변경' : '연결'}`}
+                className={cx(ui.buttonSecondary, 'h-10 gap-2 px-3')}
+              >
+                <StoreConnectionStatus configured={provider.configured} compact />
+                <span>
+                  {provider.label} {provider.configured ? '변경' : '연결'}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+
         <div
           className={cx(
-            'relative rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors',
+            'relative mt-4 rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors',
             isDragOver ? 'border-slate-500 bg-slate-100' : 'border-slate-300 bg-slate-50/80',
           )}
           onDrop={(event) => {
@@ -302,40 +338,24 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
           {fileName ? <p className="mt-3 text-sm font-medium text-slate-800">{fileName}</p> : null}
           {uploadError ? <p className="mt-3 text-sm text-red-600">{uploadError}</p> : null}
         </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {!hasNaverConfig ? (
-            <Link href="/settings?section=store-connections&provider=naver" className={ui.buttonSecondary}>
-              네이버 연결
-            </Link>
-          ) : null}
-          {!hasCoupangConfig ? (
-            <Link href="/settings?section=store-connections&provider=coupang" className={ui.buttonSecondary}>
-              쿠팡 연결
-            </Link>
-          ) : null}
-        </div>
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 md:flex-row md:items-center md:justify-between">
           <h2 className="text-sm font-semibold text-slate-950">분류 미리보기</h2>
           <div className="flex flex-wrap items-center gap-2">
-            <label htmlFor="shipping-classification-filter" className="sr-only">
-              분류 필터
-            </label>
-            <select
-              id="shipping-classification-filter"
-              value={classificationFilter}
-              onChange={(event) => setClassificationFilter(event.target.value as typeof classificationFilter)}
-              className={ui.controlSm}
-            >
-              <option value="all">전체</option>
-              <option value="naver">네이버</option>
-              <option value="coupang">쿠팡</option>
-              <option value="unclassified">미분류</option>
-              <option value="ambiguous">중복 후보</option>
-            </select>
+            <Select value={classificationFilter} onValueChange={(value) => setClassificationFilter(value as typeof classificationFilter)}>
+              <SelectTrigger aria-label="분류 필터" className={cx(ui.controlSm, 'min-w-[10rem] bg-white')}>
+                <SelectValue placeholder="전체" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">전체</SelectItem>
+                <SelectItem value="naver">네이버</SelectItem>
+                <SelectItem value="coupang">쿠팡</SelectItem>
+                <SelectItem value="unclassified">미분류</SelectItem>
+                <SelectItem value="ambiguous">중복 후보</SelectItem>
+              </SelectContent>
+            </Select>
             {loading ? <span className="text-sm text-slate-500">주문 정보를 확인하는 중…</span> : null}
           </div>
         </div>

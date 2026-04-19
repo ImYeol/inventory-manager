@@ -54,3 +54,33 @@
 **결정**: `/products`는 상품과 창고 기준정보의 단일 owner다. `상품`은 SKU, 옵션, 상태, 표시명을, `창고`는 창고명, 식별 정보, 운영 메모를 관리한다. `기준 데이터`는 별도 top-level destination이 아니다.  
 **이유**: 상품/창고 기준정보는 재고 운영의 참조 데이터이지만, 사용자 입장에서는 상품 관리라는 맥락으로 직접 찾는 편이 더 명확하다.  
 **트레이드오프**: 기존 `기준 데이터`라는 내부 용어는 redirect와 label 정리로 흡수해야 한다.
+
+## ADR-012: 상단 tabs는 view switch, toolbar는 filter/action, card는 border language로 분리한다
+**결정**: 상단 tabs는 같은 page 안의 view switch에만 사용한다. filter와 action은 compact toolbar로 둔다. bordered container는 shared surface/card variants를 canonical language로 사용한다.
+**이유**: tabs를 필터처럼 쓰거나 toolbar를 navigation처럼 쓰면 dense operational screen의 의미가 흐려진다. card/surface language를 분리하면 설명용 chrome을 줄이고 bordered surfaces를 일관되게 만들 수 있다.
+**트레이드오프**: 기존 화면에서 tabs, toolbar, card의 역할이 섞여 있으면 재배치가 필요하다.
+
+## ADR-013: 분석은 독립 1차 메뉴가 아니라 dashboard 내부 section으로 둔다
+**결정**: `분석`은 sidebar direct item으로 두지 않고 dashboard 내부 section으로 흡수한다. `/analytics`는 legacy redirect만 유지한다.  
+**이유**: KPI와 분석 차트가 같은 operational context를 설명하는데 메뉴와 화면을 분리하면 지표가 중복되고 탐색 비용만 늘어난다.  
+**트레이드오프**: dashboard props와 analytics action 시그니처가 조금 더 커진다.
+
+## ADR-014: 상품 추가는 최소 modal과 후속 옵션 생성 action 조합으로 처리한다
+**결정**: 상품 추가는 `모델명 + 기본 사이즈들 + 기본 색상들`만 받는 최소 modal로 처리하고, 저장 시 `createModel` 뒤에 `createModelSize/createModelColor`를 조합 호출한다.  
+**이유**: 상품 관리의 기본 흐름은 빠른 기준정보 생성이지 상세 편집 화면 탐색이 아니다.  
+**트레이드오프**: 생성 직후 고급 편집은 별도 흐름으로 남겨야 한다.
+
+## ADR-015: provider 연결 상태는 dot + label primitive로 통일한다
+**결정**: 네이버/쿠팡 연결 상태는 shared `StoreConnectionStatus` primitive 하나로 표현한다. 연결됨은 초록 dot, 미연결은 빨강 dot를 사용한다.  
+**이유**: settings와 shipping에서 상태 표현이 갈라지면 같은 상태를 다른 배지 언어로 읽게 된다.  
+**트레이드오프**: 기존 status badge 기반 UI는 일부 밀도 조정이 필요하다.
+
+## ADR-016: sourcing factories는 table + detail modal 구조로 전환한다
+**결정**: 외부 공장 목록은 카드형 master/detail 레이아웃 대신 `toolbar + table + detail modal + register modal` 구조를 쓴다.  
+**이유**: 운영자가 많은 공장을 빠르게 훑고 필터링하려면 카드형 탐색보다 행 중심 표면이 낫다.  
+**트레이드오프**: row interaction과 modal 상태 관리가 추가된다.
+
+## ADR-017: console의 선택형 입력은 native select를 쓰지 않고 shared Select primitive로 통일한다
+**결정**: 운영 콘솔 내 선택형 입력은 `src/components/ui/select.tsx`를 canonical primitive로 사용하고 native `<select>` 또는 화면별 개별 dropdown 구현은 남기지 않는다.  
+**이유**: 재고 운영, 상품 관리, 운송장, 소싱, dashboard에서 서로 다른 dropdown 언어가 섞이면 interaction 품질과 시각 일관성이 무너진다.  
+**트레이드오프**: 테스트 환경에서는 portal/scroll 동작을 고려한 보강이 필요하다.

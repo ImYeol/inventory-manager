@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { StatusBadge } from './badge-1'
 import { ui } from '@/app/components/ui'
+import { StoreConnectionStatus } from './store-connection-status'
 
 function formatUpdatedAt(value?: string | null) {
   if (!value) return '아직 저장 이력이 없습니다.'
@@ -34,7 +34,7 @@ export function StoreConnectionRow({
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <h2 className="text-base font-semibold text-slate-950">{provider}</h2>
-              <StatusBadge tone={configured ? 'success' : 'warning'}>{configured ? '연결됨' : '미연결'}</StatusBadge>
+              <StoreConnectionStatus configured={configured} />
             </div>
             <dl className="grid gap-2 text-sm text-slate-500 sm:grid-cols-2">
               {summary.map((item) => (
@@ -63,3 +63,5 @@ export function StoreConnectionRow({
     </section>
   )
 }
+
+export { StoreConnectionStatus }

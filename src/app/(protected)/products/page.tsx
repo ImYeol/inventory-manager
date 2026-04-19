@@ -47,7 +47,7 @@ export default async function ProductsPage() {
 
   return (
     <div className={ui.shell}>
-      <PageHeader title="상품 관리" description="상품과 창고 기준정보를 함께 관리합니다." />
+      <PageHeader title="상품 관리" description="상품과 창고 기준정보를 표에서 관리합니다." />
       <MasterDataManager models={models} warehouses={warehouses} warehouseStats={warehouseStats} />
     </div>
   )

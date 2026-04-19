@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createTransactions, getCurrentStock } from '@/lib/actions'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cx, ui } from '../../components/ui'
 
 type SizeType = { id: number; name: string; sortOrder: number; modelId: number }
@@ -28,6 +29,12 @@ type WarehouseLookup = {
   name: string
 }
 
+type SelectOption = {
+  value: string
+  label: string
+  disabled?: boolean
+}
+
 type RowData = {
   key: string
   modelId: number | ''
@@ -39,6 +46,7 @@ type RowData = {
 }
 
 const INITIAL_ROW_COUNT = 6
+const EMPTY_SELECT_VALUE = '__empty__'
 
 function todayString() {
   const d = new Date()
@@ -65,6 +73,56 @@ function emptyRow(): RowData {
     currentStock: null,
     stockLoading: false,
   }
+}
+
+function SelectControl({
+  value,
+  onValueChange,
+  options,
+  placeholder,
+  id,
+  label,
+  ariaLabel,
+  disabled,
+  className,
+}: {
+  value: string
+  onValueChange: (value: string | null) => void
+  options: SelectOption[]
+  placeholder: string
+  id?: string
+  label?: string
+  ariaLabel?: string
+  disabled?: boolean
+  className?: string
+}) {
+  return (
+    <Select
+      value={value === '' ? EMPTY_SELECT_VALUE : value}
+      onValueChange={(next) => onValueChange(next === EMPTY_SELECT_VALUE ? null : next)}
+      disabled={disabled}
+    >
+      {label ? (
+        <label htmlFor={id} className={ui.label}>
+          {label}
+        </label>
+      ) : null}
+      <SelectTrigger id={id} aria-label={ariaLabel} className={cx(ui.controlSm, className)}>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((option) => (
+          <SelectItem
+            key={option.value || EMPTY_SELECT_VALUE}
+            value={option.value === '' ? EMPTY_SELECT_VALUE : option.value}
+            disabled={option.disabled}
+          >
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
 }
 
 type InOutFormProps = {
@@ -94,6 +152,10 @@ export default function InOutForm({
   const selectedWarehouseId =
     lockedWarehouseId ?? (warehouseId > 0 && warehouses.some((item) => item.id === warehouseId) ? warehouseId : (warehouses[0]?.id ?? -1))
   const canInput = warehouses.length > 0 && selectedWarehouseId > 0
+  const warehouseOptions = useMemo<SelectOption[]>(
+    () => warehouses.map((warehouse) => ({ value: String(warehouse.id), label: warehouse.name })),
+    [warehouses],
+  )
 
   const modelMap = useMemo(() => {
     const map = new Map<number, ModelType>()
@@ -266,7 +328,6 @@ export default function InOutForm({
         </div>
 
         <div>
-          <label className={ui.label}>창고</label>
           {warehouses.length === 0 ? (
             <div className="flex h-11 items-center gap-2 rounded-lg border border-dashed border-slate-200 px-3 py-2.5 text-sm text-slate-500">
               창고가 없습니다.
@@ -279,17 +340,17 @@ export default function InOutForm({
               {warehouses.find((warehouse) => warehouse.id === selectedWarehouseId)?.name ?? '선택된 창고'}
             </div>
           ) : (
-            <select
-              value={selectedWarehouseId}
-              onChange={(event) => setWarehouseId(Number(event.target.value))}
-              className={ui.controlSm}
-            >
-              {warehouses.map((warehouse) => (
-                <option key={warehouse.id} value={warehouse.id}>
-                  {warehouse.name}
-                </option>
-              ))}
-            </select>
+            <SelectControl
+              id="transaction-warehouse"
+              value={String(selectedWarehouseId)}
+              onValueChange={(value) => {
+                if (value == null) return
+                setWarehouseId(Number(value))
+              }}
+              options={warehouseOptions}
+              placeholder="창고 선택"
+              label="창고"
+            />
           )}
         </div>
       </div>
@@ -316,24 +377,31 @@ export default function InOutForm({
                 return (
                   <tr key={row.key} className={cx('border-t border-slate-100', hasError && 'bg-red-50/60')}>
                     <td className="px-3 py-2.5">
-                      <select value={row.modelId} onChange={(event) => handleModelChange(row.key, event.target.value)} className={ui.controlSm}>
-                        <option value="">모델 선택</option>
-                        {models.map((entry) => (
-                          <option key={entry.id} value={entry.id}>
-                            {entry.name}
-                          </option>
-                        ))}
-                      </select>
+                      <SelectControl
+                        id={`transaction-model-${row.key}`}
+                        value={row.modelId === '' ? '' : String(row.modelId)}
+                        onValueChange={(value) => handleModelChange(row.key, value ?? '')}
+                        options={[
+                          { value: '', label: '모델 선택' },
+                          ...models.map((entry) => ({ value: String(entry.id), label: entry.name })),
+                        ]}
+                        placeholder="모델 선택"
+                        ariaLabel="모델"
+                      />
                     </td>
                     <td className="px-3 py-2.5">
-                      <select value={row.sizeId} onChange={(event) => handleSizeChange(row.key, event.target.value)} disabled={!row.modelId} className={ui.controlSm}>
-                        <option value="">사이즈</option>
-                        {(model?.sizes ?? []).map((size) => (
-                          <option key={size.id} value={size.id}>
-                            {size.name}
-                          </option>
-                        ))}
-                      </select>
+                      <SelectControl
+                        id={`transaction-size-${row.key}`}
+                        value={row.sizeId === '' ? '' : String(row.sizeId)}
+                        onValueChange={(value) => handleSizeChange(row.key, value ?? '')}
+                        options={[
+                          { value: '', label: '사이즈' },
+                          ...(model?.sizes ?? []).map((size) => ({ value: String(size.id), label: size.name })),
+                        ]}
+                        placeholder="사이즈"
+                        ariaLabel="사이즈"
+                        disabled={!row.modelId}
+                      />
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2">
@@ -343,19 +411,18 @@ export default function InOutForm({
                             style={{ backgroundColor: selectedColor.rgbCode }}
                           />
                         ) : null}
-                        <select
-                          value={row.colorId}
-                          onChange={(event) => handleColorChange(row.key, event.target.value)}
+                        <SelectControl
+                          id={`transaction-color-${row.key}`}
+                          value={row.colorId === '' ? '' : String(row.colorId)}
+                          onValueChange={(value) => handleColorChange(row.key, value ?? '')}
+                          options={[
+                            { value: '', label: '색상' },
+                            ...(model?.colors ?? []).map((color) => ({ value: String(color.id), label: color.name })),
+                          ]}
+                          placeholder="색상"
+                          ariaLabel="색상"
                           disabled={!row.modelId}
-                          className={ui.controlSm}
-                        >
-                          <option value="">색상</option>
-                          {(model?.colors ?? []).map((color) => (
-                            <option key={color.id} value={color.id}>
-                              {color.name}
-                            </option>
-                          ))}
-                        </select>
+                        />
                       </div>
                     </td>
                     <td className="px-3 py-2.5">

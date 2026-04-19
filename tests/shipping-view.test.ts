@@ -68,11 +68,12 @@ describe('ShippingView', () => {
 
     expect(screen.queryByText('연동 준비 상태')).toBeNull()
     expect(screen.getByLabelText('운송장 엑셀 업로드')).toBeTruthy()
-    expect(screen.getByRole('link', { name: '네이버 연결' }).getAttribute('href')).toBe('/settings?section=store-connections&provider=naver')
-    expect(screen.getByRole('link', { name: '쿠팡 연결' }).getAttribute('href')).toBe('/settings?section=store-connections&provider=coupang')
+    expect(screen.getByRole('link', { name: /네이버 연결/ }).getAttribute('href')).toBe('/settings?section=store-connections&provider=naver')
+    expect(screen.getByRole('link', { name: /쿠팡 연결/ }).getAttribute('href')).toBe('/settings?section=store-connections&provider=coupang')
+    expect(screen.getAllByLabelText('미연결')).toHaveLength(2)
   })
 
-  it('shows a provider link only for the missing provider and avoids the old readiness section', () => {
+  it('shows provider change links for configured stores and keeps the compact status rail visible', () => {
     render(
       React.createElement(ShippingView, {
         settingsSummary: {
@@ -87,8 +88,9 @@ describe('ShippingView', () => {
     )
 
     expect(screen.queryByText('연동 준비 상태')).toBeNull()
-    expect(screen.queryByRole('link', { name: '네이버 연결' })).toBeNull()
-    expect(screen.getByRole('link', { name: '쿠팡 연결' }).getAttribute('href')).toBe('/settings?section=store-connections&provider=coupang')
+    expect(screen.getByRole('link', { name: /네이버 변경/ }).getAttribute('href')).toBe('/settings?section=store-connections&provider=naver')
+    expect(screen.getByRole('link', { name: /쿠팡 연결/ }).getAttribute('href')).toBe('/settings?section=store-connections&provider=coupang')
+    expect(screen.getAllByLabelText('연결됨')).toHaveLength(1)
   })
 
   it('classifies uploaded rows and filters the preview by badge state', async () => {
@@ -137,7 +139,8 @@ describe('ShippingView', () => {
     expect(screen.getByRole('cell', { name: '홍길동' })).toBeTruthy()
     expect(screen.getByRole('cell', { name: '미분류' })).toBeTruthy()
 
-    fireEvent.change(screen.getByLabelText('분류 필터'), { target: { value: 'unclassified' } })
+    fireEvent.click(screen.getByRole('combobox', { name: '분류 필터' }))
+    fireEvent.click(await screen.findByRole('option', { name: '미분류' }))
 
     expect(screen.queryByRole('cell', { name: '홍길동' })).toBeNull()
     expect(screen.getByRole('cell', { name: '김철수' })).toBeTruthy()

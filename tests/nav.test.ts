@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
-  pathname: '/analytics',
+  pathname: '/',
 }))
 
 vi.mock('next/navigation', () => ({
@@ -32,7 +32,7 @@ vi.mock('@/app/login/actions', () => ({
 import Nav from '@/app/components/Nav'
 
 beforeEach(() => {
-  mocks.pathname = '/analytics'
+  mocks.pathname = '/'
 })
 
 afterEach(() => {
@@ -51,7 +51,7 @@ describe('Nav', () => {
     expect(screen.getByRole('link', { name: '상품 관리' }).getAttribute('href')).toBe('/products')
     expect(screen.getByRole('link', { name: '소싱' }).getAttribute('href')).toBe('/sourcing')
     expect(screen.getByRole('link', { name: '운송장' }).getAttribute('href')).toBe('/shipping')
-    expect(screen.getByRole('link', { name: '분석' }).getAttribute('href')).toBe('/analytics')
+    expect(screen.queryByRole('link', { name: '분석' })).toBeNull()
     expect(screen.queryByRole('link', { name: '스토어 연결' })).toBeNull()
     expect(screen.getAllByRole('link', { name: '설정' }).some((link) => link.getAttribute('href') === '/settings')).toBe(true)
   })
@@ -65,13 +65,7 @@ describe('Nav', () => {
     expect(screen.getAllByRole('link', { name: '재고 운영' })).toHaveLength(2)
     expect(screen.getAllByRole('link', { name: '상품 관리' })).toHaveLength(2)
     expect(screen.getAllByRole('link', { name: '소싱' })).toHaveLength(2)
-  })
-
-  it('marks the active analytics route with the highlighted styles', () => {
-    render(React.createElement(Nav))
-
-    const activeLink = screen.getAllByRole('link', { name: '분석' })[0]
-    expect(activeLink.getAttribute('aria-current')).toBe('page')
+    expect(screen.queryAllByRole('link', { name: '분석' })).toHaveLength(0)
   })
 
   it('marks sourcing as active on sourcing routes', () => {

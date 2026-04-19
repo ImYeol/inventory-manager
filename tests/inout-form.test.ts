@@ -23,11 +23,11 @@ beforeEach(() => {
 })
 
 describe('InOutForm', () => {
-  function getWarehouseSelect() {
-    const label = screen.getByText('창고')
-    const select = label.parentElement?.querySelector('select')
-    if (!select) throw new Error('warehouse select not found')
-    return select
+  async function openComboboxAndPick(label: string, option: string) {
+    const trigger = screen.getByRole('combobox', { name: label })
+    fireEvent.click(trigger)
+    fireEvent.click(await screen.findByRole('option', { name: option }))
+    return trigger
   }
 
   it('shows the warehouse setup CTA when no warehouses exist', () => {
@@ -50,10 +50,10 @@ describe('InOutForm', () => {
       }),
     )
 
-    expect((getWarehouseSelect() as HTMLSelectElement).value).toBe('7')
+    expect(screen.getByRole('combobox', { name: '창고' }).textContent).toContain('본사 창고')
   })
 
-  it('keeps the first warehouse selected and lets the user switch warehouses', () => {
+  it('keeps the first warehouse selected and lets the user switch warehouses', async () => {
     render(
       React.createElement(InOutForm, {
         warehouses: [
@@ -64,11 +64,10 @@ describe('InOutForm', () => {
       }),
     )
 
-    const warehouseSelect = getWarehouseSelect()
-    expect((warehouseSelect as HTMLSelectElement).value).toBe('7')
+    expect(screen.getByRole('combobox', { name: '창고' }).textContent).toContain('본사 창고')
 
-    fireEvent.change(warehouseSelect, { target: { value: '9' } })
-    expect((warehouseSelect as HTMLSelectElement).value).toBe('9')
+    await openComboboxAndPick('창고', '대전 창고')
+    expect(screen.getByRole('combobox', { name: '창고' }).textContent).toContain('대전 창고')
   })
 
   it('keeps the editor manual-only and removes the old paste-import panel', () => {
@@ -103,6 +102,8 @@ describe('InOutForm', () => {
       }),
     )
 
+    expect(screen.getByLabelText('날짜')).toBeTruthy()
+    expect(screen.getByText('창고')).toBeTruthy()
     expect(screen.getByRole('button', { name: '출고 등록 (0건)' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '입고/출고 전환' })).toBeNull()
     expect(screen.queryByText('표 붙여넣기')).toBeNull()

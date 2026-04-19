@@ -591,7 +591,7 @@ export async function getRawTransactions() {
   const { supabase } = await getSupabaseWithUser()
   const { data, error } = await supabase
     .from('transactions')
-    .select('date, type, quantity, model_id')
+    .select('date, type, quantity, model_id, warehouse_id')
     .order('date', { ascending: true })
 
   return ensure(
@@ -600,6 +600,7 @@ export async function getRawTransactions() {
       type: TransactionTypeValue
       quantity: number
       model_id: number
+      warehouse_id: number
     }> | null,
     error,
   )

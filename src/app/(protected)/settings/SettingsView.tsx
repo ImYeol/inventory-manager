@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition, type FormEvent } from 'react'
 import { getShippingSettingsSummary, saveCoupangSettings, saveNaverSettings } from '@/lib/actions/shipping-settings'
 import type { ShippingSettingsSummary } from '@/lib/shipping-credentials'
-import { StoreConnectionRow } from '@/components/ui/store-connection-row'
+import { StoreConnectionRow, StoreConnectionStatus } from '@/components/ui/store-connection-row'
 import { ui } from '../../components/ui'
 
 type SettingsViewProps = {
@@ -128,6 +128,13 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
         updatedAt={currentSummary.naver.updatedAt}
         href="#naver-settings"
       >
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-slate-950">네이버 API</p>
+            <p className="text-sm text-slate-500">Client ID와 Secret을 직접 갱신합니다.</p>
+          </div>
+          <StoreConnectionStatus configured={currentSummary.naver.configured} compact />
+        </div>
         <form id="naver-settings" className="space-y-4" onSubmit={handleNaverSave}>
           <div className="grid gap-4">
             <div>
@@ -181,6 +188,13 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
         updatedAt={currentSummary.coupang.updatedAt}
         href="#coupang-settings"
       >
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-slate-950">쿠팡 API</p>
+            <p className="text-sm text-slate-500">Access Key, Secret Key, Vendor ID를 관리합니다.</p>
+          </div>
+          <StoreConnectionStatus configured={currentSummary.coupang.configured} compact />
+        </div>
         <form id="coupang-settings" className="space-y-4" onSubmit={handleCoupangSave}>
           <div className="grid gap-4">
             <div>

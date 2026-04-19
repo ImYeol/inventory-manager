@@ -24,6 +24,11 @@ beforeEach(() => {
   Object.values(mocks).forEach((mock) => mock.mockReset())
 })
 
+async function openSelectAndChoose(label: string, optionName: string) {
+  fireEvent.click(screen.getByRole('combobox', { name: label }))
+  fireEvent.click(await screen.findByRole('option', { name: optionName }))
+}
+
 describe('ArrivalsView', () => {
   it('imports CSV rows and submits valid staging arrivals', async () => {
     mocks.createFactoryArrivalBatch.mockResolvedValue({ success: true, count: 1 })
@@ -52,6 +57,12 @@ describe('ArrivalsView', () => {
       target: { value: '모델,사이즈,색상,수량\nLP01,S,네이비,12' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'CSV 행 가져오기' }))
+
+    await openSelectAndChoose('공장', '광주 협력사')
+    await openSelectAndChoose('항목 #1 모델', 'LP01')
+    await openSelectAndChoose('항목 #1 사이즈', 'S')
+    await openSelectAndChoose('항목 #1 색상', '네이비')
+
     fireEvent.click(screen.getByRole('button', { name: '예정 입고 등록' }))
 
     await waitFor(() =>
@@ -110,7 +121,7 @@ describe('ArrivalsView', () => {
       }),
     )
 
-    fireEvent.change(screen.getByLabelText('입고 창고'), { target: { value: '12' } })
+    await openSelectAndChoose('입고 창고', '대자동')
     fireEvent.change(screen.getByLabelText('입고 수량'), { target: { value: '2' } })
     fireEvent.click(screen.getByRole('button', { name: '입고 반영' }))
 

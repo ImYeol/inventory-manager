@@ -38,7 +38,14 @@ vi.mock('@/app/(protected)/history/HistoryView', () => ({
 import InventoryWorkspace from '@/app/components/inventory/InventoryWorkspace'
 
 describe('InventoryWorkspace', () => {
-  it('renders a table-first workspace with compact filters and action buttons', () => {
+  async function openComboboxAndPick(label: string, option: string) {
+    const trigger = screen.getByRole('combobox', { name: label })
+    fireEvent.click(trigger)
+    fireEvent.click(await screen.findByRole('option', { name: option }))
+    return trigger
+  }
+
+  it('renders a table-first workspace with compact filters and action buttons', async () => {
     render(
       React.createElement(InventoryWorkspace, {
         warehouses: [
@@ -77,18 +84,20 @@ describe('InventoryWorkspace', () => {
 
     expect(screen.getByRole('heading', { name: '재고 운영' })).toBeTruthy()
     expect(screen.getAllByRole('heading', { name: '재고 운영' })).toHaveLength(1)
-    expect((screen.getByRole('combobox', { name: '창고 선택' }) as HTMLSelectElement).value).toBe('all')
+    expect(screen.getByRole('tab', { name: '목록' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: '이력' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '목록' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '이력' })).toBeNull()
+    expect(screen.getByRole('combobox', { name: '창고 선택' }).textContent).toContain('전체 창고')
     expect(screen.getByLabelText('상품명 검색')).toBeTruthy()
     expect(screen.getByLabelText('상태 필터')).toBeTruthy()
     expect(screen.getByRole('button', { name: '컬럼' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '목록' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '이력' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '입고' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '출고' })).toBeTruthy()
 
     fireEvent.change(screen.getByLabelText('상품명 검색'), { target: { value: 'LP01' } })
-    fireEvent.change(screen.getByLabelText('상태 필터'), { target: { value: 'normal' } })
-    fireEvent.change(screen.getByRole('combobox', { name: '창고 선택' }), { target: { value: '2' } })
+    await openComboboxAndPick('상태 필터', '정상')
+    await openComboboxAndPick('창고 선택', '대자동')
 
     const table = screen.getByRole('table')
     expect(within(table).getByText('LP01')).toBeTruthy()
@@ -123,7 +132,7 @@ describe('InventoryWorkspace', () => {
     expect(screen.queryByText('주의 항목')).toBeNull()
   })
 
-  it('renders history as an internal view without duplicating top-level filters', () => {
+  it('switches to the embedded history view through tabs without duplicating top-level filters', () => {
     render(
       React.createElement(InventoryWorkspace, {
         warehouses: [{ id: 1, name: '오금동' }],
@@ -132,7 +141,9 @@ describe('InventoryWorkspace', () => {
       }),
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /이력/ }))
+    const historyTab = screen.getByRole('tab', { name: '이력' })
+    fireEvent.mouseDown(historyTab)
+    fireEvent.click(historyTab)
     expect(screen.getByText('HistoryView:all')).toBeTruthy()
     expect(screen.queryByRole('heading', { name: '이력 필터' })).toBeNull()
     expect(screen.queryByRole('combobox', { name: '창고' })).toBeNull()

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { addTransaction, adjustInventory } from '@/lib/actions'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cx, ui } from './ui'
 
 type InventoryItem = {
@@ -62,6 +63,37 @@ function todayText() {
 
 function makeEditKey(colorId: number, sizeId: number) {
   return `${colorId}:${sizeId}`
+}
+
+function InventorySelect({
+  label,
+  value,
+  options,
+  onValueChange,
+  className,
+}: {
+  label: string
+  value: string
+  options: Array<{ value: string; label: string }>
+  onValueChange: (value: string) => void
+  className?: string
+}) {
+  return (
+    <div className={className}>
+      <Select value={value} onValueChange={onValueChange}>
+        <SelectTrigger aria-label={label} className={ui.controlSm}>
+          <SelectValue placeholder={label} />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
 }
 
 export default function InventoryView({ models, warehouses, recentMovements = [] }: InventoryViewProps) {
@@ -279,26 +311,21 @@ export default function InventoryView({ models, warehouses, recentMovements = []
             {isOpen && (
               <div className="border-t border-slate-200 bg-slate-50/60">
                 <div className="flex items-center justify-between gap-2 px-4 py-3">
-                  <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <div className="flex items-center gap-2 text-sm text-slate-600">
                     <span>창고 보기</span>
-                    <select
-                      value={filter}
-                      onChange={(e) =>
-                        setView(
-                          model.id,
-                          e.target.value === 'all' ? 'all' : Number(e.target.value),
-                        )
-                      }
-                      className={ui.controlSm}
-                    >
-                      <option value="all">전체</option>
-                      {warehouses.map((warehouse) => (
-                        <option key={warehouse.id} value={warehouse.id}>
-                          {warehouse.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                    <InventorySelect
+                      label="창고 보기"
+                      value={String(filter)}
+                      onValueChange={(next) => setView(model.id, next === 'all' ? 'all' : Number(next))}
+                      options={[
+                        { value: 'all', label: '전체' },
+                        ...warehouses.map((warehouse) => ({
+                          value: String(warehouse.id),
+                          label: warehouse.name,
+                        })),
+                      ]}
+                    />
+                  </div>
 
                   <button
                     type="button"
@@ -425,22 +452,21 @@ export default function InventoryView({ models, warehouses, recentMovements = []
                     <div className="mb-3 flex items-center justify-between">
                       <div>
                         <label className="text-sm text-slate-600">조정 창고</label>
-                        <select
-                          value={editWarehouseId ?? ''}
-                          onChange={(e) =>
+                        <InventorySelect
+                          label="조정 창고"
+                          value={String(editWarehouseId ?? warehouses[0]?.id ?? '')}
+                          className="ml-2 inline-flex"
+                          onValueChange={(next) =>
                             setAdjustWarehouseByModel((prev) => ({
                               ...prev,
-                              [model.id]: Number(e.target.value),
+                              [model.id]: Number(next),
                             }))
                           }
-                          className={cx(ui.controlSm, 'ml-2')}
-                        >
-                          {warehouses.map((warehouse) => (
-                            <option key={warehouse.id} value={warehouse.id}>
-                              {warehouse.name}
-                            </option>
-                          ))}
-                        </select>
+                          options={warehouses.map((warehouse) => ({
+                            value: String(warehouse.id),
+                            label: warehouse.name,
+                          }))}
+                        />
                       </div>
                       <span className="text-xs text-slate-500">
                         {editCount > 0 ? `변경값 ${editCount}건` : '수량을 수정해 저장하세요'}

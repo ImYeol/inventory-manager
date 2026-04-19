@@ -20,13 +20,18 @@
 
 ## 핵심 원칙
 1. 상품 관리는 상품/창고 기준정보의 top-level surface다.
-2. 재고 운영은 list/history-first다.
-3. title, subtitle, helper copy는 최소화한다.
-4. 상태는 badge와 표 셀에서 먼저 보이고, 설명 문장으로 반복하지 않는다.
-5. 하나의 surface에는 primary CTA를 하나만 둔다.
-6. 수동 입출고는 빠르되, 팝업 안의 섹션 수는 작아야 한다.
-7. 스토어 연결은 설정 안에서 관리하고, 운송장은 실행 흐름만 보여준다.
-8. 같은 내용을 카드, 배지, 문장, 버튼으로 여러 번 말하지 않는다.
+2. 대시보드는 KPI와 분석을 같은 surface에서 보여준다.
+3. 재고 운영은 list/history-first다.
+4. title, subtitle, helper copy는 최소화한다.
+5. 상태는 badge와 표 셀에서 먼저 보이고, 설명 문장으로 반복하지 않는다. 상태 라벨은 같은 화면에서 중복 표기하지 않는다.
+6. 하나의 surface에는 primary CTA를 하나만 둔다.
+7. 수동 입출고는 빠르되, 팝업 안의 섹션 수는 작아야 한다.
+8. 스토어 연결은 설정 안에서 관리하고, 운송장은 실행 흐름만 보여준다.
+9. 선택형 dropdown은 shared select primitive 하나로 통일한다.
+10. 같은 내용을 카드, 배지, 문장, 버튼으로 여러 번 말하지 않는다.
+11. `상품 관리`의 탭 언어는 `재고 운영`과 같은 밀도와 역할 규칙을 따른다.
+12. label/select/menu/view 안의 텍스트는 컴포넌트 폭에 맞춰 줄바꿈, 잘림, 정렬 기준을 명확히 가진다.
+13. 화면에서 상태를 보여줄 때는 한 번만 말하고, label/배지/문장에 같은 상태명을 반복하지 않는다.
 
 ## 디자인 토큰
 - `--background`
@@ -52,13 +57,18 @@
 
 ```text
 src/components/ui/
+├── card.tsx
+├── select.tsx
 ├── badge-1.tsx
 ├── table.tsx
 ├── basic-data-table.tsx
 ├── inventory-data-table.tsx
 ├── filter-toolbar.tsx
 ├── column-visibility-menu.tsx
+├── tabs.tsx
+├── modal.tsx
 ├── shipping-classification-badge.tsx
+├── store-connection-status.tsx
 └── store-connection-row.tsx
 ```
 
@@ -69,6 +79,17 @@ src/components/ui/
   - subtle row motion
 - `filter-toolbar`
   - compact search / dropdown / reset / action cluster
+- `card`
+  - canonical border language for bordered surfaces
+  - `default`, `muted`, `strong` variants
+- `tabs`
+  - upper view switch only
+  - do not use for filter chips or action toggles
+- `modal`
+  - lightweight shared overlay for short-lived form/edit flows
+- `select`
+  - all console dropdown selection inputs
+  - supports placeholder, disabled, compact trigger, keyboard navigation
 - `shipping-classification-badge`
   - `naver`
   - `coupang`
@@ -76,7 +97,7 @@ src/components/ui/
   - `ambiguous`
 - `store-connection-row`
   - provider label
-  - status badge
+  - dot + label status
   - masked summary
   - updated time
   - connect/change action
@@ -91,6 +112,7 @@ src/components/ui/
 
 ## 메뉴 구조
 - `대시보드`
+  - `분석 섹션`
 - `상품 관리`
   - `상품`
   - `창고`
@@ -99,16 +121,28 @@ src/components/ui/
   - `외부 공장`
   - `입고 예정`
 - `운송장`
-- `분석`
 - `설정`
   - `스토어 연결`
+
+## Dashboard Pattern
+- dashboard는 quick-start 버튼 행 대신 `KPI strip + analytics cards + operational tables`로 구성한다.
+- analytics는 독립 메뉴가 아니라 dashboard 내부 section이다.
+- 차트는 `거래 추이`, `재고 추이`, `창고별 변동 비교` 3개만 유지한다.
+- 각 차트는 자기 전용 control strip를 가진다.
 
 ## Layout Rules
 - 기본 구조는 `header -> compact toolbar -> primary table`이다.
 - summary card는 예외적이어야 하며 기본 레이아웃이 아니다.
 - 같은 섹션 안에서 card nesting이 2단 이상 늘어나면 구조를 다시 접는다.
 - title 위 kicker/eyebrow/tag cluster는 기본적으로 사용하지 않는다.
+- 상단 tabs는 같은 page 안의 view switch에만 사용하고, filter/action cluster는 toolbar로 둔다.
 - 탭과 버튼은 compact size를 기본으로 한다.
+
+## Text Fitting Rules
+- `label`, `select`, `menu`, `view` 안의 텍스트는 해당 컴포넌트 폭을 먼저 따른다.
+- 한 줄이 보장되지 않으면 `wrap -> truncate -> align` 순서로 규칙을 정한다.
+- label은 가능한 짧게 두고, select/menu/view 안에서는 긴 옵션명을 잘리거나 줄바꿈될 수 있게 설계한다.
+- 오른쪽 정렬 숫자나 상태 텍스트는 같은 행에서 기준선을 유지해야 한다.
 
 ## 페이지 chrome 예산
 - 기본 헤더는 `title + 짧은 설명 + 액션 영역`까지만 허용한다.
@@ -119,6 +153,7 @@ src/components/ui/
 ## 상품 관리 패턴
 - visible destination은 `상품 관리`다. `기준 데이터`는 사용자 메뉴 이름으로 쓰지 않는다.
 - 상품과 창고는 같은 관리 도메인 안에 두되, 서로 다른 리스트와 편집 폼으로 분리한다.
+- 두 탭 모두 `compact toolbar + basic data table + modal action` 구조를 쓴다.
 - 상품 표에서는 SKU, 옵션, 상태, 표시명이 먼저 보여야 하고, 설명 카드가 그 앞에 서면 안 된다.
 - 창고 표에서는 창고명, 사용 여부, 운영 메모, 연결 상태가 먼저 보여야 하고, 상태 설명은 inline state로만 보조한다.
 
@@ -185,6 +220,7 @@ src/components/ui/
 - `네이버 미연결`, `쿠팡 미연결` 상태는 버튼이 살아 있어야 한다.
 - 버튼을 누르면 해당 provider의 settings section으로 이동한다.
 - 운송장 화면에 credential form을 넣지 않는다.
+- 상태 표현은 초록/빨강 원형 dot와 짧은 label 조합으로 통일한다.
 
 ## 설정 패턴
 - 설정은 더 이상 “다른 페이지로 가라”는 안내 카드만 두는 화면이 아니다.
@@ -208,9 +244,12 @@ src/components/ui/
 - 반복 액션은 icon + text를 기본으로 한다.
 - 같은 시야에서 filled primary 버튼은 1개가 기본이다.
 - filter, column visibility, status filter는 compact dropdown으로 처리한다.
+- dropdown 선택 입력은 shared `Select` primitive만 사용한다.
+- native `<select>`와 화면별 개별 dropdown 구현은 허용하지 않는다.
 - full-width giant button은 업로드 dropzone 같은 예외적 액션에만 한정한다.
 
 ## 카드와 surface 규칙
+- card/surface variants는 bordered container의 canonical language다.
 - 카드 안에 다시 설명 카드, 그 안에 상태 카드가 중첩되면 실패 신호다.
 - 정보가 많아질수록 새 카드를 더하는 대신 표, inline disclosure, drawer를 쓴다.
 - “상태를 설명하기 위한 카드”는 기본적으로 만들지 않는다.

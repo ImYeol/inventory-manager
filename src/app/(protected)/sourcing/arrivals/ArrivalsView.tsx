@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createFactoryArrivalBatch, receiveFactoryArrival } from '@/lib/actions'
 import { StatusBadge } from '@/components/ui/badge-1'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PageHeader, cx, ui } from '@/app/components/ui'
 
 type FactoryLookup = {
@@ -59,6 +60,11 @@ type ReceiveDraft = {
   quantities: Record<number, number>
 }
 
+type SelectOption<Value extends string | number> = {
+  value: Value
+  label: string
+}
+
 function createRow(): ArrivalRow {
   return {
     key: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -93,6 +99,44 @@ function buildReceiveDrafts(arrivals: ArrivalRecord[], warehouses: WarehouseLook
   }, {})
 }
 
+function SelectField<Value extends string | number>({
+  label,
+  value,
+  placeholder,
+  options,
+  onValueChange,
+  disabled,
+}: {
+  label: string
+  value: Value | null
+  placeholder: string
+  options: Array<SelectOption<Value>>
+  onValueChange: (value: Value | null) => void
+  disabled?: boolean
+}) {
+  return (
+    <div>
+      <label className={ui.label}>{label}</label>
+      <Select
+        value={value !== null ? String(value) : undefined}
+        onValueChange={(next) => onValueChange(next ? (next as Value) : null)}
+        disabled={disabled}
+      >
+        <SelectTrigger aria-label={label} className={cx(ui.controlSm, 'w-full bg-white')}>
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={String(option.value)} value={String(option.value)}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
+
 export default function ArrivalsView({
   factories,
   warehouses,
@@ -108,7 +152,7 @@ export default function ArrivalsView({
   const [isPending, startTransition] = useTransition()
   const [entryMode, setEntryMode] = useState<'manual' | 'csv'>('manual')
   const [message, setMessage] = useState<string | null>(null)
-  const [factoryId, setFactoryId] = useState<number>(factories.find((factory) => factory.isActive)?.id ?? factories[0]?.id ?? 0)
+  const [factoryId, setFactoryId] = useState<number | null>(factories.find((factory) => factory.isActive)?.id ?? factories[0]?.id ?? null)
   const [expectedDate, setExpectedDate] = useState(new Date().toISOString().slice(0, 10))
   const [memo, setMemo] = useState('')
   const [rows, setRows] = useState<ArrivalRow[]>([createRow(), createRow()])
@@ -116,6 +160,7 @@ export default function ArrivalsView({
   const [receiveDrafts, setReceiveDrafts] = useState<Record<number, ReceiveDraft>>(() => buildReceiveDrafts(arrivals, warehouses))
 
   const activeFactories = factories.filter((factory) => factory.isActive)
+  const factoryOptions = activeFactories.length > 0 ? activeFactories : factories
 
   useEffect(() => {
     setReceiveDrafts(buildReceiveDrafts(arrivals, warehouses))
@@ -182,6 +227,8 @@ export default function ArrivalsView({
   }
 
   const submitRows = () => {
+    const selectedFactoryId = factoryId
+
     const validRows = normalizedRows
       .filter((row) => row.valid)
       .map((row) => ({
@@ -191,10 +238,15 @@ export default function ArrivalsView({
         orderedQuantity: row.orderedQuantity as number,
       }))
 
+    if (!selectedFactoryId) {
+      setMessage('공장을 선택해주세요.')
+      return
+    }
+
     startTransition(async () => {
       try {
         await createFactoryArrivalBatch({
-          factoryId,
+          factoryId: selectedFactoryId,
           expectedDate,
           memo,
           sourceChannel: entryMode,
@@ -291,14 +343,14 @@ export default function ArrivalsView({
 
           <div className="grid gap-3 md:grid-cols-2">
             <div>
-              <label className={ui.label}>공장</label>
-              <select value={factoryId} onChange={(event) => setFactoryId(Number(event.target.value))} className={ui.controlSm}>
-                {activeFactories.map((factory) => (
-                  <option key={factory.id} value={factory.id}>
-                    {factory.name}
-                  </option>
-                ))}
-              </select>
+              <SelectField
+                label="공장"
+                value={factoryId}
+                placeholder={factoryOptions.length > 0 ? '공장 선택' : '등록된 공장이 없습니다'}
+                options={factoryOptions.map((factory) => ({ value: factory.id, label: factory.name }))}
+                onValueChange={(next) => setFactoryId(next === null ? null : Number(next))}
+                disabled={factoryOptions.length === 0}
+              />
             </div>
             <div>
               <label className={ui.label}>예정 입고일</label>
@@ -356,66 +408,57 @@ export default function ArrivalsView({
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_8rem]">
-                    <select
-                      value={row.modelId}
-                      onChange={(event) =>
+                    <SelectField
+                      label={`항목 #${index + 1} 모델`}
+                      value={row.modelId === '' ? null : row.modelId}
+                      placeholder="모델 선택"
+                      options={models.map((model) => ({ value: model.id, label: model.name }))}
+                      onValueChange={(next) =>
                         setRows((current) =>
                           current.map((item) =>
                             item.key === row.key
-                              ? { ...item, modelId: Number(event.target.value), sizeId: '', colorId: '', error: null }
+                              ? {
+                                  ...item,
+                                  modelId: next === null ? '' : Number(next),
+                                  sizeId: '',
+                                  colorId: '',
+                                  error: null,
+                                }
                               : item,
                           ),
                         )
                       }
-                      className={ui.controlSm}
-                    >
-                      <option value="">모델 선택</option>
-                      {models.map((model) => (
-                        <option key={model.id} value={model.id}>
-                          {model.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
 
-                    <select
-                      value={row.sizeId}
-                      onChange={(event) =>
+                    <SelectField
+                      label={`항목 #${index + 1} 사이즈`}
+                      value={row.sizeId === '' ? null : row.sizeId}
+                      placeholder="사이즈"
+                      options={(row.model?.sizes ?? []).map((size) => ({ value: size.id, label: size.name }))}
+                      onValueChange={(next) =>
                         setRows((current) =>
                           current.map((item) =>
-                            item.key === row.key ? { ...item, sizeId: Number(event.target.value), error: null } : item,
+                            item.key === row.key ? { ...item, sizeId: next === null ? '' : Number(next), error: null } : item,
                           ),
                         )
                       }
                       disabled={!row.model}
-                      className={ui.controlSm}
-                    >
-                      <option value="">사이즈</option>
-                      {(row.model?.sizes ?? []).map((size) => (
-                        <option key={size.id} value={size.id}>
-                          {size.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
 
-                    <select
-                      value={row.colorId}
-                      onChange={(event) =>
+                    <SelectField
+                      label={`항목 #${index + 1} 색상`}
+                      value={row.colorId === '' ? null : row.colorId}
+                      placeholder="색상"
+                      options={(row.model?.colors ?? []).map((color) => ({ value: color.id, label: color.name }))}
+                      onValueChange={(next) =>
                         setRows((current) =>
                           current.map((item) =>
-                            item.key === row.key ? { ...item, colorId: Number(event.target.value), error: null } : item,
+                            item.key === row.key ? { ...item, colorId: next === null ? '' : Number(next), error: null } : item,
                           ),
                         )
                       }
                       disabled={!row.model}
-                      className={ui.controlSm}
-                    >
-                      <option value="">색상</option>
-                      {(row.model?.colors ?? []).map((color) => (
-                        <option key={color.id} value={color.id}>
-                          {color.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
 
                     <input
                       type="number"
@@ -516,31 +559,23 @@ export default function ArrivalsView({
                         <p className="mt-1 text-sm text-slate-500">창고를 선택하고 항목별 수량을 조정한 뒤 한 번에 반영합니다.</p>
                       </div>
                       <div className="min-w-0 md:w-64">
-                        <label htmlFor={`arrival-warehouse-${arrival.id}`} className={ui.label}>
-                          입고 창고
-                        </label>
-                        <select
-                          id={`arrival-warehouse-${arrival.id}`}
-                          value={receiveDrafts[arrival.id]?.warehouseId ?? warehouses[0]?.id ?? 0}
-                          onChange={(event) =>
+                        <SelectField
+                          label="입고 창고"
+                          value={receiveDrafts[arrival.id]?.warehouseId ?? warehouses[0]?.id ?? null}
+                          placeholder={warehouses.length === 0 ? '등록된 창고가 없습니다' : '창고 선택'}
+                          options={
+                            warehouses.length === 0
+                              ? [{ value: 0, label: '등록된 창고가 없습니다' }]
+                              : warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))
+                          }
+                          onValueChange={(next) =>
                             updateReceiveDraft(arrival.id, (draft) => ({
                               ...draft,
-                              warehouseId: Number(event.target.value),
+                              warehouseId: next === null ? 0 : Number(next),
                             }))
                           }
-                          className={ui.controlSm}
                           disabled={warehouses.length === 0}
-                        >
-                          {warehouses.length === 0 ? (
-                            <option value={0}>등록된 창고가 없습니다</option>
-                          ) : (
-                            warehouses.map((warehouse) => (
-                              <option key={warehouse.id} value={warehouse.id}>
-                                {warehouse.name}
-                              </option>
-                            ))
-                          )}
-                        </select>
+                        />
                       </div>
                     </div>
 

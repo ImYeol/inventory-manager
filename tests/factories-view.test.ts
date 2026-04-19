@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, within, waitFor } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
@@ -24,9 +24,13 @@ beforeEach(() => {
   Object.values(mocks).forEach((mock) => mock.mockReset())
 })
 
+async function chooseSelectOption(label: string, optionName: string) {
+  fireEvent.click(screen.getByRole('combobox', { name: label }))
+  fireEvent.click(await screen.findByRole('option', { name: optionName }))
+}
+
 describe('FactoriesView', () => {
-  it('creates and toggles factories', async () => {
-    mocks.createFactory.mockResolvedValue({ success: true })
+  it('shows the toolbar, filters the table, and opens the detail modal', async () => {
     mocks.setFactoryActive.mockResolvedValue({ success: true })
 
     render(
@@ -37,22 +41,80 @@ describe('FactoriesView', () => {
             name: '광주 협력사',
             contactName: '홍길동',
             phone: '010-1111-2222',
-            email: null,
-            notes: null,
+            email: 'gwangju@example.com',
+            notes: '주력 공장',
             isActive: true,
             arrivalCount: 2,
             pendingQuantity: 24,
+          },
+          {
+            id: 2,
+            name: '부산 협력사',
+            contactName: '김철수',
+            phone: '010-3333-4444',
+            email: null,
+            notes: null,
+            isActive: false,
+            arrivalCount: 1,
+            pendingQuantity: 6,
           },
         ],
       }),
     )
 
-    fireEvent.change(screen.getByPlaceholderText('예: 광주 봉제 협력사'), { target: { value: '부산 협력사' } })
+    expect(screen.getByRole('heading', { name: '외부 공장' })).toBeTruthy()
+    expect(screen.getByRole('table', { name: '공장 목록' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '공장 등록' })).toBeTruthy()
+
+    fireEvent.change(screen.getByRole('searchbox', { name: '공장 검색' }), { target: { value: '부산' } })
+    expect(screen.getByRole('row', { name: /부산 협력사/ })).toBeTruthy()
+    expect(screen.queryByRole('row', { name: /광주 협력사/ })).toBeNull()
+
+    await chooseSelectOption('상태 필터', '비활성')
+    expect(screen.getByRole('row', { name: /부산 협력사/ })).toBeTruthy()
+    expect(screen.queryByRole('row', { name: /광주 협력사/ })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '상세' }))
+
+    expect(screen.getByRole('dialog', { name: '부산 협력사' })).toBeTruthy()
+    expect(screen.getByText('김철수')).toBeTruthy()
+    expect(screen.getByText('잔여 6개')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '다시 활성화' }))
+
+    await waitFor(() => expect(mocks.setFactoryActive).toHaveBeenCalledWith(2, true))
+  })
+
+  it('opens the register modal and submits a new factory', async () => {
+    mocks.createFactory.mockResolvedValue({ success: true })
+
+    render(
+      React.createElement(FactoriesView, {
+        factories: [],
+      }),
+    )
+
     fireEvent.click(screen.getByRole('button', { name: '공장 등록' }))
 
-    await waitFor(() => expect(mocks.createFactory).toHaveBeenCalledWith(expect.objectContaining({ name: '부산 협력사' })))
+    const dialog = screen.getByRole('dialog', { name: '공장 등록' })
+    const form = within(dialog)
+    fireEvent.change(form.getByPlaceholderText('예: 광주 봉제 협력사'), { target: { value: '부산 협력사' } })
+    fireEvent.change(form.getByPlaceholderText('담당자 이름'), { target: { value: '홍길동' } })
+    fireEvent.change(form.getByPlaceholderText('010-0000-0000'), { target: { value: '010-2222-3333' } })
+    fireEvent.change(form.getByPlaceholderText('factory@example.com'), { target: { value: 'factory@example.com' } })
+    fireEvent.change(form.getByPlaceholderText('납기 메모, 연락 가능 시간, 특이사항'), { target: { value: '야간 연락' } })
+    fireEvent.click(form.getByRole('button', { name: '등록' }))
 
-    fireEvent.click(screen.getByRole('button', { name: '비활성화' }))
-    await waitFor(() => expect(mocks.setFactoryActive).toHaveBeenCalledWith(1, false))
+    await waitFor(() =>
+      expect(mocks.createFactory).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: '부산 협력사',
+          contactName: '홍길동',
+          phone: '010-2222-3333',
+          email: 'factory@example.com',
+          notes: '야간 연락',
+        }),
+      ),
+    )
   })
 })

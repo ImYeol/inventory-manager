@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { StatusBadge } from '@/components/ui/badge-1'
 import { BasicDataTable } from '@/components/ui/basic-data-table'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cx, ui } from '../../components/ui'
 
 type TransactionItem = {
@@ -25,8 +26,58 @@ type TransactionItem = {
 
 type ModelItem = { id: number; name: string }
 type WarehouseItem = { id: number; name: string }
+type SelectOption = { value: string; label: string; disabled?: boolean }
+const EMPTY_SELECT_VALUE = '__empty__'
 
 const PAGE_SIZE = 20
+
+function SelectControl({
+  value,
+  onValueChange,
+  options,
+  placeholder,
+  id,
+  label,
+  ariaLabel,
+  disabled,
+}: {
+  value: string
+  onValueChange: (value: string | null) => void
+  options: SelectOption[]
+  placeholder: string
+  id?: string
+  label?: string
+  ariaLabel?: string
+  disabled?: boolean
+}) {
+  return (
+    <Select
+      value={value === '' ? EMPTY_SELECT_VALUE : value}
+      onValueChange={(next) => onValueChange(next === EMPTY_SELECT_VALUE ? null : next)}
+      disabled={disabled}
+    >
+      {label ? (
+        <label htmlFor={id} className={ui.label}>
+          {label}
+        </label>
+      ) : null}
+      <SelectTrigger id={id} aria-label={ariaLabel} className={ui.controlSm}>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((option) => (
+          <SelectItem
+            key={option.value || EMPTY_SELECT_VALUE}
+            value={option.value === '' ? EMPTY_SELECT_VALUE : option.value}
+            disabled={option.disabled}
+          >
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
 
 function formatSourceChannel(sourceChannel?: string | null) {
   if (sourceChannel === 'manual') return '수동'
@@ -137,88 +188,70 @@ export default function HistoryView({
 
         <div className={cx('grid grid-cols-1 gap-3', controlledWarehouseId === undefined ? 'sm:grid-cols-2 lg:grid-cols-6' : 'sm:grid-cols-2 lg:grid-cols-5')}>
           <div>
-            <label htmlFor="history-model" className={ui.label}>
-              모델
-            </label>
-            <select
+            <SelectControl
               id="history-model"
+              label="모델"
               value={filterModel}
-              onChange={(event) => {
-                setFilterModel(event.target.value)
+              onValueChange={(value) => {
+                setFilterModel(value ?? '')
                 setPage(1)
               }}
-              className={ui.controlSm}
-            >
-              <option value="">전체</option>
-              {models.map((model) => (
-                <option key={model.id} value={model.name}>
-                  {model.name}
-                </option>
-              ))}
-            </select>
+              placeholder="전체"
+              options={[{ value: '', label: '전체' }, ...models.map((model) => ({ value: model.name, label: model.name }))]}
+            />
           </div>
 
           <div>
-            <label htmlFor="history-type" className={ui.label}>
-              구분
-            </label>
-            <select
+            <SelectControl
               id="history-type"
+              label="구분"
               value={filterType}
-              onChange={(event) => {
-                setFilterType(event.target.value)
+              onValueChange={(value) => {
+                setFilterType(value ?? '')
                 setPage(1)
               }}
-              className={ui.controlSm}
-            >
-              <option value="">전체</option>
-              <option value="입고">입고</option>
-              <option value="출고">출고</option>
-              <option value="재고조정">재고조정</option>
-            </select>
+              placeholder="전체"
+              options={[
+                { value: '', label: '전체' },
+                { value: '입고', label: '입고' },
+                { value: '출고', label: '출고' },
+                { value: '재고조정', label: '재고조정' },
+              ]}
+            />
           </div>
 
           <div>
-            <label htmlFor="history-source-channel" className={ui.label}>
-              등록 방식
-            </label>
-            <select
+            <SelectControl
               id="history-source-channel"
+              label="등록 방식"
               value={filterSourceChannel}
-              onChange={(event) => {
-                setFilterSourceChannel(event.target.value)
+              onValueChange={(value) => {
+                setFilterSourceChannel(value ?? '')
                 setPage(1)
               }}
-              className={ui.controlSm}
-            >
-              <option value="">전체</option>
-              <option value="manual">수동</option>
-              <option value="csv">CSV</option>
-              <option value="factory-arrival">예정입고 반영</option>
-            </select>
+              placeholder="전체"
+              options={[
+                { value: '', label: '전체' },
+                { value: 'manual', label: '수동' },
+                { value: 'csv', label: 'CSV' },
+                { value: 'factory-arrival', label: '예정입고 반영' },
+              ]}
+            />
           </div>
 
           {controlledWarehouseId === undefined ? (
             <div>
-              <label htmlFor="history-warehouse" className={ui.label}>
-                창고
-              </label>
-              <select
+              <SelectControl
                 id="history-warehouse"
-                value={filterWarehouseId}
-                onChange={(event) => {
-                  setFilterWarehouseId(event.target.value ? Number(event.target.value) : '')
+                label="창고"
+                value={filterWarehouseId === '' ? '' : String(filterWarehouseId)}
+                onValueChange={(value) => {
+                  setFilterWarehouseId(value ? Number(value) : '')
                   setPage(1)
                 }}
-                className={ui.controlSm}
-              >
-                <option value="">전체</option>
-                {warehouses.map((warehouse) => (
-                  <option key={warehouse.id} value={warehouse.id}>
-                    {warehouse.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="전체"
+                options={[{ value: '', label: '전체' }, ...warehouses.map((warehouse) => ({ value: String(warehouse.id), label: warehouse.name }))]}
+              />
             </div>
           ) : (
             <div className={cx(ui.controlSm, 'pointer-events-none flex flex-col justify-center bg-slate-50 text-slate-700')}>

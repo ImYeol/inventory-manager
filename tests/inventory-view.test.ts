@@ -8,6 +8,11 @@ afterEach(() => {
   cleanup()
 })
 
+async function chooseSelectOption(label: string, optionName: string) {
+  fireEvent.click(screen.getByRole('combobox', { name: label }))
+  fireEvent.click(await screen.findByRole('option', { name: optionName }))
+}
+
 describe('InventoryView', () => {
   it('opens the only model by default and shows aggregated totals', () => {
     render(
@@ -51,7 +56,7 @@ describe('InventoryView', () => {
     expect(within(row as HTMLTableRowElement).getByText('↗2')).toBeTruthy()
   })
 
-  it('updates quantities when switching warehouse filter', () => {
+  it('updates quantities when switching warehouse filter', async () => {
     render(
       React.createElement(InventoryView, {
         warehouses: [
@@ -78,7 +83,7 @@ describe('InventoryView', () => {
       })
     )
 
-    fireEvent.change(screen.getByLabelText('창고 보기'), { target: { value: '2' } })
+    await chooseSelectOption('창고 보기', '대자동')
 
     const row = screen.getByText('네이비').closest('tr')
     expect(row).not.toBeNull()

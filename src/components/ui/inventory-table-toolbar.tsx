@@ -1,12 +1,11 @@
 "use client"
 
-import type { ReactNode } from 'react'
-
 import { ColumnVisibilityMenu, type ColumnOption } from './column-visibility-menu'
 import { FilterToolbar } from './filter-toolbar'
 import { Input } from './input'
 import { Button } from './button'
-import { cx, ui } from '@/app/components/ui'
+import { ui } from '@/app/components/ui'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select'
 
 type WarehouseOption = {
   id: number
@@ -26,7 +25,6 @@ type InventoryTableToolbarProps<T extends string> = {
   onToggleColumn: (column: T) => void
   onInbound: () => void
   onOutbound: () => void
-  historyAction?: ReactNode
 }
 
 export function InventoryTableToolbar<T extends string>({
@@ -42,7 +40,6 @@ export function InventoryTableToolbar<T extends string>({
   onToggleColumn,
   onInbound,
   onOutbound,
-  historyAction,
 }: InventoryTableToolbarProps<T>) {
   return (
     <FilterToolbar>
@@ -51,19 +48,22 @@ export function InventoryTableToolbar<T extends string>({
           <label htmlFor="inventory-warehouse" className="sr-only">
             창고 선택
           </label>
-          <select
-            id="inventory-warehouse"
-            value={selectedWarehouseId}
-            onChange={(event) => onWarehouseChange(event.target.value === 'all' ? 'all' : Number(event.target.value))}
-            className={cx(ui.controlSm, 'bg-white')}
+          <Select
+            value={selectedWarehouseId === 'all' ? 'all' : String(selectedWarehouseId)}
+            onValueChange={(value) => onWarehouseChange(value == null || value === 'all' ? 'all' : Number(value))}
           >
-            <option value="all">전체 창고</option>
-            {warehouses.map((warehouse) => (
-              <option key={warehouse.id} value={warehouse.id}>
-                {warehouse.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="inventory-warehouse" className={ui.controlSm}>
+              <SelectValue placeholder="전체 창고" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체 창고</SelectItem>
+              {warehouses.map((warehouse) => (
+                <SelectItem key={warehouse.id} value={String(warehouse.id)}>
+                  {warehouse.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="min-w-[15rem] flex-1">
@@ -77,27 +77,50 @@ export function InventoryTableToolbar<T extends string>({
           <label htmlFor="inventory-status" className="sr-only">
             상태 필터
           </label>
-          <select
-            id="inventory-status"
+          <Select
             value={statusFilter}
-            onChange={(event) => onStatusFilterChange(event.target.value as typeof statusFilter)}
-            className={ui.controlSm}
+            onValueChange={(value) => onStatusFilterChange((value ?? 'all') as typeof statusFilter)}
           >
-            <option value="all">전체 상태</option>
-            <option value="normal">정상</option>
-            <option value="warning">주의</option>
-            <option value="danger">품절</option>
-          </select>
+            <SelectTrigger id="inventory-status" className={ui.controlSm}>
+              <SelectValue placeholder="전체 상태" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체 상태</SelectItem>
+              <SelectItem value="normal">정상</SelectItem>
+              <SelectItem value="warning">주의</SelectItem>
+              <SelectItem value="danger">품절</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {historyAction}
         <ColumnVisibilityMenu columns={columns} visibleColumns={visibleColumns} onToggle={onToggleColumn} />
-        <Button type="button" onClick={onInbound} size="sm" className="h-10 gap-2 rounded-xl px-3">
+        <Button
+          type="button"
+          onClick={onInbound}
+          size="sm"
+          className="h-10 gap-2 rounded-xl px-3"
+          style={{
+            borderColor: 'color-mix(in srgb, #16a34a 26%, var(--border))',
+            backgroundColor: '#16a34a',
+            color: '#ffffff',
+          }}
+        >
           입고
         </Button>
-        <Button type="button" variant="secondary" onClick={onOutbound} size="sm" className="h-10 gap-2 rounded-xl px-3">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onOutbound}
+          size="sm"
+          className="h-10 gap-2 rounded-xl px-3"
+          style={{
+            borderColor: 'color-mix(in srgb, #f59e0b 26%, var(--border))',
+            backgroundColor: '#fffbeb',
+            color: '#92400e',
+          }}
+        >
           출고
         </Button>
       </div>

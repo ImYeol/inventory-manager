@@ -28,6 +28,18 @@ export type WarehouseCompareItem = {
   }>
 }
 
+function isWithinRange(date: string, dateFrom?: string, dateTo?: string) {
+  if (dateFrom && date < dateFrom) return false
+  if (dateTo && date > dateTo) return false
+  return true
+}
+
+function getTransactionDelta(type: string, quantity: number) {
+  if (type === 'INBOUND') return quantity
+  if (type === 'OUTBOUND') return -quantity
+  return 0
+}
+
 export async function getTransactionTrend(
   period: 'daily' | 'monthly' | 'yearly',
   modelId?: number,
@@ -36,9 +48,7 @@ export async function getTransactionTrend(
 ): Promise<TrendItem[]> {
   const transactions = (await getRawTransactions()).filter((item) => {
     if (modelId && item.model_id !== modelId) return false
-    if (dateFrom && item.date < dateFrom) return false
-    if (dateTo && item.date > dateTo) return false
-    return true
+    return isWithinRange(item.date, dateFrom, dateTo)
   })
 
   const grouped: Record<string, { inbound: number; outbound: number }> = {}
@@ -62,25 +72,36 @@ export async function getInventorySummary(): Promise<InventorySummaryItem[]> {
 export async function getInventoryHistory(
   period: 'daily' | 'monthly' | 'yearly',
   modelId?: number,
+  dateFrom?: string,
+  dateTo?: string,
 ): Promise<InventoryHistoryItem[]> {
-  const transactions = (await getRawTransactions()).filter((item) => !modelId || item.model_id === modelId)
+  const allTransactions = await getRawTransactions()
+  const transactions = allTransactions.filter((item) => {
+    if (modelId && item.model_id !== modelId) return false
+    return isWithinRange(item.date, dateFrom, dateTo)
+  })
   const { inventorySummary, models } = await getAnalyticsData()
   const selectedModelName = models.find((model) => model.id === modelId)?.name
   const currentTotal = modelId
     ? inventorySummary.find((item) => item.modelName === selectedModelName)?.total ?? 0
     : inventorySummary.reduce((sum, item) => sum + item.total, 0)
+  const totalAfterRange = allTransactions
+    .filter((item) => {
+      if (modelId && item.model_id !== modelId) return false
+      return !!dateTo && item.date > dateTo
+    })
+    .reduce((sum, item) => sum + getTransactionDelta(item.type, item.quantity), 0)
 
   const grouped: Record<string, number> = {}
   for (const item of transactions) {
     const key = formatDateGroup(item.date, period)
     if (!grouped[key]) grouped[key] = 0
-    if (item.type === 'INBOUND') grouped[key] += item.quantity
-    if (item.type === 'OUTBOUND') grouped[key] -= item.quantity
+    grouped[key] += getTransactionDelta(item.type, item.quantity)
   }
 
   const sortedKeys = Object.keys(grouped).sort()
   const totalDelta = sortedKeys.reduce((sum, key) => sum + grouped[key], 0)
-  let running = currentTotal - totalDelta
+  let running = currentTotal - totalAfterRange - totalDelta
 
   return sortedKeys.map((key) => {
     running += grouped[key]
@@ -88,38 +109,45 @@ export async function getInventoryHistory(
   })
 }
 
-export async function getWarehouseComparison(modelId?: number): Promise<WarehouseCompareItem[]> {
+export async function getWarehouseComparison(
+  modelId?: number,
+  dateFrom?: string,
+  dateTo?: string,
+): Promise<WarehouseCompareItem[]> {
   const { catalog, warehouses } = await getAnalyticsData()
-  const modelFilter = modelId ? new Set([modelId]) : undefined
-
   const warehouseNameById = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse.name]))
-  const grouped: Record<string, { modelName: string; totals: Map<number, number> }> = {}
+  const modelNameById = new Map(catalog.map((model) => [model.id, model.name]))
+  const modelOrder = new Map(catalog.map((model, index) => [model.id, index]))
+  const grouped = new Map<number, Map<number, number>>()
 
-  for (const model of catalog) {
-    if (modelFilter && !modelFilter.has(model.id)) continue
+  const transactions = (await getRawTransactions()).filter((item) => {
+    if (modelId && item.model_id !== modelId) return false
+    return isWithinRange(item.date, dateFrom, dateTo)
+  })
 
-    const totalMap = new Map<number, number>()
-    for (const warehouse of warehouses) {
-      totalMap.set(warehouse.id, 0)
+  for (const item of transactions) {
+    if (!grouped.has(item.model_id)) {
+      const initialTotals = new Map<number, number>()
+      for (const warehouse of warehouses) {
+        initialTotals.set(warehouse.id, 0)
+      }
+      grouped.set(item.model_id, initialTotals)
     }
 
-    for (const item of model.inventory) {
-      const next = (totalMap.get(item.warehouseId) ?? 0) + item.quantity
-      totalMap.set(item.warehouseId, next)
-    }
+    const totals = grouped.get(item.model_id)
+    if (!totals) continue
 
-    grouped[model.name] = {
-      modelName: model.name,
-      totals: totalMap,
-    }
+    totals.set(item.warehouse_id, (totals.get(item.warehouse_id) ?? 0) + getTransactionDelta(item.type, item.quantity))
   }
 
-  return Object.values(grouped).map((entry) => ({
-    modelName: entry.modelName,
-    warehouseTotals: [...entry.totals.entries()].map(([id, quantity]) => ({
-      id,
-      name: warehouseNameById.get(id) ?? `창고 #${id}`,
-      quantity,
-    })),
-  }))
+  return [...grouped.entries()]
+    .sort(([left], [right]) => (modelOrder.get(left) ?? Number.MAX_SAFE_INTEGER) - (modelOrder.get(right) ?? Number.MAX_SAFE_INTEGER))
+    .map(([modelIdValue, totals]) => ({
+      modelName: modelNameById.get(modelIdValue) ?? `모델 #${modelIdValue}`,
+      warehouseTotals: [...totals.entries()].map(([id, quantity]) => ({
+        id,
+        name: warehouseNameById.get(id) ?? `창고 #${id}`,
+        quantity,
+      })),
+    }))
 }

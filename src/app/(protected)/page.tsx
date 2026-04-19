@@ -1,14 +1,28 @@
+import { formatDateLabel } from '@/lib/inventory'
 import { getAnalyticsData, getTransactionsWithRelations } from '@/lib/data'
 import DashboardView from '../components/DashboardView'
 import { PageHeader, ui } from '../components/ui'
-import { formatDateLabel } from '@/lib/inventory'
+import {
+  getInventoryHistory,
+  getTransactionTrend,
+  getWarehouseComparison,
+} from '@/lib/actions/analytics'
 
 export const dynamic = 'force-dynamic'
 
 export default async function Home() {
-  const [{ inventorySummary, warehouses, catalog }, { transactions }] = await Promise.all([
+  const [
+    { inventorySummary, warehouses, catalog, models },
+    { transactions },
+    initialInventoryHistory,
+    initialTransactionTrend,
+    initialWarehouseComparison,
+  ] = await Promise.all([
     getAnalyticsData(),
     getTransactionsWithRelations(),
+    getInventoryHistory('monthly'),
+    getTransactionTrend('monthly'),
+    getWarehouseComparison(),
   ])
 
   const todayLabel = formatDateLabel(new Date())
@@ -74,13 +88,17 @@ export default async function Home() {
     <div className={ui.shell}>
       <PageHeader
         title="대시보드"
-        description="재고 운영 상태와 최근 흐름을 한 화면에서 확인합니다."
+        description="재고 현황과 최근 흐름을 바로 봅니다."
       />
       <DashboardView
         metrics={metrics}
         warehouses={warehouseTotals}
         attentionItems={attentionItems}
         recentActivities={transactions.slice(0, 6)}
+        models={models}
+        initialInventoryHistory={initialInventoryHistory}
+        initialTransactionTrend={initialTransactionTrend}
+        initialWarehouseComparison={initialWarehouseComparison}
       />
     </div>
   )
