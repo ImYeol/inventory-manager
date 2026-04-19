@@ -1,0 +1,35 @@
+{
+  "project": "Seleccase Inventory",
+  "phase": "inventory-shipping-settings-reset",
+  "status": "pending",
+  "steps": [
+    {
+      "step": 0,
+      "name": "docs-and-ia-reset",
+      "status": "completed",
+      "started_at": "2026-04-20T04:26:10+0900",
+      "completed_at": "2026-04-20T04:29:52+0900",
+      "summary": "Rewrote the IA docs so product management is a top-level domain, inventory is list/history and inbound/outbound centered, settings owns store connections, and legacy 기준 데이터 /integrations ownership is demoted to redirects."
+    },
+    {
+      "step": 1,
+      "name": "navigation-products-and-settings-ownership",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "inventory-table-and-quick-entry-simplification",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "shipping-classification-and-store-connection-merge",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "regression-and-phase-closeout",
+      "status": "pending"
+    }
+  ]
+}
