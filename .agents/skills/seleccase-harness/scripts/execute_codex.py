@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Codex-native harness executor for phased headless execution and status management."""
+"""Codex-native harness executor for phased headless execution."""
 
 from __future__ import annotations
 
@@ -8,36 +8,280 @@ import contextlib
 import json
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 import types
+from copy import deepcopy
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from phase_runtime import (
-    active_step,
-    build_step_context,
-    first_pending_step,
-    load_guardrails,
-    load_json,
-    phase_paths,
-    repo_root_from_script,
-    set_top_phase_status,
-    stamp,
-    step_file_for,
-    validate_phase,
-    write_json,
-)
-
+READ_STATUS = {"pending", "in_progress", "completed", "blocked", "error"}
 MAX_RETRIES = 3
-FEAT_MSG = "feat({phase}): step {num} - {name}"
-CHORE_MSG = "chore({phase}): step {num} output"
+FEATURE_COMMIT_MSG = "feat({phase}): step {num} - {name}"
+METADATA_COMMIT_MSG = "chore({phase}): step {num} metadata"
+PHASE_COMPLETE_COMMIT_MSG = "chore({phase}): mark phase completed"
+KST = timezone(timedelta(hours=9))
+
+
+def repo_root_from_script(script_path: str | Path) -> Path:
+    return Path(script_path).resolve().parents[4]
+
+
+def stamp() -> str:
+    return datetime.now(KST).strftime("%Y-%m-%dT%H:%M:%S%z")
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def phase_paths(root: Path, phase_dir: str) -> dict[str, Path]:
+    phases_dir = root / "phases"
+    phase_dir_path = phases_dir / phase_dir
+    return {
+        "root": root,
+        "phases_dir": phases_dir,
+        "top_index": phases_dir / "index.json",
+        "phase_dir": phase_dir_path,
+        "phase_index": phase_dir_path / "index.json",
+    }
+
+
+def step_file_for(phase_dir: Path, step_number: int, suffix: str = ".md") -> Path:
+    return phase_dir / f"step{step_number}{suffix}"
+
+
+def run_git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True)
+
+
+def ensure_branch(root: Path, branch_name: str) -> None:
+    current = run_git(root, "rev-parse", "--abbrev-ref", "HEAD")
+    if current.returncode != 0:
+        raise RuntimeError(current.stderr.strip() or "git rev-parse failed")
+    if current.stdout.strip() == branch_name:
+        return
+
+    exists = run_git(root, "rev-parse", "--verify", branch_name)
+    if exists.returncode == 0:
+        result = run_git(root, "checkout", branch_name)
+    else:
+        result = run_git(root, "checkout", "-b", branch_name)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or f"Failed to checkout '{branch_name}'")
+
+
+def load_guardrails(root: Path) -> str:
+    agents_path = root / "AGENTS.md"
+    if not agents_path.exists():
+        raise RuntimeError("AGENTS.md not found at repository root.")
+    return agents_path.read_text(encoding="utf-8")
+
+
+def build_step_context(phase_index: dict[str, Any]) -> str:
+    lines = [
+        f"- Step {step['step']} ({step['name']}): {step['summary']}"
+        for step in phase_index.get("steps", [])
+        if step.get("status") == "completed" and step.get("summary")
+    ]
+    if not lines:
+        return ""
+    return "## Completed Step Summaries\n\n" + "\n".join(lines) + "\n\n"
+
+
+def normalize_step(step: dict[str, Any]) -> dict[str, Any]:
+    normalized = deepcopy(step)
+    status = normalized.get("status", "pending")
+    if status not in READ_STATUS:
+        raise RuntimeError(f"Invalid step status '{status}'.")
+    if status == "in_progress":
+        normalized["status"] = "pending"
+    if normalized["status"] != "completed":
+        normalized.pop("summary", None)
+        normalized.pop("completed_at", None)
+    if normalized["status"] != "blocked":
+        normalized.pop("blocked_reason", None)
+        normalized.pop("blocked_at", None)
+    if normalized["status"] != "error":
+        normalized.pop("error_message", None)
+        normalized.pop("failed_at", None)
+    return normalized
+
+
+def derive_phase_status(steps: list[dict[str, Any]]) -> str:
+    statuses = [step.get("status") for step in steps]
+    if "error" in statuses:
+        return "error"
+    if "blocked" in statuses:
+        return "blocked"
+    if steps and all(status == "completed" for status in statuses):
+        return "completed"
+    return "pending"
+
+
+def normalize_phase_index(phase_index: dict[str, Any]) -> dict[str, Any]:
+    normalized = deepcopy(phase_index)
+    normalized.pop("current_step", None)
+    normalized.pop("created_at", None)
+
+    steps = normalized.get("steps")
+    if not isinstance(steps, list):
+        raise RuntimeError("Phase index must include a steps array.")
+    normalized["steps"] = [normalize_step(step) for step in steps]
+    normalized["status"] = derive_phase_status(normalized["steps"])
+
+    if normalized["status"] != "completed":
+        normalized.pop("completed_at", None)
+    if normalized["status"] != "blocked":
+        normalized.pop("blocked_at", None)
+    if normalized["status"] != "error":
+        normalized.pop("failed_at", None)
+    return normalized
+
+
+def normalize_top_index(top_index: dict[str, Any]) -> dict[str, Any]:
+    normalized = deepcopy(top_index)
+    phases = normalized.get("phases")
+    if not isinstance(phases, list):
+        raise RuntimeError("phases/index.json must include a phases array.")
+
+    for entry in phases:
+        if not isinstance(entry, dict):
+            raise RuntimeError("Each phase entry must be an object.")
+        status = entry.get("status", "pending")
+        if status not in READ_STATUS:
+            raise RuntimeError(f"Invalid top-level phase status '{status}'.")
+        if status == "in_progress":
+            status = "pending"
+        entry["status"] = status
+        entry.pop("current_step", None)
+        entry.pop("created_at", None)
+        if status != "completed":
+            entry.pop("completed_at", None)
+        if status != "blocked":
+            entry.pop("blocked_at", None)
+        if status != "error":
+            entry.pop("failed_at", None)
+    return normalized
+
+
+def sync_top_phase_status(
+    top_index: dict[str, Any],
+    phase_dir: str,
+    status: str,
+    *,
+    completed_at: str | None = None,
+    blocked_at: str | None = None,
+    failed_at: str | None = None,
+) -> None:
+    for entry in top_index.get("phases", []):
+        if entry.get("dir") != phase_dir:
+            continue
+        existing_completed_at = entry.get("completed_at")
+        existing_blocked_at = entry.get("blocked_at")
+        existing_failed_at = entry.get("failed_at")
+        entry["status"] = status
+        entry.pop("current_step", None)
+        entry.pop("created_at", None)
+        entry.pop("completed_at", None)
+        entry.pop("blocked_at", None)
+        entry.pop("failed_at", None)
+        if status == "completed" and (completed_at or existing_completed_at):
+            entry["completed_at"] = completed_at or existing_completed_at
+        if status == "blocked" and (blocked_at or existing_blocked_at):
+            entry["blocked_at"] = blocked_at or existing_blocked_at
+        if status == "error" and (failed_at or existing_failed_at):
+            entry["failed_at"] = failed_at or existing_failed_at
+        return
+    raise RuntimeError(f"Phase '{phase_dir}' not found in phases/index.json.")
+
+
+def persist_phase_state(paths: dict[str, Path], phase_index: dict[str, Any], top_index: dict[str, Any]) -> None:
+    write_json(paths["phase_index"], normalize_phase_index(phase_index))
+    write_json(paths["top_index"], normalize_top_index(top_index))
+
+
+def ensure_phase_exists(root: Path, phase_dir: str) -> dict[str, Path]:
+    paths = phase_paths(root, phase_dir)
+    if not paths["phase_dir"].is_dir():
+        raise RuntimeError(f"Phase directory '{paths['phase_dir']}' not found.")
+    if not paths["phase_index"].is_file():
+        raise RuntimeError(f"Phase index '{paths['phase_index']}' not found.")
+    if not paths["top_index"].is_file():
+        raise RuntimeError(f"Top phase index '{paths['top_index']}' not found.")
+    return paths
+
+
+def load_phase_state(root: Path, phase_dir: str, *, persist_normalized: bool) -> tuple[dict[str, Path], dict[str, Any], dict[str, Any]]:
+    paths = ensure_phase_exists(root, phase_dir)
+    raw_phase = load_json(paths["phase_index"])
+    raw_top = load_json(paths["top_index"])
+    phase_index = normalize_phase_index(raw_phase)
+    top_index = normalize_top_index(raw_top)
+
+    sync_top_phase_status(
+        top_index,
+        phase_dir,
+        phase_index["status"],
+        completed_at=phase_index.get("completed_at"),
+        blocked_at=phase_index.get("blocked_at"),
+        failed_at=phase_index.get("failed_at"),
+    )
+
+    if persist_normalized and (raw_phase != phase_index or raw_top != top_index):
+        persist_phase_state(paths, phase_index, top_index)
+
+    return paths, phase_index, top_index
+
+
+def first_pending_step(phase_index: dict[str, Any]) -> dict[str, Any] | None:
+    for step in phase_index.get("steps", []):
+        if step.get("status") == "pending":
+            return step
+    return None
+
+
+def lookup_step(phase_index: dict[str, Any], step_number: int) -> dict[str, Any]:
+    for step in phase_index.get("steps", []):
+        if step.get("step") == step_number:
+            return step
+    raise RuntimeError(f"Step {step_number} not found in phase index.")
+
+
+def clear_step_result_fields(step: dict[str, Any]) -> None:
+    for key in [
+        "summary",
+        "completed_at",
+        "blocked_reason",
+        "blocked_at",
+        "error_message",
+        "failed_at",
+    ]:
+        step.pop(key, None)
+
+
+def build_codex_exec_command(root: Path) -> list[str]:
+    return [
+        "codex",
+        "exec",
+        "-C",
+        str(root),
+        "--skip-git-repo-check",
+        "--sandbox",
+        "danger-full-access",
+        "--full-auto",
+        "--ephemeral",
+        "-",
+    ]
 
 
 @contextlib.contextmanager
 def progress_indicator(label: str):
-    """Simple terminal progress indicator with elapsed time."""
     frames = "|/-\\"
     stop = threading.Event()
     started_at = time.monotonic()
@@ -63,843 +307,317 @@ def progress_indicator(label: str):
         info.elapsed = time.monotonic() - started_at
 
 
-def run_git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True)
+class HarnessExecutor:
+    def __init__(self, root: Path, phase_dir: str, *, push: bool = False) -> None:
+        self.root = root
+        self.phase_dir = phase_dir
+        self.push = push
+        self.paths, self.phase_index, self.top_index = load_phase_state(self.root, self.phase_dir, persist_normalized=True)
+        self.phase_name = self.phase_index["phase"]
+        self.branch_name = f"feat-{self.phase_name}"
+        self.steps_run = 0
 
-
-def ensure_branch(root: Path, branch_name: str) -> None:
-    current = run_git(root, "rev-parse", "--abbrev-ref", "HEAD")
-    if current.returncode != 0:
-        raise RuntimeError(current.stderr.strip() or "git rev-parse failed")
-    if current.stdout.strip() == branch_name:
-        return
-
-    exists = run_git(root, "rev-parse", "--verify", branch_name)
-    result = run_git(root, "checkout", branch_name) if exists.returncode == 0 else run_git(root, "checkout", "-b", branch_name)
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or f"Failed to checkout '{branch_name}'")
-
-
-def commit_step(root: Path, phase_dir: str, phase_name: str, step_number: int, step_name: str) -> None:
-    step_prefix = f"phases/{phase_dir}/step{step_number}"
-    excluded = [
-        "phases/index.json",
-        f"phases/{phase_dir}/index.json",
-        f"{step_prefix}-output.json",
-        f"{step_prefix}-codex-result.json",
-        f"{step_prefix}-prompt.md",
-    ]
-
-    run_git(root, "add", "-A")
-    run_git(root, "reset", "HEAD", "--", *excluded)
-    if run_git(root, "diff", "--cached", "--quiet").returncode != 0:
-        message = FEAT_MSG.format(phase=phase_name, num=step_number, name=step_name)
-        result = run_git(root, "commit", "-m", message)
-        if result.returncode != 0:
-            raise RuntimeError(result.stderr.strip() or f"Failed to commit step {step_number}")
-
-    run_git(root, "add", "-A")
-    if run_git(root, "diff", "--cached", "--quiet").returncode != 0:
-        message = CHORE_MSG.format(phase=phase_name, num=step_number)
-        result = run_git(root, "commit", "-m", message)
-        if result.returncode != 0:
-            raise RuntimeError(result.stderr.strip() or f"Failed to commit step metadata for {step_number}")
-
-
-def finalize_phase(root: Path, phase_name: str, branch_name: str, auto_push: bool) -> None:
-    run_git(root, "add", "-A")
-    if run_git(root, "diff", "--cached", "--quiet").returncode != 0:
-        message = f"chore({phase_name}): mark phase completed"
-        result = run_git(root, "commit", "-m", message)
-        if result.returncode != 0:
-            raise RuntimeError(result.stderr.strip() or "Failed to commit final phase metadata")
-
-    if auto_push:
-        result = run_git(root, "push", "-u", "origin", branch_name)
-        if result.returncode != 0:
-            raise RuntimeError(result.stderr.strip() or f"Failed to push '{branch_name}'")
-
-
-def ensure_phase_exists(root: Path, phase_dir: str) -> dict[str, Path]:
-    paths = phase_paths(root, phase_dir)
-    if not paths["phase_dir"].is_dir():
-        raise RuntimeError(f"Phase directory '{paths['phase_dir']}' not found.")
-    if not paths["phase_index"].is_file():
-        raise RuntimeError(f"Phase index '{paths['phase_index']}' not found.")
-    if not paths["top_index"].is_file():
-        raise RuntimeError(f"Top phase index '{paths['top_index']}' not found.")
-    return paths
-
-
-def write_step_output(paths: dict[str, Path], step_number: int, payload: dict[str, Any]) -> None:
-    write_json(paths["phase_dir"] / f"step{step_number}-output.json", payload)
-
-
-def step_result_path(paths: dict[str, Path], step_number: int) -> Path:
-    return paths["phase_dir"] / f"step{step_number}-codex-result.json"
-
-
-def lookup_step(phase_index: dict[str, Any], step_number: int) -> dict[str, Any]:
-    for step in phase_index["steps"]:
-        if step["step"] == step_number:
-            return step
-    raise RuntimeError(f"Step {step_number} not found in phase index.")
-
-
-def build_prompt(
-    root: Path,
-    phase_dir: str,
-    phase_index: dict[str, Any],
-    step: dict[str, Any],
-    branch_name: str,
-    prev_error: str | None = None,
-) -> str:
-    step_path = step_file_for(root / "phases" / phase_dir, step["step"])
-    step_body = step_path.read_text(encoding="utf-8")
-    guardrails = load_guardrails(root)
-    step_context = build_step_context(phase_index)
-    helper = "python3 .agents/skills/seleccase-harness/scripts/execute_codex.py"
-    retry_section = ""
-    if prev_error:
-        retry_section = (
-            "## Previous Attempt Failed\n\n"
-            "Fix the issue below before you retry this step.\n\n"
-            f"{prev_error.strip()}\n\n"
+    def refresh_state(self, *, persist_normalized: bool = True) -> tuple[dict[str, Any], dict[str, Any]]:
+        self.paths, self.phase_index, self.top_index = load_phase_state(
+            self.root,
+            self.phase_dir,
+            persist_normalized=persist_normalized,
         )
+        return self.phase_index, self.top_index
 
-    return (
-        "# Codex Harness Prompt\n\n"
-        f"- Project: {phase_index['project']}\n"
-        f"- Phase: {phase_index['phase']}\n"
-        f"- Step: {step['step']} ({step['name']})\n"
-        f"- Branch: {branch_name}\n\n"
-        "## Execution Rules\n\n"
-        "1. Execute only this step and keep earlier completed work consistent.\n"
-        "2. Read the step file and listed dependencies before editing.\n"
-        "3. Run the step acceptance criteria directly.\n"
-        "4. Record the outcome before you finish by running exactly one helper command from the repository root:\n"
-        f"   - complete: `{helper} complete {phase_dir} --summary \"...\"`\n"
-        f"   - blocked: `{helper} block {phase_dir} --reason \"...\"`\n"
-        f"   - error: `{helper} error {phase_dir} --message \"...\"`\n"
-        "5. Do not change unrelated step statuses or broaden scope.\n"
-        "6. Commit the changes you made for this step if the run results in code or metadata changes.\n\n"
-        f"{step_context}"
-        f"{retry_section}"
-        f"## Guardrails\n\n{guardrails}\n\n"
-        "---\n\n"
-        f"{step_body}\n"
-    )
-
-
-def build_automation_prompt(prompt: str) -> str:
-    return (
-        f"{prompt.rstrip()}\n\n"
-        "## Automation Contract\n\n"
-        "You are running headlessly through `codex exec`.\n"
-        "Implement exactly this step, run the step acceptance criteria directly when possible, and do not stop after editing files.\n"
-        "You must record the phase outcome before finishing by invoking the harness helper command for `complete`, `block`, or `error`.\n"
-        "Return a JSON object that matches the provided schema.\n"
-        "Use these status rules in the JSON response:\n"
-        "- `completed`: the step scope is implemented and verified.\n"
-        "- `blocked`: you cannot continue because a real blocker requires user intervention.\n"
-        "- `error`: the step failed or could not be finished within scope.\n"
-        "Keep `summary` short and concrete. Put the main implementation and validation notes in `details`. "
-        "List the commands you ran in `validations`.\n"
-    )
-
-
-def parse_structured_result(raw: str) -> dict[str, Any]:
-    try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Codex output was not valid JSON: {exc}") from exc
-
-    if not isinstance(payload, dict):
-        raise RuntimeError("Codex output must be a JSON object.")
-
-    status = payload.get("status")
-    summary = payload.get("summary")
-    details = payload.get("details")
-    validations = payload.get("validations")
-    valid_statuses = {"completed", "blocked", "error"}
-
-    if status not in valid_statuses:
-        raise RuntimeError(f"Codex output status must be one of {sorted(valid_statuses)}, got {status!r}.")
-    if not isinstance(summary, str) or not summary.strip():
-        raise RuntimeError("Codex output must include a non-empty summary string.")
-    if not isinstance(details, str) or not details.strip():
-        raise RuntimeError("Codex output must include a non-empty details string.")
-    if not isinstance(validations, list) or any(not isinstance(item, str) for item in validations):
-        raise RuntimeError("Codex output validations must be an array of strings.")
-
-    return payload
-
-
-def build_output_schema_file(schema_path: Path) -> None:
-    schema = {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": {
-            "status": {"type": "string", "enum": ["completed", "blocked", "error"]},
-            "summary": {"type": "string", "minLength": 1},
-            "details": {"type": "string", "minLength": 1},
-            "validations": {
-                "type": "array",
-                "items": {"type": "string"},
-            },
-        },
-        "required": ["status", "summary", "details", "validations"],
-    }
-    write_json(schema_path, schema)
-
-
-def build_codex_exec_command(
-    *,
-    root: Path,
-    output_path: Path,
-    schema_path: Path,
-    model: str | None,
-    profile: str | None,
-) -> list[str]:
-    command = [
-        "codex",
-        "exec",
-        "-C",
-        str(root),
-        "--skip-git-repo-check",
-        "--sandbox",
-        "danger-full-access",
-        "--full-auto",
-        "--ephemeral",
-        "--output-schema",
-        str(schema_path),
-        "--output-last-message",
-        str(output_path),
-        "-",
-    ]
-    if model:
-        command[2:2] = ["--model", model]
-    if profile:
-        command[2:2] = ["--profile", profile]
-    return command
-
-
-def run_codex_for_step(
-    *,
-    root: Path,
-    prompt: str,
-    output_path: Path,
-    schema_path: Path,
-    model: str | None,
-    profile: str | None,
-) -> dict[str, Any]:
-    command = build_codex_exec_command(
-        root=root,
-        output_path=output_path,
-        schema_path=schema_path,
-        model=model,
-        profile=profile,
-    )
-    result = subprocess.run(
-        command,
-        cwd=root,
-        input=prompt,
-        capture_output=True,
-        text=True,
-    )
-
-    if result.returncode != 0:
-        stderr = result.stderr.strip()
-        stdout = result.stdout.strip()
-        message = stderr or stdout or f"codex exec failed with exit code {result.returncode}"
-        raise RuntimeError(message)
-
-    if not output_path.is_file():
-        raise RuntimeError(f"Codex did not write the structured output file: {output_path}")
-
-    payload = parse_structured_result(output_path.read_text(encoding="utf-8"))
-    payload["codex_stdout"] = result.stdout
-    payload["codex_stderr"] = result.stderr
-    return payload
-
-
-def clear_step_transient_fields(step: dict[str, Any]) -> None:
-    for key in [
-        "blocked_reason",
-        "blocked_at",
-        "error_message",
-        "failed_at",
-    ]:
-        step.pop(key, None)
-
-
-def command_prepare(root: Path, phase_dir: str, branch_prefix: str, output: Path | None) -> int:
-    paths = ensure_phase_exists(root, phase_dir)
-    errors = validate_phase(root, phase_dir)
-    if errors:
-        raise RuntimeError("\n".join(errors))
-
-    phase_index = load_json(paths["phase_index"])
-    top_index = load_json(paths["top_index"])
-
-    current = active_step(phase_index)
-    if current is None:
-        current = first_pending_step(phase_index)
-        if current is None:
-            print(f"Phase '{phase_dir}' has no pending steps.")
-            return 0
-        current["status"] = "in_progress"
-        current.setdefault("started_at", stamp())
-        phase_index.setdefault("created_at", stamp())
-
-    phase_index["status"] = "in_progress"
-    phase_index["current_step"] = current["step"]
-    set_top_phase_status(top_index, phase_dir, status="in_progress", current_step=current["step"])
-
-    branch_name = f"{branch_prefix}{phase_index['phase']}"
-    ensure_branch(root, branch_name)
-
-    prompt = build_prompt(root, phase_dir, phase_index, current, branch_name)
-    prompt_path = output or (paths["phase_dir"] / f"step{current['step']}-prompt.md")
-    prompt_path.write_text(prompt, encoding="utf-8")
-
-    write_json(paths["phase_index"], phase_index)
-    write_json(paths["top_index"], top_index)
-    write_step_output(
-        paths,
-        current["step"],
-        {
-            "step": current["step"],
-            "name": current["name"],
-            "status": "prepared",
-            "prepared_at": stamp(),
-            "branch": branch_name,
-            "prompt_file": str(prompt_path),
-        },
-    )
-
-    print(
-        json.dumps(
+    def write_step_output(
+        self,
+        *,
+        step_number: int,
+        step_name: str,
+        attempt: int,
+        result: subprocess.CompletedProcess[str],
+        observed_status: str,
+        prompt_path: Path,
+    ) -> None:
+        output_path = step_file_for(self.paths["phase_dir"], step_number, suffix="-output.json")
+        write_json(
+            output_path,
             {
-                "phase": phase_dir,
-                "step": current["step"],
-                "prompt_file": str(prompt_path),
-                "branch": branch_name,
+                "phase": self.phase_name,
+                "phase_dir": self.phase_dir,
+                "step": step_number,
+                "name": step_name,
+                "attempt": attempt,
+                "started_at": stamp(),
+                "finished_at": stamp(),
+                "status": observed_status,
+                "returncode": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "prompt_path": str(prompt_path.relative_to(self.root)),
             },
-            ensure_ascii=False,
         )
-    )
-    return 0
 
+    def build_prompt(
+        self,
+        phase_index: dict[str, Any],
+        step: dict[str, Any],
+        *,
+        branch_name: str,
+        prev_error: str | None = None,
+    ) -> str:
+        step_path = step_file_for(self.paths["phase_dir"], step["step"])
+        step_body = step_path.read_text(encoding="utf-8")
+        retry_section = ""
+        if prev_error:
+            retry_section = (
+                "## Previous Attempt Failed\n\n"
+                "Fix the issue below before you retry this step.\n\n"
+                f"{prev_error.strip()}\n\n"
+            )
 
-def sync_recorded_completion(root: Path, phase_dir: str, step_number: int) -> None:
-    paths = ensure_phase_exists(root, phase_dir)
-    phase_index = load_json(paths["phase_index"])
-    top_index = load_json(paths["top_index"])
-    step = lookup_step(phase_index, step_number)
-    if step.get("status") != "completed":
-        raise RuntimeError(f"Step {step_number} is not marked completed.")
+        return (
+            "# Codex Harness Prompt\n\n"
+            f"- Project: {phase_index['project']}\n"
+            f"- Phase: {phase_index['phase']}\n"
+            f"- Step: {step['step']} ({step['name']})\n"
+            f"- Branch: {branch_name}\n\n"
+            "## Execution Rules\n\n"
+            "1. Execute only this step and keep earlier completed work consistent.\n"
+            "2. Read the step file and AGENTS.md before editing.\n"
+            "3. Run the step acceptance criteria directly.\n"
+            "4. Update `phases/"
+            f"{self.phase_dir}/index.json` directly when the step is done.\n"
+            "5. Write the current step result into the phase index file itself. Do not call helper commands.\n"
+            "6. Do not change unrelated step statuses or broaden scope.\n\n"
+            f"{build_step_context(phase_index)}"
+            f"{retry_section}"
+            f"## Guardrails\n\n{load_guardrails(self.root)}\n\n"
+            "---\n\n"
+            f"{step_body}\n"
+        )
 
-    clear_step_transient_fields(step)
-    step.setdefault("completed_at", stamp())
-    current = active_step(phase_index)
-    if current is not None and current["step"] != step_number:
-        set_top_phase_status(top_index, phase_dir, status="in_progress", current_step=current["step"])
-    elif phase_index.get("status") == "completed":
-        set_top_phase_status(top_index, phase_dir, status="completed", current_step=None)
-    else:
-        next_step = first_pending_step(phase_index)
-        if next_step is None:
-            phase_index["status"] = "completed"
-            phase_index["completed_at"] = phase_index.get("completed_at", stamp())
-            phase_index.pop("current_step", None)
-            set_top_phase_status(top_index, phase_dir, status="completed", current_step=None)
-        else:
-            next_step["status"] = "in_progress"
-            next_step.setdefault("started_at", stamp())
-            phase_index["status"] = "in_progress"
-            phase_index["current_step"] = next_step["step"]
-            set_top_phase_status(top_index, phase_dir, status="in_progress", current_step=next_step["step"])
+    def build_automation_prompt(self, prompt: str) -> str:
+        return (
+            f"{prompt.rstrip()}\n\n"
+            "## Automation Contract\n\n"
+            "You are running headlessly through `codex exec --full-auto --ephemeral`.\n"
+            "Implement exactly this step, run the acceptance criteria directly when possible, and do not stop after editing files.\n"
+            "Record the result by editing `phases/"
+            f"{self.phase_dir}/index.json` directly. Conversation output is ignored.\n"
+        )
 
-    write_json(paths["phase_index"], phase_index)
-    write_json(paths["top_index"], top_index)
-    write_step_output(
-        paths,
-        step_number,
-        {
-            "step": step_number,
-            "name": step["name"],
-            "status": "completed",
-            "summary": step["summary"],
-            "completed_at": step["completed_at"],
-        },
-    )
+    def run_codex_for_step(self, *, prompt: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            build_codex_exec_command(self.root),
+            cwd=self.root,
+            input=self.build_automation_prompt(prompt),
+            capture_output=True,
+            text=True,
+        )
 
+    def mark_step_pending_for_retry(
+        self,
+        paths: dict[str, Path],
+        phase_index: dict[str, Any],
+        top_index: dict[str, Any],
+        step_number: int,
+    ) -> None:
+        target = lookup_step(phase_index, step_number)
+        target["status"] = "pending"
+        target["started_at"] = stamp()
+        clear_step_result_fields(target)
+        phase_index["status"] = "pending"
+        phase_index.pop("completed_at", None)
+        phase_index.pop("blocked_at", None)
+        phase_index.pop("failed_at", None)
+        sync_top_phase_status(top_index, self.phase_dir, "pending")
+        persist_phase_state(paths, phase_index, top_index)
 
-def sync_recorded_block(root: Path, phase_dir: str, step_number: int) -> None:
-    paths = ensure_phase_exists(root, phase_dir)
-    phase_index = load_json(paths["phase_index"])
-    top_index = load_json(paths["top_index"])
-    step = lookup_step(phase_index, step_number)
-    if step.get("status") != "blocked":
-        raise RuntimeError(f"Step {step_number} is not marked blocked.")
+    def mark_step_error(
+        self,
+        paths: dict[str, Path],
+        phase_index: dict[str, Any],
+        top_index: dict[str, Any],
+        step_number: int,
+        message: str,
+    ) -> None:
+        target = lookup_step(phase_index, step_number)
+        target["status"] = "error"
+        target["error_message"] = message.strip()
+        target["failed_at"] = stamp()
+        phase_index["status"] = "error"
+        phase_index["failed_at"] = target["failed_at"]
+        phase_index.pop("completed_at", None)
+        phase_index.pop("blocked_at", None)
+        sync_top_phase_status(top_index, self.phase_dir, "error", failed_at=target["failed_at"])
+        persist_phase_state(paths, phase_index, top_index)
 
-    step.setdefault("blocked_at", stamp())
-    phase_index["status"] = "blocked"
-    phase_index["current_step"] = step_number
-    set_top_phase_status(top_index, phase_dir, status="blocked", current_step=step_number)
+    def commit_step(self, step_number: int, step_name: str) -> None:
+        excluded = [
+            "phases/index.json",
+            f"phases/{self.phase_dir}/index.json",
+            f"phases/{self.phase_dir}/step{step_number}.md",
+            f"phases/{self.phase_dir}/step{step_number}-prompt.md",
+            f"phases/{self.phase_dir}/step{step_number}-output.json",
+        ]
 
-    write_json(paths["phase_index"], phase_index)
-    write_json(paths["top_index"], top_index)
-    write_step_output(
-        paths,
-        step_number,
-        {
-            "step": step_number,
-            "name": step["name"],
-            "status": "blocked",
-            "blocked_reason": step["blocked_reason"],
-            "blocked_at": step["blocked_at"],
-        },
-    )
+        run_git(self.root, "add", "-A")
+        run_git(self.root, "reset", "HEAD", "--", *excluded)
+        if run_git(self.root, "diff", "--cached", "--quiet").returncode != 0:
+            message = FEATURE_COMMIT_MSG.format(phase=self.phase_name, num=step_number, name=step_name)
+            result = run_git(self.root, "commit", "-m", message)
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip() or f"Failed to commit step {step_number}")
 
+        run_git(self.root, "add", "-A")
+        if run_git(self.root, "diff", "--cached", "--quiet").returncode != 0:
+            message = METADATA_COMMIT_MSG.format(phase=self.phase_name, num=step_number)
+            result = run_git(self.root, "commit", "-m", message)
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip() or f"Failed to commit step metadata for {step_number}")
 
-def sync_recorded_error(root: Path, phase_dir: str, step_number: int) -> None:
-    paths = ensure_phase_exists(root, phase_dir)
-    phase_index = load_json(paths["phase_index"])
-    top_index = load_json(paths["top_index"])
-    step = lookup_step(phase_index, step_number)
-    if step.get("status") != "error":
-        raise RuntimeError(f"Step {step_number} is not marked error.")
+    def finalize_phase(self) -> None:
+        run_git(self.root, "add", "-A")
+        if run_git(self.root, "diff", "--cached", "--quiet").returncode != 0:
+            result = run_git(self.root, "commit", "-m", PHASE_COMPLETE_COMMIT_MSG.format(phase=self.phase_name))
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip() or "Failed to commit final phase metadata")
 
-    step.setdefault("failed_at", stamp())
-    phase_index["status"] = "error"
-    phase_index["current_step"] = step_number
-    set_top_phase_status(top_index, phase_dir, status="error", current_step=step_number)
+        if self.push:
+            result = run_git(self.root, "push", "-u", "origin", self.branch_name)
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip() or f"Failed to push '{self.branch_name}'")
 
-    write_json(paths["phase_index"], phase_index)
-    write_json(paths["top_index"], top_index)
-    write_step_output(
-        paths,
-        step_number,
-        {
-            "step": step_number,
-            "name": step["name"],
-            "status": "error",
-            "error_message": step["error_message"],
-            "failed_at": step["failed_at"],
-        },
-    )
+    def run(self) -> int:
+        if self.phase_index.get("status") == "blocked":
+            blocked_step = next((step for step in self.phase_index["steps"] if step.get("status") == "blocked"), None)
+            reason = blocked_step.get("blocked_reason", "unknown") if blocked_step else "unknown"
+            raise RuntimeError(f"Phase '{self.phase_dir}' is blocked. Resolve and reset it first. Reason: {reason}")
+        if self.phase_index.get("status") == "error":
+            error_step = next((step for step in self.phase_index["steps"] if step.get("status") == "error"), None)
+            message = error_step.get("error_message", "unknown") if error_step else "unknown"
+            raise RuntimeError(f"Phase '{self.phase_dir}' is in error state. Reset it first. Error: {message}")
 
+        ensure_branch(self.root, self.branch_name)
 
-def reset_step_for_retry(root: Path, phase_dir: str, step_number: int) -> None:
-    paths = ensure_phase_exists(root, phase_dir)
-    phase_index = load_json(paths["phase_index"])
-    top_index = load_json(paths["top_index"])
-    target = lookup_step(phase_index, step_number)
+        while True:
+            self.refresh_state(persist_normalized=True)
 
-    target["status"] = "in_progress"
-    target.setdefault("started_at", stamp())
-    for key in [
-        "summary",
-        "completed_at",
-        "blocked_reason",
-        "blocked_at",
-        "error_message",
-        "failed_at",
-    ]:
-        target.pop(key, None)
+            if self.phase_index.get("status") == "completed" and first_pending_step(self.phase_index) is None:
+                self.finalize_phase()
+                print(f"Phase '{self.phase_dir}' completed after {self.steps_run} step(s).")
+                return 0
 
-    phase_index["status"] = "in_progress"
-    phase_index["current_step"] = step_number
-    set_top_phase_status(top_index, phase_dir, status="in_progress", current_step=step_number)
+            current = first_pending_step(self.phase_index)
+            if current is None:
+                self.finalize_phase()
+                print(f"Phase '{self.phase_dir}' has no runnable steps.")
+                return 0
 
-    write_json(paths["phase_index"], phase_index)
-    write_json(paths["top_index"], top_index)
+            if "started_at" not in current:
+                current["started_at"] = stamp()
+                persist_phase_state(self.paths, self.phase_index, self.top_index)
 
+            step_number = current["step"]
+            step_name = current["name"]
+            prompt_path = step_file_for(self.paths["phase_dir"], step_number, suffix="-prompt.md")
+            prev_error: str | None = None
 
-def command_run(
-    root: Path,
-    phase_dir: str,
-    branch_prefix: str,
-    model: str | None,
-    profile: str | None,
-    max_steps: int | None,
-    auto_push: bool,
-) -> int:
-    paths = ensure_phase_exists(root, phase_dir)
-    phase_index = load_json(paths["phase_index"])
-    if phase_index.get("status") == "blocked":
-        current = phase_index.get("current_step")
-        step = lookup_step(phase_index, current) if isinstance(current, int) else None
-        reason = step.get("blocked_reason", "unknown") if step else "unknown"
-        raise RuntimeError(f"Phase '{phase_dir}' is blocked. Resolve and reset it first. Reason: {reason}")
-    if phase_index.get("status") == "error":
-        current = phase_index.get("current_step")
-        step = lookup_step(phase_index, current) if isinstance(current, int) else None
-        message = step.get("error_message", "unknown") if step else "unknown"
-        raise RuntimeError(f"Phase '{phase_dir}' is in error state. Reset it first. Error: {message}")
+            for attempt in range(1, MAX_RETRIES + 1):
+                self.refresh_state(persist_normalized=False)
+                current = lookup_step(self.phase_index, step_number)
+                prompt_text = self.build_prompt(self.phase_index, current, branch_name=self.branch_name, prev_error=prev_error)
+                prompt_path.write_text(prompt_text, encoding="utf-8")
 
-    steps_run = 0
-
-    while True:
-        paths = ensure_phase_exists(root, phase_dir)
-        phase_index = load_json(paths["phase_index"])
-        phase_name = phase_index["phase"]
-        branch_name = f"{branch_prefix}{phase_name}"
-
-        if phase_index.get("status") == "completed":
-            finalize_phase(root, phase_name, branch_name, auto_push and steps_run > 0)
-            print(f"Phase '{phase_dir}' completed after {steps_run} step(s).")
-            return 0
-        if max_steps is not None and steps_run >= max_steps:
-            print(f"Stopped after {steps_run} step(s) because --max-steps was reached.")
-            return 0
-
-        current = active_step(phase_index) or first_pending_step(phase_index)
-        if current is None:
-            print(f"Phase '{phase_dir}' has no runnable steps.")
-            return 0
-
-        command_prepare(root, phase_dir, branch_prefix, None)
-        paths = ensure_phase_exists(root, phase_dir)
-        phase_index = load_json(paths["phase_index"])
-        current = active_step(phase_index)
-        if current is None:
-            raise RuntimeError(f"Phase '{phase_dir}' has no in-progress step after prepare.")
-
-        step_number = current["step"]
-        step_name = current["name"]
-        prompt_path = paths["phase_dir"] / f"step{step_number}-prompt.md"
-        result_path = step_result_path(paths, step_number)
-        prev_error: str | None = None
-
-        for attempt in range(1, MAX_RETRIES + 1):
-            phase_index = load_json(paths["phase_index"])
-            current = lookup_step(phase_index, step_number)
-            prompt_text = build_prompt(root, phase_dir, phase_index, current, branch_name, prev_error=prev_error)
-            prompt_path.write_text(prompt_text, encoding="utf-8")
-
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                tmp_root = Path(tmp_dir)
-                schema_path = tmp_root / "codex-output-schema.json"
-                output_path = tmp_root / "codex-last-message.json"
-                build_output_schema_file(schema_path)
                 tag = f"Step {step_number}: {step_name}"
                 if attempt > 1:
                     tag += f" [retry {attempt}/{MAX_RETRIES}]"
+
                 with progress_indicator(tag):
-                    payload = run_codex_for_step(
-                        root=root,
-                        prompt=build_automation_prompt(prompt_text),
-                        output_path=output_path,
-                        schema_path=schema_path,
-                        model=model,
-                        profile=profile,
+                    result = self.run_codex_for_step(prompt=prompt_text)
+
+                _, refreshed_phase, refreshed_top = load_phase_state(self.root, self.phase_dir, persist_normalized=True)
+                refreshed_step = lookup_step(refreshed_phase, step_number)
+                self.write_step_output(
+                    step_number=step_number,
+                    step_name=step_name,
+                    attempt=attempt,
+                    result=result,
+                    observed_status=refreshed_step.get("status", "pending"),
+                    prompt_path=prompt_path,
+                )
+                helper_message = (
+                    refreshed_step.get("summary")
+                    or refreshed_step.get("blocked_reason")
+                    or refreshed_step.get("error_message")
+                )
+
+                if refreshed_step.get("status") == "completed":
+                    self.commit_step(step_number, step_name)
+                    self.steps_run += 1
+                    break
+
+                if refreshed_step.get("status") == "blocked":
+                    self.commit_step(step_number, step_name)
+                    print(f"Phase '{self.phase_dir}' blocked at step {step_number}: {helper_message or 'blocked'}")
+                    return 1
+
+                if refreshed_step.get("status") == "error":
+                    error_message = str(helper_message or "Step failed.").strip()
+                    if attempt < MAX_RETRIES:
+                        self.mark_step_pending_for_retry(self.paths, refreshed_phase, refreshed_top, step_number)
+                        prev_error = error_message
+                        print(f"Retrying step {step_number} after recorded error: {error_message}")
+                        continue
+                    self.mark_step_error(
+                        self.paths,
+                        refreshed_phase,
+                        refreshed_top,
+                        step_number,
+                        f"[after {MAX_RETRIES} attempts] {error_message}",
                     )
+                    self.commit_step(step_number, step_name)
+                    print(f"Phase '{self.phase_dir}' failed at step {step_number}: {error_message}")
+                    return 1
 
-            write_json(result_path, payload)
-            refreshed_phase = load_json(paths["phase_index"])
-            refreshed_step = lookup_step(refreshed_phase, step_number)
-            recorded_status = refreshed_step.get("status")
+                process_error = (result.stderr or result.stdout or "").strip()
+                if result.returncode != 0:
+                    error_message = process_error or f"codex exec failed with exit code {result.returncode}"
+                else:
+                    error_message = "Codex finished without recording a step outcome."
 
-            if recorded_status == "completed":
-                sync_recorded_completion(root, phase_dir, step_number)
-                commit_step(root, phase_dir, phase_name, step_number, step_name)
-                steps_run += 1
-                break
-
-            if recorded_status == "blocked":
-                sync_recorded_block(root, phase_dir, step_number)
-                commit_step(root, phase_dir, phase_name, step_number, step_name)
-                print(f"Phase '{phase_dir}' blocked at step {step_number}: {refreshed_step['blocked_reason']}")
-                return 1
-
-            if recorded_status == "error":
-                error_message = refreshed_step.get("error_message", payload["summary"]).strip()
                 if attempt < MAX_RETRIES:
-                    reset_step_for_retry(root, phase_dir, step_number)
+                    self.mark_step_pending_for_retry(self.paths, refreshed_phase, refreshed_top, step_number)
                     prev_error = error_message
-                    print(f"Retrying step {step_number} after recorded error: {error_message}")
+                    print(f"Retrying step {step_number} after failed attempt: {error_message}")
                     continue
-                sync_recorded_error(root, phase_dir, step_number)
-                commit_step(root, phase_dir, phase_name, step_number, step_name)
-                print(f"Phase '{phase_dir}' failed at step {step_number}: {error_message}")
+
+                self.mark_step_error(
+                    self.paths,
+                    refreshed_phase,
+                    refreshed_top,
+                    step_number,
+                    f"[after {MAX_RETRIES} attempts] {error_message}",
+                )
+                self.commit_step(step_number, step_name)
+                print(f"Phase '{self.phase_dir}' failed at step {step_number}: {error_message}")
                 return 1
-
-            summary = payload["summary"].strip()
-            if payload["status"] == "completed":
-                command_complete(root, phase_dir, summary)
-                commit_step(root, phase_dir, phase_name, step_number, step_name)
-                steps_run += 1
-                break
-
-            if payload["status"] == "blocked":
-                command_block(root, phase_dir, summary)
-                commit_step(root, phase_dir, phase_name, step_number, step_name)
-                print(f"Phase '{phase_dir}' blocked at step {step_number}: {summary}")
-                return 1
-
-            error_message = payload["details"].strip() or summary or "Step did not update status."
-            if attempt < MAX_RETRIES:
-                reset_step_for_retry(root, phase_dir, step_number)
-                prev_error = error_message
-                print(f"Retrying step {step_number} after failed attempt: {error_message}")
-                continue
-
-            reset_step_for_retry(root, phase_dir, step_number)
-            command_error(root, phase_dir, f"[after {MAX_RETRIES} attempts] {error_message}")
-            commit_step(root, phase_dir, phase_name, step_number, step_name)
-            print(f"Phase '{phase_dir}' failed at step {step_number}: {error_message}")
-            return 1
-
-
-def command_complete(root: Path, phase_dir: str, summary: str) -> int:
-    paths = ensure_phase_exists(root, phase_dir)
-    phase_index = load_json(paths["phase_index"])
-    top_index = load_json(paths["top_index"])
-    current = active_step(phase_index)
-    if current is None:
-        raise RuntimeError(f"Phase '{phase_dir}' has no in-progress step to complete.")
-
-    clear_step_transient_fields(current)
-    current["status"] = "completed"
-    current["summary"] = summary.strip()
-    current["completed_at"] = stamp()
-
-    next_step = first_pending_step(phase_index)
-    if next_step is None:
-        phase_index["status"] = "completed"
-        phase_index["completed_at"] = stamp()
-        phase_index.pop("current_step", None)
-        set_top_phase_status(top_index, phase_dir, status="completed", current_step=None)
-    else:
-        next_step["status"] = "in_progress"
-        next_step.setdefault("started_at", stamp())
-        phase_index["status"] = "in_progress"
-        phase_index["current_step"] = next_step["step"]
-        set_top_phase_status(top_index, phase_dir, status="in_progress", current_step=next_step["step"])
-
-    write_json(paths["phase_index"], phase_index)
-    write_json(paths["top_index"], top_index)
-    write_step_output(
-        paths,
-        current["step"],
-        {
-            "step": current["step"],
-            "name": current["name"],
-            "status": "completed",
-            "summary": current["summary"],
-            "completed_at": current["completed_at"],
-        },
-    )
-    return 0
-
-
-def command_block(root: Path, phase_dir: str, reason: str) -> int:
-    paths = ensure_phase_exists(root, phase_dir)
-    phase_index = load_json(paths["phase_index"])
-    top_index = load_json(paths["top_index"])
-    current = active_step(phase_index)
-    if current is None:
-        raise RuntimeError(f"Phase '{phase_dir}' has no in-progress step to block.")
-
-    current["status"] = "blocked"
-    current["blocked_reason"] = reason.strip()
-    current["blocked_at"] = stamp()
-    phase_index["status"] = "blocked"
-    phase_index["current_step"] = current["step"]
-    set_top_phase_status(top_index, phase_dir, status="blocked", current_step=current["step"])
-
-    write_json(paths["phase_index"], phase_index)
-    write_json(paths["top_index"], top_index)
-    write_step_output(
-        paths,
-        current["step"],
-        {
-            "step": current["step"],
-            "name": current["name"],
-            "status": "blocked",
-            "blocked_reason": current["blocked_reason"],
-            "blocked_at": current["blocked_at"],
-        },
-    )
-    return 0
-
-
-def command_error(root: Path, phase_dir: str, message: str) -> int:
-    paths = ensure_phase_exists(root, phase_dir)
-    phase_index = load_json(paths["phase_index"])
-    top_index = load_json(paths["top_index"])
-    current = active_step(phase_index)
-    if current is None:
-        raise RuntimeError(f"Phase '{phase_dir}' has no in-progress step to mark as error.")
-
-    current["status"] = "error"
-    current["error_message"] = message.strip()
-    current["failed_at"] = stamp()
-    phase_index["status"] = "error"
-    phase_index["current_step"] = current["step"]
-    set_top_phase_status(top_index, phase_dir, status="error", current_step=current["step"])
-
-    write_json(paths["phase_index"], phase_index)
-    write_json(paths["top_index"], top_index)
-    write_step_output(
-        paths,
-        current["step"],
-        {
-            "step": current["step"],
-            "name": current["name"],
-            "status": "error",
-            "error_message": current["error_message"],
-            "failed_at": current["failed_at"],
-        },
-    )
-    return 0
-
-
-def command_reset(root: Path, phase_dir: str, step_number: int) -> int:
-    paths = ensure_phase_exists(root, phase_dir)
-    phase_index = load_json(paths["phase_index"])
-    top_index = load_json(paths["top_index"])
-
-    target = None
-    for step in phase_index["steps"]:
-        if step["step"] == step_number:
-            target = step
-        elif step.get("status") == "in_progress":
-            step["status"] = "pending"
-            step.pop("started_at", None)
-    if target is None:
-        raise RuntimeError(f"Step {step_number} not found in phase '{phase_dir}'.")
-
-    target["status"] = "pending"
-    for key in [
-        "summary",
-        "completed_at",
-        "blocked_reason",
-        "blocked_at",
-        "error_message",
-        "failed_at",
-        "started_at",
-    ]:
-        target.pop(key, None)
-
-    phase_index["status"] = "pending"
-    phase_index.pop("current_step", None)
-    set_top_phase_status(top_index, phase_dir, status="pending", current_step=None)
-
-    write_json(paths["phase_index"], phase_index)
-    write_json(paths["top_index"], top_index)
-    return 0
-
-
-def command_status(root: Path, phase_dir: str) -> int:
-    paths = ensure_phase_exists(root, phase_dir)
-    phase_index = load_json(paths["phase_index"])
-
-    print(f"Phase: {phase_index['phase']}")
-    print(f"Status: {phase_index.get('status')}")
-    print(f"Current step: {phase_index.get('current_step')}")
-    for step in phase_index["steps"]:
-        marker = "->" if step.get("status") == "in_progress" else "  "
-        line = f"{marker} step {step['step']}: {step['name']} [{step.get('status')}]"
-        if step.get("summary"):
-            line += f" | {step['summary']}"
-        if step.get("blocked_reason"):
-            line += f" | blocked: {step['blocked_reason']}"
-        if step.get("error_message"):
-            line += f" | error: {step['error_message']}"
-        print(line)
-    return 0
-
-
-def command_validate(root: Path, phase_dir: str | None) -> int:
-    errors = validate_phase(root, phase_dir)
-    if errors:
-        for error in errors:
-            print(f"ERROR: {error}", file=sys.stderr)
-        return 1
-    if phase_dir is None:
-        print("OK: phase metadata is consistent.")
-    else:
-        print(f"OK: phase '{phase_dir}' metadata is consistent.")
-    return 0
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    known_commands = {"prepare", "run", "complete", "block", "error", "reset", "status", "validate"}
-    normalized_argv = list(argv)
-    if normalized_argv and normalized_argv[0] not in known_commands and not normalized_argv[0].startswith("-"):
-        normalized_argv.insert(0, "run")
-
     parser = argparse.ArgumentParser(description="Codex-native phase executor.")
-    parser.add_argument("--root", default=str(repo_root_from_script(__file__)), help="Repository root.")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    prepare = subparsers.add_parser("prepare", help="Prepare the active or next pending step.")
-    prepare.add_argument("phase_dir")
-    prepare.add_argument("--branch-prefix", default="feat-")
-    prepare.add_argument("--output", type=Path)
-
-    run = subparsers.add_parser("run", help="Run steps headlessly with codex exec until completion or blockage.")
-    run.add_argument("phase_dir")
-    run.add_argument("--branch-prefix", default="feat-")
-    run.add_argument("--model")
-    run.add_argument("--profile")
-    run.add_argument("--max-steps", type=int)
-    run.add_argument("--push", action="store_true", help="Push the feature branch after phase completion.")
-
-    complete = subparsers.add_parser("complete", help="Complete the current step and advance.")
-    complete.add_argument("phase_dir")
-    complete.add_argument("--summary", required=True)
-
-    blocked = subparsers.add_parser("block", help="Mark the current step as blocked.")
-    blocked.add_argument("phase_dir")
-    blocked.add_argument("--reason", required=True)
-
-    error = subparsers.add_parser("error", help="Mark the current step as failed.")
-    error.add_argument("phase_dir")
-    error.add_argument("--message", required=True)
-
-    reset = subparsers.add_parser("reset", help="Reset a step to pending.")
-    reset.add_argument("phase_dir")
-    reset.add_argument("--step", type=int, required=True)
-
-    status = subparsers.add_parser("status", help="Show phase status.")
-    status.add_argument("phase_dir")
-
-    validate = subparsers.add_parser("validate", help="Validate phase metadata.")
-    validate.add_argument("phase_dir", nargs="?")
-
-    return parser.parse_args(normalized_argv)
+    parser.add_argument("phase_dir", help="Phase directory under phases/.")
+    parser.add_argument("--push", action="store_true", help="Push the feature branch after phase completion.")
+    return parser.parse_args(argv)
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, *, root: Path | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
-    root = Path(args.root).resolve()
+    resolved_root = (root or repo_root_from_script(__file__)).resolve()
 
     try:
-        if args.command == "prepare":
-            return command_prepare(root, args.phase_dir, args.branch_prefix, args.output)
-        if args.command == "run":
-            return command_run(root, args.phase_dir, args.branch_prefix, args.model, args.profile, args.max_steps, args.push)
-        if args.command == "complete":
-            return command_complete(root, args.phase_dir, args.summary)
-        if args.command == "block":
-            return command_block(root, args.phase_dir, args.reason)
-        if args.command == "error":
-            return command_error(root, args.phase_dir, args.message)
-        if args.command == "reset":
-            return command_reset(root, args.phase_dir, args.step)
-        if args.command == "status":
-            return command_status(root, args.phase_dir)
-        if args.command == "validate":
-            return command_validate(root, args.phase_dir)
+        executor = HarnessExecutor(resolved_root, args.phase_dir, push=args.push)
+        return executor.run()
     except RuntimeError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
-    return 0
 
 
 if __name__ == "__main__":

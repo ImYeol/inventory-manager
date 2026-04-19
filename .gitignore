@@ -42,6 +42,10 @@ next-env.d.ts
 
 /src/generated/prisma
 
+# python caches
+__pycache__/
+*.py[cod]
+
 # database
 *.db
 *.db-journal
