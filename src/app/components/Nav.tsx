@@ -15,7 +15,7 @@ import {
   Truck,
 } from 'lucide-react'
 import { logout } from '@/app/login/actions'
-import { MenuLink, MenuSection } from '@/components/ui/menu'
+import { MenuLink } from '@/components/ui/menu'
 import { cx, ui } from './ui'
 
 type NavProps = {

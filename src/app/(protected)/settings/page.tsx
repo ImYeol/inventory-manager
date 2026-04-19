@@ -1,13 +1,31 @@
-import { Database, LogOut } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 import { logout } from '@/app/login/actions'
 import { getShippingSettingsSummary } from '@/lib/actions/shipping-settings'
-import { ActionToolbar, ToolbarButtonAction, ToolbarLinkAction } from '@/components/ui/toolbar'
+import { ActionToolbar, ToolbarButtonAction } from '@/components/ui/toolbar'
 import { PageHeader, ui } from '../../components/ui'
 import SettingsView from './SettingsView'
 
 export const dynamic = 'force-dynamic'
 
-export default async function SettingsPage() {
+type SettingsPageProps = {
+  searchParams?:
+    | Promise<{
+        section?: string
+        provider?: string
+      }>
+    | {
+        section?: string
+        provider?: string
+      }
+}
+
+export default async function SettingsPage({ searchParams }: SettingsPageProps = {}) {
+  const resolvedSearchParams = await (searchParams ?? Promise.resolve({}))
+  const focusProvider =
+    resolvedSearchParams.section === 'store-connections' &&
+    (resolvedSearchParams.provider === 'naver' || resolvedSearchParams.provider === 'coupang')
+      ? resolvedSearchParams.provider
+      : undefined
   const summary = await getShippingSettingsSummary()
 
   return (
@@ -17,9 +35,6 @@ export default async function SettingsPage() {
         description="스토어 연결 상태와 연결 정보를 관리합니다."
         actions={
           <ActionToolbar>
-            <ToolbarLinkAction href="/products" icon={<Database className="h-4 w-4" />}>
-              상품 관리
-            </ToolbarLinkAction>
             <form action={logout}>
               <ToolbarButtonAction type="submit" icon={<LogOut className="h-4 w-4" />}>
                 로그아웃
@@ -28,7 +43,7 @@ export default async function SettingsPage() {
           </ActionToolbar>
         }
       />
-      <SettingsView summary={summary} />
+      <SettingsView summary={summary} focusProvider={focusProvider} />
     </div>
   )
 }

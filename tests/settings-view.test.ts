@@ -10,7 +10,7 @@ afterEach(() => {
 })
 
 describe('SettingsView', () => {
-  it('renders store connections directly inside settings without the old redirect-only guidance', () => {
+  it('renders store connections directly inside settings as the canonical owner', () => {
     render(
       React.createElement(SettingsView, {
         summary: {
@@ -29,9 +29,13 @@ describe('SettingsView', () => {
     )
 
     expect(screen.queryByText('설정은 기준 데이터와 운영 진입점만 제공합니다.')).toBeNull()
-    expect(screen.getByRole('heading', { name: '네이버' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: '쿠팡' })).toBeTruthy()
+    expect(screen.getAllByRole('heading', { name: '네이버' })).toHaveLength(2)
+    expect(screen.getAllByRole('heading', { name: '쿠팡' })).toHaveLength(2)
+    expect(screen.getByRole('link', { name: '연결' }).getAttribute('href')).toBe('#naver-settings')
+    expect(screen.getByRole('link', { name: '변경' }).getAttribute('href')).toBe('#coupang-settings')
     expect(screen.getByRole('button', { name: '네이버 저장' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '쿠팡 저장' })).toBeTruthy()
+    expect(screen.getByLabelText('네이버 Client ID')).toBeTruthy()
+    expect(screen.getByLabelText('쿠팡 Access Key')).toBeTruthy()
   })
 })

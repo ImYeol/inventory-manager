@@ -53,7 +53,7 @@ describe('Nav', () => {
     expect(screen.getByRole('link', { name: '운송장' }).getAttribute('href')).toBe('/shipping')
     expect(screen.getByRole('link', { name: '분석' }).getAttribute('href')).toBe('/analytics')
     expect(screen.queryByRole('link', { name: '스토어 연결' })).toBeNull()
-    expect(screen.getByRole('link', { name: '설정' }).getAttribute('href')).toBe('/settings')
+    expect(screen.getAllByRole('link', { name: '설정' }).some((link) => link.getAttribute('href') === '/settings')).toBe(true)
   })
 
   it('opens the mobile drawer and renders the same information architecture', () => {

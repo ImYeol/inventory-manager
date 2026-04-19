@@ -59,4 +59,16 @@ describe('SettingsPage', () => {
     expect(screen.getByRole('button', { name: '로그아웃' })).toBeTruthy()
     expect(screen.getByTestId('settings-view')).toBeTruthy()
   })
+
+  it('forwards store-connection deep links to the settings view', async () => {
+    const summary = {
+      naver: { configured: true, masked: { clientId: 'nv-••••' }, updatedAt: '2026-04-12T10:00:00.000Z' },
+      coupang: { configured: false, masked: {}, updatedAt: null },
+    }
+    mocks.getShippingSettingsSummary.mockResolvedValue(summary)
+
+    render(await SettingsPage({ searchParams: Promise.resolve({ section: 'store-connections', provider: 'naver' }) }))
+
+    expect(mocks.settingsView).toHaveBeenCalledWith(expect.objectContaining({ summary, focusProvider: 'naver' }))
+  })
 })

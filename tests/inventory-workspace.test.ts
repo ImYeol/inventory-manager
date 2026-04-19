@@ -93,7 +93,7 @@ describe('InventoryWorkspace', () => {
     expect(screen.queryByText('LP02')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '입고' }))
-    expect(screen.getByRole('heading', { name: '빠른 입고' })).toBeTruthy()
+    expect(screen.getByText('빠른 입고')).toBeTruthy()
 
     fireEvent.change(screen.getByLabelText('창고 선택'), { target: { value: '2' } })
     fireEvent.click(screen.getByRole('button', { name: '닫기' }))

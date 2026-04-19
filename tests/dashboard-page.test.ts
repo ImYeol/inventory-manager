@@ -98,6 +98,6 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('link', { name: /전체 재고/ }).getAttribute('href')).toBe('/inventory')
     expect(screen.getByRole('link', { name: /오늘 입고/ }).getAttribute('href')).toBe('/history')
     expect(screen.getByRole('link', { name: '운영 포인트: 재고현황' }).getAttribute('href')).toBe('/inventory')
-    expect(screen.getByRole('link', { name: '기준 데이터' }).getAttribute('href')).toBe('/settings/master-data')
+    expect(screen.getByRole('link', { name: '상품 관리' }).getAttribute('href')).toBe('/products')
   })
 })

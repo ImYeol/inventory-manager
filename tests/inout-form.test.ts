@@ -39,7 +39,7 @@ describe('InOutForm', () => {
     )
 
     expect(screen.getByText('창고가 없습니다.')).toBeTruthy()
-    expect(screen.getByRole('link', { name: '창고 등록하러 가기' }).getAttribute('href')).toBe('/settings/master-data')
+    expect(screen.getByRole('link', { name: '창고 등록하러 가기' }).getAttribute('href')).toBe('/products')
     expect(screen.getByText('입출고 등록은 창고 등록 후 이용할 수 있습니다.')).toBeTruthy()
   })
 

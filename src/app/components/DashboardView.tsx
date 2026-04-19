@@ -48,8 +48,8 @@ const quickStart = [
     icon: <Boxes className="h-4 w-4" />,
   },
   {
-    title: '기준 데이터',
-    href: '/settings/master-data',
+    title: '상품 관리',
+    href: '/products',
     icon: <Database className="h-4 w-4" />,
   },
   {
