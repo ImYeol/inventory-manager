@@ -36,3 +36,4 @@ npm run test
 ## 금지사항
 - demo 테이블의 repository/avatar 같은 필드를 그대로 복제하지 마라. 이유: 운영 도메인과 무관한 AI slop가 된다.
 - 한 화면에 큰 카드, 긴 설명, 테이블, 팝업 보조 패널을 동시에 얹지 마라. 이유: 작업 표면이 묻힌다.
+- `next.config.ts`, `package.json`, `src/app/layout.tsx`, `src/app/globals.css`를 건드리지 마라. 이유: step 2의 재고 테이블/입출고 UX 단순화와 무관한 전역 빌드/폰트 변경은 회귀 범위를 넓힌다.

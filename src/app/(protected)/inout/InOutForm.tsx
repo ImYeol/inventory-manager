@@ -73,7 +73,6 @@ type InOutFormProps = {
   initialType?: '입고' | '출고'
   initialWarehouseId?: number
   lockedWarehouseId?: number | null
-  entryMode?: 'manual' | 'csv'
   onSubmitted?: () => void
 }
 
@@ -185,11 +184,6 @@ export default function InOutForm({
     })
   }
 
-  const clearAll = () => {
-    setRows(Array.from({ length: INITIAL_ROW_COUNT }, emptyRow))
-    setMessage(null)
-  }
-
   const resolvedRows = useMemo(
     () =>
       rows.map((row) => {
@@ -263,19 +257,7 @@ export default function InOutForm({
 
   return (
     <div className="space-y-4">
-      {message ? (
-        <div
-          className={cx(
-            'rounded-xl border px-4 py-3 text-center text-sm font-medium',
-            message.error ? 'border-red-200 bg-red-50 text-red-700' : 'border-slate-200 bg-slate-50 text-slate-700',
-          )}
-          aria-live="polite"
-        >
-          {message.text}
-        </div>
-      ) : null}
-
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-end">
         <div>
           <label className={ui.label} htmlFor="transaction-date">
             날짜
@@ -310,22 +292,6 @@ export default function InOutForm({
             </select>
           )}
         </div>
-
-        <div className="flex gap-2 md:justify-end">
-          <button type="button" onClick={addRow} className={ui.buttonSecondary}>
-            행 추가
-          </button>
-          <button type="button" onClick={clearAll} className={ui.buttonGhost}>
-            초기화
-          </button>
-        </div>
-      </div>
-
-      {!canInput ? <p className="text-sm text-slate-500">입출고 등록은 창고 등록 후 이용할 수 있습니다.</p> : null}
-
-      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-        <span className={ui.pill}>유효 {filledRows.length}건</span>
-        <span className={ui.pillMuted}>확인 필요 {invalidRowCount}건</span>
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -431,9 +397,38 @@ export default function InOutForm({
         </div>
       </div>
 
-      <button onClick={submitAll} disabled={isPending || filledRows.length === 0 || !canInput} className={cx(ui.buttonPrimary, 'h-12 w-full justify-center text-base')}>
-        {isPending ? '등록 중…' : `${initialType} 등록 (${filledRows.length}건)`}
-      </button>
+      <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <span className={ui.pill}>유효 {filledRows.length}건</span>
+            <span className={ui.pillMuted}>확인 필요 {invalidRowCount}건</span>
+          </div>
+          {message ? (
+            <p
+              className={cx(
+                'text-xs font-medium',
+                message.error ? 'text-red-600' : 'text-slate-500',
+              )}
+              aria-live="polite"
+            >
+              {message.text}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap gap-2 md:justify-end">
+          <button type="button" onClick={addRow} className={ui.buttonSecondary}>
+            행 추가
+          </button>
+          <button
+            type="button"
+            onClick={submitAll}
+            disabled={isPending || filledRows.length === 0 || !canInput}
+            className={cx(ui.buttonPrimary, 'h-12 justify-center text-base')}
+          >
+            {isPending ? '등록 중…' : `${initialType} 등록 (${filledRows.length}건)`}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 {
   "project": "Seleccase Inventory",
   "phase": "inventory-shipping-settings-reset",
-  "status": "pending",
+  "status": "completed",
   "steps": [
     {
       "step": 0,
@@ -22,17 +22,27 @@
     {
       "step": 2,
       "name": "inventory-table-and-quick-entry-simplification",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-04-20T04:40:47+0900",
+      "completed_at": "2026-04-20T05:08:14+0900",
+      "summary": "Reworked inventory into a dense table-first surface with warehouse/search/status filters, column visibility controls, embedded history, and compact fixed quick-entry sheets without paste-mode or duplicate type toggles."
     },
     {
       "step": 3,
       "name": "shipping-classification-and-store-connection-merge",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-04-20T05:08:14+0900",
+      "completed_at": "2026-04-20T05:08:14+0900",
+      "summary": "Collapsed duplicated settings and shipping chrome by merging store-connection status plus edit forms into single provider surfaces and moving shipping classification, filter, and provider send actions into one preview-focused workspace with deep links for missing connections."
     },
     {
       "step": 4,
       "name": "regression-and-phase-closeout",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-04-20T05:08:14+0900",
+      "completed_at": "2026-04-20T05:08:14+0900",
+      "summary": "Verified the reset by running lint, build, and the full Vitest suite after restoring Homebrew node/npm onto PATH, and synced the docs to the shipped inventory, shipping, and settings patterns."
     }
-  ]
+  ],
+  "completed_at": "2026-04-20T05:08:14+0900"
 }

@@ -26,12 +26,12 @@
 **트레이드오프**: 대량 입력은 CSV 경로가 더 중요해진다.
 
 ## ADR-006: 스토어 연결은 설정 소유로 수렴한다
-**결정**: 네이버/쿠팡 연결 상태와 credential 편집의 canonical owner는 `/settings`다. `/integrations`는 남더라도 redirect 또는 thin alias로 제한한다.  
+**결정**: 네이버/쿠팡 연결 상태와 credential 편집의 canonical owner는 `/settings`다. `/integrations`는 남더라도 redirect 또는 thin alias로 제한한다. 가능하면 provider별 상태 요약과 편집 form은 같은 surface에 둔다.
 **이유**: `IntegrationsView`와 `SettingsView`가 동시에 스토어 연결을 설명하면 IA가 중복되고, 사용자는 어디서 연결을 바꾸는지 헷갈린다.  
 **트레이드오프**: 기존 `/integrations` 링크는 호환 경로 또는 redirect 처리가 필요하다.
 
 ## ADR-007: `운송장`은 연결 설명 페이지가 아니라 분류와 발송 실행 화면이다
-**결정**: `/shipping`은 `업로드 → 미리보기 → 분류 → 매칭/발송`만 소유한다. 별도 `연동 준비 상태` 섹션은 두지 않는다.  
+**결정**: `/shipping`은 `업로드 → 미리보기 → 분류 → 매칭/발송`만 소유한다. 별도 `연동 준비 상태` 섹션은 두지 않는다. 채널별 발송 액션은 preview surface와 붙여서 다룬다.
 **이유**: 연결 준비와 실행 흐름을 한 화면에서 반복 설명하면 작업 표면보다 안내 카드가 더 커진다.  
 **트레이드오프**: 연결 부족 상태는 짧은 badge와 deep link로만 전달해야 한다.
 

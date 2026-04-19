@@ -207,6 +207,16 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
     () => previewRows.filter((row) => classificationFilter === 'all' || row.classification === classificationFilter),
     [classificationFilter, previewRows],
   )
+  const classificationSummary = useMemo(
+    () => ({
+      total: previewRows.length,
+      naver: previewRows.filter((row) => row.classification === 'naver').length,
+      coupang: previewRows.filter((row) => row.classification === 'coupang').length,
+      unclassified: previewRows.filter((row) => row.classification === 'unclassified').length,
+      ambiguous: previewRows.filter((row) => row.classification === 'ambiguous').length,
+    }),
+    [previewRows],
+  )
 
   const naverMatches = previewRows.filter((row) => row.classification === 'naver' && row.matchedOrder?.provider === 'naver')
   const coupangMatches = previewRows.filter((row) => row.classification === 'coupang' && row.matchedOrder?.provider === 'coupang')
@@ -304,16 +314,12 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
               쿠팡 연결
             </Link>
           ) : null}
-          {loading ? <span className="text-sm text-slate-500">주문 정보를 확인하는 중…</span> : null}
         </div>
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-950">분류 미리보기</h2>
-            <p className="mt-1 text-sm text-slate-500">받는분 이름과 주소를 비교해 채널을 분류합니다.</p>
-          </div>
+          <h2 className="text-sm font-semibold text-slate-950">분류 미리보기</h2>
           <div className="flex flex-wrap items-center gap-2">
             <label htmlFor="shipping-classification-filter" className="sr-only">
               분류 필터
@@ -330,7 +336,16 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
               <option value="unclassified">미분류</option>
               <option value="ambiguous">중복 후보</option>
             </select>
+            {loading ? <span className="text-sm text-slate-500">주문 정보를 확인하는 중…</span> : null}
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3 text-xs text-slate-500">
+          <span className={ui.pill}>전체 {classificationSummary.total}건</span>
+          <span className={ui.pill}>네이버 {classificationSummary.naver}건</span>
+          <span className={ui.pill}>쿠팡 {classificationSummary.coupang}건</span>
+          <span className={ui.pillMuted}>미분류 {classificationSummary.unclassified}건</span>
+          {classificationSummary.ambiguous > 0 ? <span className={ui.pillMuted}>중복 후보 {classificationSummary.ambiguous}건</span> : null}
         </div>
 
         <div className="overflow-x-auto">
@@ -380,35 +395,36 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
             </tbody>
           </table>
         </div>
+
+        <div className="border-t border-slate-100 px-4 py-3">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+              <span>네이버 {naverMatches.length}건 발송 가능</span>
+              {naverMessage ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">{naverMessage}</span> : null}
+              <span>쿠팡 {coupangMatches.length}건 발송 가능</span>
+              {coupangMessage ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">{coupangMessage}</span> : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleNaverSend}
+                disabled={naverSending || naverMatches.length === 0}
+                className={ui.buttonPrimary}
+              >
+                {naverSending ? '네이버 발송 중…' : '네이버 발송'}
+              </button>
+              <button
+                type="button"
+                onClick={handleCoupangSend}
+                disabled={coupangSending || coupangMatches.length === 0}
+                className={ui.buttonSecondary}
+              >
+                {coupangSending ? '쿠팡 발송 중…' : '쿠팡 발송'}
+              </button>
+            </div>
+          </div>
+        </div>
       </section>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold text-slate-950">네이버 발송</h2>
-              <p className="mt-1 text-sm text-slate-500">{naverMatches.length}건 발송 가능</p>
-            </div>
-            <button type="button" onClick={handleNaverSend} disabled={naverSending || naverMatches.length === 0} className={ui.buttonPrimary}>
-              {naverSending ? '발송 중…' : '네이버 발송'}
-            </button>
-          </div>
-          {naverMessage ? <p className="mt-3 text-sm text-slate-600">{naverMessage}</p> : null}
-        </section>
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold text-slate-950">쿠팡 발송</h2>
-              <p className="mt-1 text-sm text-slate-500">{coupangMatches.length}건 발송 가능</p>
-            </div>
-            <button type="button" onClick={handleCoupangSend} disabled={coupangSending || coupangMatches.length === 0} className={ui.buttonPrimary}>
-              {coupangSending ? '발송 중…' : '쿠팡 발송'}
-            </button>
-          </div>
-          {coupangMessage ? <p className="mt-3 text-sm text-slate-600">{coupangMessage}</p> : null}
-        </section>
-      </div>
     </div>
   )
 }

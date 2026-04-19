@@ -9,10 +9,7 @@ export default async function ShippingPage() {
 
   return (
     <div className={ui.shell}>
-      <PageHeader
-        title="운송장 관리"
-        description="업로드한 운송장을 채널별로 분류하고 바로 발송합니다."
-      />
+      <PageHeader title="운송장 관리" />
       <ShippingView settingsSummary={settingsSummary} />
     </div>
   )

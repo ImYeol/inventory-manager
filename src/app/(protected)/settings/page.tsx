@@ -32,7 +32,6 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps =
     <div className={ui.shell}>
       <PageHeader
         title="설정"
-        description="스토어 연결 상태와 연결 정보를 관리합니다."
         actions={
           <ActionToolbar>
             <form action={logout}>

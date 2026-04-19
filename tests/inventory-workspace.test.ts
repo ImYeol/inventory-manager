@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 
 vi.mock('next/link', () => ({
   default: ({
@@ -19,16 +19,14 @@ vi.mock('@/app/(protected)/inout/InOutForm', () => ({
   default: ({
     initialType,
     lockedWarehouseId,
-    entryMode,
   }: {
     initialType?: string
     lockedWarehouseId?: number | null
-    entryMode?: string
   }) =>
     React.createElement(
       'div',
       {},
-      `InOutForm:${initialType ?? '입고'}:${lockedWarehouseId ?? 'all'}:${entryMode ?? 'manual'}`,
+      `InOutForm:${initialType ?? '입고'}:${lockedWarehouseId ?? 'all'}`,
     ),
 }))
 
@@ -79,26 +77,36 @@ describe('InventoryWorkspace', () => {
 
     expect(screen.getByRole('heading', { name: '재고 운영' })).toBeTruthy()
     expect(screen.getAllByRole('heading', { name: '재고 운영' })).toHaveLength(1)
-    expect((screen.getByRole('combobox', { name: '창고 선택' }) as HTMLSelectElement).value).toBe('1')
-    expect(screen.getByLabelText('상품 검색')).toBeTruthy()
+    expect((screen.getByRole('combobox', { name: '창고 선택' }) as HTMLSelectElement).value).toBe('all')
+    expect(screen.getByLabelText('상품명 검색')).toBeTruthy()
     expect(screen.getByLabelText('상태 필터')).toBeTruthy()
     expect(screen.getByRole('button', { name: '컬럼' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '재고 목록' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '목록' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '이력' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '입고' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '출고' })).toBeTruthy()
 
-    fireEvent.change(screen.getByLabelText('상품 검색'), { target: { value: 'LP01' } })
-    expect(screen.getByText('LP01')).toBeTruthy()
-    expect(screen.queryByText('LP02')).toBeNull()
+    fireEvent.change(screen.getByLabelText('상품명 검색'), { target: { value: 'LP01' } })
+    fireEvent.change(screen.getByLabelText('상태 필터'), { target: { value: 'normal' } })
+    fireEvent.change(screen.getByRole('combobox', { name: '창고 선택' }), { target: { value: '2' } })
+
+    const table = screen.getByRole('table')
+    expect(within(table).getByText('LP01')).toBeTruthy()
+    expect(within(table).getByText('대자동')).toBeTruthy()
+    expect(within(table).queryByText('오금동')).toBeNull()
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: '컬럼' }))
+    const menu = screen.getByRole('menu')
+    fireEvent.click(within(menu).getByText('창고'))
+    expect(within(screen.getByRole('table')).queryByText('창고')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '입고' }))
-    expect(screen.getByText('빠른 입고')).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: '빠른 입고' })).toBeTruthy()
+    expect(screen.getByText('InOutForm:입고:2')).toBeTruthy()
 
-    fireEvent.change(screen.getByLabelText('창고 선택'), { target: { value: '2' } })
-    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
-    fireEvent.click(screen.getByRole('button', { name: '입고' }))
-    expect(screen.getByText('InOutForm:입고:2:manual')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '출고' }))
+    expect(screen.getByRole('dialog', { name: '빠른 출고' })).toBeTruthy()
+    expect(screen.getByText('InOutForm:출고:2')).toBeTruthy()
   })
 
   it('does not render oversized summary chrome when the table is empty', () => {
@@ -125,7 +133,7 @@ describe('InventoryWorkspace', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: /이력/ }))
-    expect(screen.getByText('HistoryView:1')).toBeTruthy()
+    expect(screen.getByText('HistoryView:all')).toBeTruthy()
     expect(screen.queryByRole('heading', { name: '이력 필터' })).toBeNull()
     expect(screen.queryByRole('combobox', { name: '창고' })).toBeNull()
   })

@@ -40,7 +40,6 @@ describe('InOutForm', () => {
 
     expect(screen.getByText('창고가 없습니다.')).toBeTruthy()
     expect(screen.getByRole('link', { name: '창고 등록하러 가기' }).getAttribute('href')).toBe('/products')
-    expect(screen.getByText('입출고 등록은 창고 등록 후 이용할 수 있습니다.')).toBeTruthy()
   })
 
   it('selects the only warehouse by default', () => {
@@ -90,6 +89,22 @@ describe('InOutForm', () => {
     expect(screen.queryByRole('button', { name: '표 붙여넣기' })).toBeNull()
     expect(screen.queryByLabelText('붙여넣기')).toBeNull()
     expect(screen.queryByRole('button', { name: '행으로 가져오기' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '초기화' })).toBeNull()
+    expect(screen.getByRole('button', { name: '행 추가' })).toBeTruthy()
     expect(screen.getAllByRole('button', { name: '행 복제' }).length).toBeGreaterThan(0)
+  })
+
+  it('locks the overlay to the requested transaction type', () => {
+    render(
+      React.createElement(InOutForm, {
+        warehouses: [{ id: 7, name: '본사 창고' }],
+        models: [],
+        initialType: '출고',
+      }),
+    )
+
+    expect(screen.getByRole('button', { name: '출고 등록 (0건)' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '입고/출고 전환' })).toBeNull()
+    expect(screen.queryByText('표 붙여넣기')).toBeNull()
   })
 })

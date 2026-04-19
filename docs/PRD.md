@@ -138,6 +138,7 @@ Seleccase Inventory를 `상품 관리 + 테이블 중심 재고 운영 + 설정 
   - 마스킹된 요약
   - 최근 변경 시각
   - `연결` 또는 `변경` 버튼
+- provider별 상태 요약과 편집 form은 가능한 한 같은 surface 안에 둔다.
 - provider별 deep link 또는 section focus를 지원한다.
 - `/integrations`는 새 owner가 아니라 `설정 > 스토어 연결`로 보내는 alias/redirect 후보로 간주한다.
 
@@ -162,6 +163,7 @@ Seleccase Inventory를 `상품 관리 + 테이블 중심 재고 운영 + 설정 
 - 기존 `업로드 → 미리보기 → 매칭/발송` 흐름은 유지한다.
 - 분류 표는 발송 대상 정리에 필요한 1차 surface가 된다.
 - 채널별 발송 액션은 분류 결과를 기반으로 계산한다.
+- 채널별 발송 액션은 분류 표의 header/footer action rail에 붙이는 편을 우선한다.
 
 ## 비기능 요구사항
 - 기존 `inventory`와 `transactions` 원장 구조는 유지한다.

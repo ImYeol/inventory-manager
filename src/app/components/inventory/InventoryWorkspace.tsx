@@ -1,15 +1,12 @@
 'use client'
 
-import type { ReactNode } from 'react'
 import { useMemo, useState } from 'react'
-import { Minus, Plus } from 'lucide-react'
 import InOutForm from '@/app/(protected)/inout/InOutForm'
 import HistoryView from '@/app/(protected)/history/HistoryView'
 import { PageHeader, cx, ui } from '@/app/components/ui'
-import { ColumnVisibilityMenu } from '@/components/ui/column-visibility-menu'
-import { FilterToolbar } from '@/components/ui/filter-toolbar'
-import { Input } from '@/components/ui/input'
+import { FixedSheet } from '@/components/ui/fixed-sheet'
 import { InventoryDataTable, type InventoryColumnKey, type InventoryDataRow } from '@/components/ui/inventory-data-table'
+import { InventoryTableToolbar } from '@/components/ui/inventory-table-toolbar'
 
 type InventoryItem = {
   id: number
@@ -87,42 +84,6 @@ function inventoryStatus(quantity: number) {
   return { label: '정상', tone: 'success' as const, raw: 'normal' as const }
 }
 
-function EntryOverlay({
-  open,
-  title,
-  onClose,
-  children,
-}: {
-  open: boolean
-  title: string
-  onClose: () => void
-  children: ReactNode
-}) {
-  if (!open) return null
-
-  return (
-    <div className="fixed inset-0 z-50">
-      <button type="button" aria-label="입력 창 닫기" onClick={onClose} className="absolute inset-0 bg-slate-950/45" />
-      <div className="absolute inset-x-0 bottom-0 top-10 overflow-hidden rounded-t-[28px] border border-slate-200 bg-white shadow-2xl md:inset-x-[max(2rem,calc(50%-32rem))] md:bottom-8 md:top-8 md:rounded-[28px]">
-        <div className="flex h-full flex-col">
-          <div className="border-b border-slate-200 px-4 py-4 md:px-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-slate-950">{title}</p>
-                <p className="mt-1 text-sm text-slate-500">창고 컨텍스트를 유지한 채 여러 SKU를 한 번에 입력합니다.</p>
-              </div>
-              <button type="button" onClick={onClose} className={cx(ui.buttonGhost, 'h-11 min-w-11 px-3')}>
-                닫기
-              </button>
-            </div>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">{children}</div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function InventoryWorkspace({
   models,
   warehouses,
@@ -132,7 +93,7 @@ export default function InventoryWorkspace({
   warehouses: WarehouseLookup[]
   transactions: TransactionItem[]
 }) {
-  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | 'all'>(warehouses[0]?.id ?? 'all')
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | 'all'>('all')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'normal' | 'warning' | 'danger'>('all')
   const [activeView, setActiveView] = useState<ViewMode>('list')
@@ -232,65 +193,30 @@ export default function InventoryWorkspace({
     <div className={ui.shell}>
       <PageHeader title="재고 운영" description="재고를 조회하고 바로 입고/출고 처리합니다." />
 
-      <FilterToolbar>
-        <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <div className="min-w-[11rem]">
-            <label htmlFor="inventory-warehouse" className="sr-only">
-              창고 선택
-            </label>
-            <select
-              id="inventory-warehouse"
-              value={selectedWarehouseId}
-              onChange={(event) => setSelectedWarehouseId(event.target.value === 'all' ? 'all' : Number(event.target.value))}
-              className={cx(ui.controlSm, 'bg-white')}
-            >
-              <option value="all">전체 창고</option>
-              {warehouses.map((warehouse) => (
-                <option key={warehouse.id} value={warehouse.id}>
-                  {warehouse.name}
-                </option>
-              ))}
-            </select>
+      <InventoryTableToolbar
+        warehouses={warehouses}
+        selectedWarehouseId={selectedWarehouseId}
+        onWarehouseChange={setSelectedWarehouseId}
+        search={search}
+        onSearchChange={setSearch}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+        columns={ALL_COLUMNS}
+        visibleColumns={visibleColumns}
+        onToggleColumn={toggleColumn}
+        onInbound={() => setOverlayMode('입고')}
+        onOutbound={() => setOverlayMode('출고')}
+        historyAction={
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={() => setActiveView('list')} className={cx(activeView === 'list' ? ui.tabActive : ui.tab, 'h-10 px-3')}>
+              목록
+            </button>
+            <button type="button" onClick={() => setActiveView('history')} className={cx(activeView === 'history' ? ui.tabActive : ui.tab, 'h-10 px-3')}>
+              이력
+            </button>
           </div>
-
-          <div className="min-w-[14rem]">
-            <label htmlFor="inventory-search" className="sr-only">
-              상품 검색
-            </label>
-            <Input id="inventory-search" type="search" placeholder="상품 검색" value={search} onChange={(event) => setSearch(event.target.value)} />
-          </div>
-
-          <div className="min-w-[10rem]">
-            <label htmlFor="inventory-status" className="sr-only">
-              상태 필터
-            </label>
-            <select id="inventory-status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)} className={ui.controlSm}>
-              <option value="all">전체 상태</option>
-              <option value="normal">정상</option>
-              <option value="warning">주의</option>
-              <option value="danger">품절</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => setActiveView('list')} className={cx(activeView === 'list' ? ui.tabActive : ui.tab, 'h-10 px-3')}>
-            재고 목록
-          </button>
-          <button type="button" onClick={() => setActiveView('history')} className={cx(activeView === 'history' ? ui.tabActive : ui.tab, 'h-10 px-3')}>
-            이력
-          </button>
-          <ColumnVisibilityMenu columns={ALL_COLUMNS} visibleColumns={visibleColumns} onToggle={toggleColumn} />
-          <button type="button" onClick={() => setOverlayMode('입고')} className={cx(ui.buttonPrimary, 'h-10 gap-2 px-3')}>
-            <Plus className="h-4 w-4" />
-            입고
-          </button>
-          <button type="button" onClick={() => setOverlayMode('출고')} className={cx(ui.buttonSecondary, 'h-10 gap-2 px-3')}>
-            <Minus className="h-4 w-4" />
-            출고
-          </button>
-        </div>
-      </FilterToolbar>
+        }
+      />
 
       <div className="mt-4">
         {activeView === 'list' ? (
@@ -306,7 +232,7 @@ export default function InventoryWorkspace({
         )}
       </div>
 
-      <EntryOverlay
+      <FixedSheet
         open={overlayMode !== null}
         title={overlayMode === '입고' ? '빠른 입고' : '빠른 출고'}
         onClose={() => setOverlayMode(null)}
@@ -317,10 +243,9 @@ export default function InventoryWorkspace({
           initialType={overlayMode ?? '입고'}
           initialWarehouseId={typeof selectedWarehouseId === 'number' ? selectedWarehouseId : warehouses[0]?.id}
           lockedWarehouseId={typeof selectedWarehouseId === 'number' ? selectedWarehouseId : null}
-          entryMode="manual"
           onSubmitted={() => setOverlayMode(null)}
         />
-      </EntryOverlay>
+      </FixedSheet>
     </div>
   )
 }

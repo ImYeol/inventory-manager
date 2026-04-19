@@ -55,7 +55,7 @@ describe('SettingsPage', () => {
     expect(mocks.settingsView).toHaveBeenCalledTimes(1)
     expect(mocks.settingsView).toHaveBeenCalledWith(expect.objectContaining({ summary }))
     expect(screen.queryByRole('link', { name: '기준 데이터' })).toBeNull()
-    expect(screen.getByText('스토어 연결 상태와 연결 정보를 관리합니다.')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '설정' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '로그아웃' })).toBeTruthy()
     expect(screen.getByTestId('settings-view')).toBeTruthy()
   })
