@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createFactoryArrivalBatch, receiveFactoryArrival } from '@/lib/actions'
 import { StatusBadge } from '@/components/ui/badge-1'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PageHeader, cx, ui } from '@/app/components/ui'
 
@@ -122,7 +123,7 @@ function SelectField<Value extends string | number>({
         onValueChange={(next) => onValueChange(next ? (next as Value) : null)}
         disabled={disabled}
       >
-        <SelectTrigger aria-label={label} className={cx(ui.controlSm, 'w-full bg-white')}>
+        <SelectTrigger aria-label={label} className={ui.controlSm}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
@@ -325,13 +326,13 @@ export default function ArrivalsView({
       />
 
       {message ? (
-        <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-          {message}
-        </div>
+        <Card variant="muted" className="mb-4 overflow-hidden">
+          <CardContent className="px-4 py-3 text-sm text-slate-700">{message}</CardContent>
+        </Card>
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <section className={cx(ui.panel, ui.panelBody, 'space-y-4 md:p-4')}>
+        <section className="space-y-4">
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => setEntryMode('manual')} className={entryMode === 'manual' ? ui.tabActive : ui.tab}>
               수동 등록
@@ -363,21 +364,23 @@ export default function ArrivalsView({
           </div>
 
           {entryMode === 'csv' ? (
-            <div className="space-y-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-4">
-              <label htmlFor="arrival-csv" className="text-sm font-medium text-slate-700">
-                CSV 붙여넣기
-              </label>
-              <textarea
-                id="arrival-csv"
-                value={csvText}
-                onChange={(event) => setCsvText(event.target.value)}
-                placeholder={'모델,사이즈,색상,수량\nLP01,S,네이비,24'}
-                className={cx(ui.control, 'min-h-28 resize-y font-mono text-sm')}
-              />
-              <button type="button" onClick={importCsvRows} className={ui.buttonSecondary} disabled={csvText.trim().length === 0}>
-                CSV 행 가져오기
-              </button>
-            </div>
+            <Card variant="default" className="overflow-hidden">
+              <CardHeader className="px-4 py-3">
+                <CardTitle className="text-sm">CSV 붙여넣기</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 px-4 py-4">
+                <textarea
+                  id="arrival-csv"
+                  value={csvText}
+                  onChange={(event) => setCsvText(event.target.value)}
+                  placeholder={'모델,사이즈,색상,수량\nLP01,S,네이비,24'}
+                  className={cx(ui.control, 'min-h-28 resize-y font-mono text-sm')}
+                />
+                <button type="button" onClick={importCsvRows} className={ui.buttonSecondary} disabled={csvText.trim().length === 0}>
+                  CSV 행 가져오기
+                </button>
+              </CardContent>
+            </Card>
           ) : null}
 
           <div className="space-y-3">
@@ -390,268 +393,268 @@ export default function ArrivalsView({
 
             <div className="space-y-3">
               {normalizedRows.map((row, index) => (
-                <div key={row.key} className={cx('space-y-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-3', row.error && 'border-amber-200 bg-amber-50/70')}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-slate-700">항목 #{index + 1}</span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setRows((current) => {
-                          const next = current.filter((item) => item.key !== row.key)
-                          return next.length === 0 ? [createRow()] : next
-                        })
-                      }
-                      className="text-sm text-slate-400 hover:text-slate-950"
-                    >
-                      삭제
-                    </button>
-                  </div>
+                <Card key={row.key} variant="default" className={cx('overflow-hidden', row.error && 'border-amber-200')}>
+                  <CardContent className="space-y-3 px-3 py-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-slate-700">항목 #{index + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setRows((current) => {
+                            const next = current.filter((item) => item.key !== row.key)
+                            return next.length === 0 ? [createRow()] : next
+                          })
+                        }
+                        className="text-sm text-slate-400 hover:text-slate-950"
+                      >
+                        삭제
+                      </button>
+                    </div>
 
-                  <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_8rem]">
-                    <SelectField
-                      label={`항목 #${index + 1} 모델`}
-                      value={row.modelId === '' ? null : row.modelId}
-                      placeholder="모델 선택"
-                      options={models.map((model) => ({ value: model.id, label: model.name }))}
-                      onValueChange={(next) =>
-                        setRows((current) =>
-                          current.map((item) =>
-                            item.key === row.key
-                              ? {
-                                  ...item,
-                                  modelId: next === null ? '' : Number(next),
-                                  sizeId: '',
-                                  colorId: '',
-                                  error: null,
-                                }
-                              : item,
-                          ),
-                        )
-                      }
-                    />
+                    <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_8rem]">
+                      <SelectField
+                        label={`항목 #${index + 1} 모델`}
+                        value={row.modelId === '' ? null : row.modelId}
+                        placeholder="모델 선택"
+                        options={models.map((model) => ({ value: model.id, label: model.name }))}
+                        onValueChange={(next) =>
+                          setRows((current) =>
+                            current.map((item) =>
+                              item.key === row.key
+                                ? {
+                                    ...item,
+                                    modelId: next === null ? '' : Number(next),
+                                    sizeId: '',
+                                    colorId: '',
+                                    error: null,
+                                  }
+                                : item,
+                            ),
+                          )
+                        }
+                      />
 
-                    <SelectField
-                      label={`항목 #${index + 1} 사이즈`}
-                      value={row.sizeId === '' ? null : row.sizeId}
-                      placeholder="사이즈"
-                      options={(row.model?.sizes ?? []).map((size) => ({ value: size.id, label: size.name }))}
-                      onValueChange={(next) =>
-                        setRows((current) =>
-                          current.map((item) =>
-                            item.key === row.key ? { ...item, sizeId: next === null ? '' : Number(next), error: null } : item,
-                          ),
-                        )
-                      }
-                      disabled={!row.model}
-                    />
+                      <SelectField
+                        label={`항목 #${index + 1} 사이즈`}
+                        value={row.sizeId === '' ? null : row.sizeId}
+                        placeholder="사이즈"
+                        options={(row.model?.sizes ?? []).map((size) => ({ value: size.id, label: size.name }))}
+                        onValueChange={(next) =>
+                          setRows((current) =>
+                            current.map((item) =>
+                              item.key === row.key ? { ...item, sizeId: next === null ? '' : Number(next), error: null } : item,
+                            ),
+                          )
+                        }
+                        disabled={!row.model}
+                      />
 
-                    <SelectField
-                      label={`항목 #${index + 1} 색상`}
-                      value={row.colorId === '' ? null : row.colorId}
-                      placeholder="색상"
-                      options={(row.model?.colors ?? []).map((color) => ({ value: color.id, label: color.name }))}
-                      onValueChange={(next) =>
-                        setRows((current) =>
-                          current.map((item) =>
-                            item.key === row.key ? { ...item, colorId: next === null ? '' : Number(next), error: null } : item,
-                          ),
-                        )
-                      }
-                      disabled={!row.model}
-                    />
+                      <SelectField
+                        label={`항목 #${index + 1} 색상`}
+                        value={row.colorId === '' ? null : row.colorId}
+                        placeholder="색상"
+                        options={(row.model?.colors ?? []).map((color) => ({ value: color.id, label: color.name }))}
+                        onValueChange={(next) =>
+                          setRows((current) =>
+                            current.map((item) =>
+                              item.key === row.key ? { ...item, colorId: next === null ? '' : Number(next), error: null } : item,
+                            ),
+                          )
+                        }
+                        disabled={!row.model}
+                      />
 
-                    <input
-                      type="number"
-                      min={1}
-                      value={row.orderedQuantity}
-                      onChange={(event) =>
-                        setRows((current) =>
-                          current.map((item) =>
-                            item.key === row.key
-                              ? { ...item, orderedQuantity: event.target.value ? Number(event.target.value) : '', error: null }
-                              : item,
-                          ),
-                        )
-                      }
-                      placeholder="수량"
-                      className={cx(ui.controlSm, 'text-right')}
-                    />
-                  </div>
+                      <input
+                        type="number"
+                        min={1}
+                        value={row.orderedQuantity}
+                        onChange={(event) =>
+                          setRows((current) =>
+                            current.map((item) =>
+                              item.key === row.key
+                                ? { ...item, orderedQuantity: event.target.value ? Number(event.target.value) : '', error: null }
+                                : item,
+                            ),
+                          )
+                        }
+                        placeholder="수량"
+                        className={cx(ui.controlSm, 'text-right')}
+                      />
+                    </div>
 
-                  {row.error ? <p className="text-xs font-medium text-amber-700">{row.error}</p> : null}
-                </div>
+                    {row.error ? <p className="text-xs font-medium text-amber-700">{row.error}</p> : null}
+                  </CardContent>
+                </Card>
               ))}
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 md:flex-row md:items-center md:justify-between">
-            <div className="text-sm text-slate-600">
-              유효 항목 <span className="font-semibold text-slate-950">{normalizedRows.filter((row) => row.valid).length}</span>건
-            </div>
-            <button
-              type="button"
-              onClick={submitRows}
-              disabled={isPending || normalizedRows.filter((row) => row.valid).length === 0}
-              className={ui.buttonPrimary}
-            >
-              예정 입고 등록
-            </button>
-          </div>
+          <Card variant="default" className="overflow-hidden">
+            <CardContent className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
+              <div className="text-sm text-slate-600">
+                유효 항목 <span className="font-semibold text-slate-950">{normalizedRows.filter((row) => row.valid).length}</span>건
+              </div>
+              <button
+                type="button"
+                onClick={submitRows}
+                disabled={isPending || normalizedRows.filter((row) => row.valid).length === 0}
+                className={ui.buttonPrimary}
+              >
+                예정 입고 등록
+              </button>
+            </CardContent>
+          </Card>
         </section>
 
-        <section className={cx(ui.panel, 'overflow-hidden')}>
-          <div className={ui.panelHeader}>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold tracking-tight text-slate-950">예정 목록</h2>
-              </div>
-              <span className={ui.pill}>총 {arrivals.length}건</span>
+        <section className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold tracking-tight text-slate-950">예정 목록</h2>
             </div>
+            <span className={ui.pill}>총 {arrivals.length}건</span>
           </div>
 
-          <div className="divide-y divide-slate-100">
-            {arrivals.length === 0 ? (
-              <div className={ui.emptyState}>등록된 예정 입고가 없습니다.</div>
-            ) : (
-              arrivals.map((arrival) => (
-                <div key={arrival.id} className="space-y-4 px-4 py-4 md:px-5">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-base font-semibold text-slate-950">{arrival.factoryName}</h3>
-                        <StatusBadge
-                          tone={
-                            arrival.status === '예정'
-                              ? 'info'
-                              : arrival.status === '부분입고'
-                                ? 'warning'
-                                : arrival.status === '입고완료'
-                                  ? 'success'
-                                  : 'neutral'
-                          }
-                          className="px-2.5 py-1"
-                        >
-                          {arrival.status}
-                        </StatusBadge>
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-                        <span>{arrival.expectedDate}</span>
-                        <StatusBadge tone={arrival.sourceChannel === 'csv' ? 'info' : 'neutral'} className="px-2.5 py-1">
-                          {arrival.sourceChannel === 'csv' ? 'CSV 등록' : '수동 등록'}
-                        </StatusBadge>
-                      </div>
-                      {arrival.memo ? <p className="mt-2 text-sm text-slate-600">{arrival.memo}</p> : null}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <span className={ui.pillMuted}>
-                        총 수량 {arrival.totalOrderedQuantity}개
-                      </span>
-                      <span className={ui.pillMuted}>
-                        잔여 수량 {arrival.remainingQuantity}개
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 border-t border-slate-200 pt-4">
-                    <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div className={ui.tableShell}>
+            <div className="divide-y divide-slate-100">
+              {arrivals.length === 0 ? (
+                <div className={ui.emptyState}>등록된 예정 입고가 없습니다.</div>
+              ) : (
+                arrivals.map((arrival) => (
+                  <div key={arrival.id} className="space-y-4 px-4 py-4 md:px-5">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-slate-950">입고 반영</p>
-                        <p className="mt-1 text-sm text-slate-500">창고를 선택하고 항목별 수량을 조정한 뒤 한 번에 반영합니다.</p>
-                      </div>
-                      <div className="min-w-0 md:w-64">
-                        <SelectField
-                          label="입고 창고"
-                          value={receiveDrafts[arrival.id]?.warehouseId ?? warehouses[0]?.id ?? null}
-                          placeholder={warehouses.length === 0 ? '등록된 창고가 없습니다' : '창고 선택'}
-                          options={
-                            warehouses.length === 0
-                              ? [{ value: 0, label: '등록된 창고가 없습니다' }]
-                              : warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))
-                          }
-                          onValueChange={(next) =>
-                            updateReceiveDraft(arrival.id, (draft) => ({
-                              ...draft,
-                              warehouseId: next === null ? 0 : Number(next),
-                            }))
-                          }
-                          disabled={warehouses.length === 0}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      {arrival.items.map((item) => {
-                        const quantity = receiveDrafts[arrival.id]?.quantities[item.id] ?? item.remainingQuantity
-
-                        return (
-                          <div
-                            key={item.id}
-                            className="grid gap-3 border-t border-slate-200 pt-3 first:border-t-0 first:pt-0 md:grid-cols-[minmax(0,1fr)_9rem] md:items-end"
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-semibold text-slate-950">{arrival.factoryName}</h3>
+                          <StatusBadge
+                            tone={
+                              arrival.status === '예정'
+                                ? 'info'
+                                : arrival.status === '부분입고'
+                                  ? 'warning'
+                                  : arrival.status === '입고완료'
+                                    ? 'success'
+                                    : 'neutral'
+                            }
+                            className="px-2.5 py-1"
                           >
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between gap-3">
-                                <div>
-                                  <p className="text-sm font-semibold text-slate-950">{item.modelName}</p>
-                                  <p className="mt-1 text-sm text-slate-500">
-                                    {item.colorName} / {item.sizeName}
-                                  </p>
-                                </div>
-                                <span className={cx(ui.pillMuted, 'shrink-0')}>잔여 {item.remainingQuantity}</span>
-                              </div>
-                              <p className="text-xs text-slate-500">
-                                주문 {item.orderedQuantity} · 받은 {item.receivedQuantity}
-                              </p>
-                            </div>
-
-                            <div>
-                              <label htmlFor={`arrival-quantity-${arrival.id}-${item.id}`} className={ui.label}>
-                                입고 수량
-                              </label>
-                              <input
-                                id={`arrival-quantity-${arrival.id}-${item.id}`}
-                                type="number"
-                                min={0}
-                                max={item.remainingQuantity}
-                                value={quantity}
-                                onChange={(event) =>
-                                  updateReceiveDraft(arrival.id, (draft) => ({
-                                    ...draft,
-                                    quantities: {
-                                      ...draft.quantities,
-                                      [item.id]: event.target.value ? Number(event.target.value) : 0,
-                                    },
-                                  }))
-                                }
-                                className={cx(ui.controlSm, 'text-right')}
-                                disabled={item.remainingQuantity === 0}
-                              />
-                            </div>
-                          </div>
-                        )
-                      })}
+                            {arrival.status}
+                          </StatusBadge>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                          <span>{arrival.expectedDate}</span>
+                          <StatusBadge tone={arrival.sourceChannel === 'csv' ? 'info' : 'neutral'} className="px-2.5 py-1">
+                            {arrival.sourceChannel === 'csv' ? 'CSV 등록' : '수동 등록'}
+                          </StatusBadge>
+                        </div>
+                        {arrival.memo ? <p className="mt-2 text-sm text-slate-600">{arrival.memo}</p> : null}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className={ui.pillMuted}>총 수량 {arrival.totalOrderedQuantity}개</span>
+                        <span className={ui.pillMuted}>잔여 수량 {arrival.remainingQuantity}개</span>
+                      </div>
                     </div>
 
-                    <div className="flex flex-col gap-3 border-t border-slate-200 pt-3 md:flex-row md:items-center md:justify-between">
-                      <div className="text-sm text-slate-600">
-                        선택된 창고로{' '}
-                        <span className="font-semibold text-slate-950">
-                          {arrival.items.reduce((sum, item) => sum + (receiveDrafts[arrival.id]?.quantities[item.id] ?? item.remainingQuantity), 0)}
-                        </span>
-                        건을 반영합니다.
+                    <div className="space-y-3 border-t border-[color:var(--border)] pt-4">
+                      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-950">입고 반영</p>
+                          <p className="mt-1 text-sm text-slate-500">창고를 선택하고 항목별 수량을 조정한 뒤 한 번에 반영합니다.</p>
+                        </div>
+                        <div className="min-w-0 md:w-64">
+                          <SelectField
+                            label="입고 창고"
+                            value={receiveDrafts[arrival.id]?.warehouseId ?? warehouses[0]?.id ?? null}
+                            placeholder={warehouses.length === 0 ? '등록된 창고가 없습니다' : '창고 선택'}
+                            options={
+                              warehouses.length === 0
+                                ? [{ value: 0, label: '등록된 창고가 없습니다' }]
+                                : warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))
+                            }
+                            onValueChange={(next) =>
+                              updateReceiveDraft(arrival.id, (draft) => ({
+                                ...draft,
+                                warehouseId: next === null ? 0 : Number(next),
+                              }))
+                            }
+                            disabled={warehouses.length === 0}
+                          />
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => submitReceive(arrival)}
-                        disabled={isPending || warehouses.length === 0 || arrival.remainingQuantity === 0}
-                        className={ui.buttonPrimary}
-                      >
-                        입고 반영
-                      </button>
+
+                      <div className="space-y-2">
+                        {arrival.items.map((item) => {
+                          const quantity = receiveDrafts[arrival.id]?.quantities[item.id] ?? item.remainingQuantity
+
+                          return (
+                            <div
+                              key={item.id}
+                              className="grid gap-3 border-t border-[color:var(--border)] pt-3 first:border-t-0 first:pt-0 md:grid-cols-[minmax(0,1fr)_9rem] md:items-end"
+                            >
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div>
+                                    <p className="text-sm font-semibold text-slate-950">{item.modelName}</p>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                      {item.colorName} / {item.sizeName}
+                                    </p>
+                                  </div>
+                                  <span className={cx(ui.pillMuted, 'shrink-0')}>잔여 {item.remainingQuantity}</span>
+                                </div>
+                                <p className="text-xs text-slate-500">
+                                  주문 {item.orderedQuantity} · 받은 {item.receivedQuantity}
+                                </p>
+                              </div>
+
+                              <div>
+                                <label htmlFor={`arrival-quantity-${arrival.id}-${item.id}`} className={ui.label}>
+                                  입고 수량
+                                </label>
+                                <input
+                                  id={`arrival-quantity-${arrival.id}-${item.id}`}
+                                  type="number"
+                                  min={0}
+                                  max={item.remainingQuantity}
+                                  value={quantity}
+                                  onChange={(event) =>
+                                    updateReceiveDraft(arrival.id, (draft) => ({
+                                      ...draft,
+                                      quantities: {
+                                        ...draft.quantities,
+                                        [item.id]: event.target.value ? Number(event.target.value) : 0,
+                                      },
+                                    }))
+                                  }
+                                  className={cx(ui.controlSm, 'text-right')}
+                                  disabled={item.remainingQuantity === 0}
+                                />
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      <div className="flex flex-col gap-3 border-t border-[color:var(--border)] pt-3 md:flex-row md:items-center md:justify-between">
+                        <div className="text-sm text-slate-600">
+                          선택된 창고로{' '}
+                          <span className="font-semibold text-slate-950">
+                            {arrival.items.reduce((sum, item) => sum + (receiveDrafts[arrival.id]?.quantities[item.id] ?? item.remainingQuantity), 0)}
+                          </span>
+                          건을 반영합니다.
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => submitReceive(arrival)}
+                          disabled={isPending || warehouses.length === 0 || arrival.remainingQuantity === 0}
+                          className={ui.buttonPrimary}
+                        >
+                          입고 반영
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
         </section>
       </div>

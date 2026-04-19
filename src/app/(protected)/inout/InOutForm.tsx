@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createTransactions, getCurrentStock } from '@/lib/actions'
+import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cx, ui } from '../../components/ui'
 
@@ -329,14 +330,14 @@ export default function InOutForm({
 
         <div>
           {warehouses.length === 0 ? (
-            <div className="flex h-11 items-center gap-2 rounded-lg border border-dashed border-slate-200 px-3 py-2.5 text-sm text-slate-500">
+            <div className={cx(ui.surfaceMuted, 'flex h-11 items-center gap-2 rounded-lg border border-dashed border-[color:var(--border)] px-3 py-2.5 text-sm text-slate-500')}>
               창고가 없습니다.
               <Link href="/products" className="text-slate-700 underline underline-offset-2">
                 창고 등록하러 가기
               </Link>
             </div>
           ) : lockedWarehouseId ? (
-            <div className="flex h-11 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700">
+            <div className={cx(ui.surfaceMuted, 'flex h-11 items-center rounded-lg px-3 text-sm font-medium text-slate-700')}>
               {warehouses.find((warehouse) => warehouse.id === selectedWarehouseId)?.name ?? '선택된 창고'}
             </div>
           ) : (
@@ -355,10 +356,11 @@ export default function InOutForm({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
+      <Card variant="strong" className="overflow-hidden">
+        <CardContent className="p-0">
+          <div className={cx(ui.tableShell, 'overflow-x-auto border-0 shadow-none')}>
           <table className="w-full text-sm">
-            <thead>
+              <thead>
               <tr className="ui-table-head text-left">
                 <th className="px-3 py-3">모델</th>
                 <th className="px-3 py-3">사이즈</th>
@@ -375,7 +377,7 @@ export default function InOutForm({
                 const hasError = rowErrors[idx].length > 0
 
                 return (
-                  <tr key={row.key} className={cx('border-t border-slate-100', hasError && 'bg-red-50/60')}>
+                  <tr key={row.key} className={cx('border-t border-[color:var(--border)]', hasError && 'bg-red-50/60')}>
                     <td className="px-3 py-2.5">
                       <SelectControl
                         id={`transaction-model-${row.key}`}
@@ -406,10 +408,7 @@ export default function InOutForm({
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2">
                         {selectedColor ? (
-                          <span
-                            className="h-3.5 w-3.5 rounded-full border border-slate-200"
-                            style={{ backgroundColor: selectedColor.rgbCode }}
-                          />
+                          <span className="h-3.5 w-3.5 rounded-full border border-[color:var(--border)]" style={{ backgroundColor: selectedColor.rgbCode }} />
                         ) : null}
                         <SelectControl
                           id={`transaction-color-${row.key}`}
@@ -460,11 +459,12 @@ export default function InOutForm({
                 )
               })}
             </tbody>
-          </table>
-        </div>
-      </div>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
 
-      <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-3 border-t border-[color:var(--border)] pt-4 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
             <span className={ui.pill}>유효 {filledRows.length}건</span>

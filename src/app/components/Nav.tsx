@@ -117,7 +117,7 @@ export default function Nav({ user }: NavProps) {
 
   return (
     <>
-      <aside className="fixed left-0 top-0 z-30 hidden h-screen w-[17rem] border-r border-slate-200 bg-white/90 backdrop-blur md:flex md:flex-col">
+      <aside className={ui.desktopSidebar}>
         <NavigationContent pathname={pathname} user={user} />
       </aside>
 

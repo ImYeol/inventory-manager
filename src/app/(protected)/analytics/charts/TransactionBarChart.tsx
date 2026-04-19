@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
+import { ui } from '@/app/components/ui'
 type Props = {
   data: { label: string; inbound: number; outbound: number }[]
 }
@@ -17,9 +18,7 @@ type Props = {
 export default function TransactionBarChart({ data }: Props) {
   if (data.length === 0) {
     return (
-      <div className="flex h-[300px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 text-sm text-slate-400">
-        데이터가 없습니다.
-      </div>
+      <div className={ui.emptyState}>데이터가 없습니다.</div>
     );
   }
 
@@ -33,7 +32,8 @@ export default function TransactionBarChart({ data }: Props) {
           <Tooltip
             contentStyle={{
               borderRadius: '8px',
-              border: '1px solid #e2e8f0',
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
               fontSize: '13px',
             }}
           />

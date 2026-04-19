@@ -47,6 +47,7 @@ describe('InventoryView', () => {
     )
 
     expect(screen.getByRole('button', { name: /LP01/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /LP01/ }).closest('section')?.className).toContain('ui-card')
     expect(screen.getByText('소계')).toBeTruthy()
 
     const row = screen.getByText('네이비').closest('tr')

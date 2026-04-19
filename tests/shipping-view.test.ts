@@ -67,10 +67,13 @@ describe('ShippingView', () => {
     )
 
     expect(screen.queryByText('연동 준비 상태')).toBeNull()
+    expect(screen.getByText('운송장 업로드').closest('section')?.className).toContain('ui-card')
+    expect(screen.getByText('분류 미리보기').closest('section')?.className).toContain('ui-card')
     expect(screen.getByLabelText('운송장 엑셀 업로드')).toBeTruthy()
     expect(screen.getByRole('link', { name: /네이버 연결/ }).getAttribute('href')).toBe('/settings?section=store-connections&provider=naver')
     expect(screen.getByRole('link', { name: /쿠팡 연결/ }).getAttribute('href')).toBe('/settings?section=store-connections&provider=coupang')
     expect(screen.getAllByLabelText('미연결')).toHaveLength(2)
+    expect(screen.getByRole('combobox', { name: '분류 필터' }).className).not.toContain('bg-white')
   })
 
   it('shows provider change links for configured stores and keeps the compact status rail visible', () => {

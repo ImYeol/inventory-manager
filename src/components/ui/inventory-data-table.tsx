@@ -1,7 +1,9 @@
 "use client"
 
 import * as React from 'react'
-import { motion } from 'framer-motion'
+import { motion, type Variants } from 'framer-motion'
+import { cn } from '@/lib/utils'
+import { ui } from '@/app/components/ui'
 import { StatusBadge } from './badge-1'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './table'
 
@@ -29,7 +31,7 @@ export type InventoryDataRow = {
   }
 }
 
-const rowVariants = {
+const rowVariants: Variants = {
   hidden: { opacity: 0, y: 10 },
   visible: (i: number) => ({
     opacity: 1,
@@ -60,15 +62,15 @@ export function InventoryDataTable({
   visibleColumns: Set<InventoryColumnKey>
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className={ui.tableShell}>
       <div className="relative w-full overflow-auto">
         <Table>
           <TableHeader>
-            <TableRow className="hover:bg-transparent">
+            <TableRow>
               {tableHeaders
                 .filter((header) => visibleColumns.has(header.key))
                 .map((header) => (
-                  <TableHead key={header.key} className={header.className}>
+                  <TableHead key={header.key} className={cn(ui.tableHeadCell, header.className)}>
                     {header.label}
                   </TableHead>
                 ))}
@@ -83,28 +85,25 @@ export function InventoryDataTable({
                   initial="hidden"
                   animate="visible"
                   variants={rowVariants}
-                  className="border-b border-slate-100 transition-colors hover:bg-slate-50/70"
+                  className="border-b border-slate-100 transition-colors hover:bg-slate-50/70 data-[state=selected]:bg-slate-50"
                 >
-                  {visibleColumns.has('modelName') && <TableCell className="font-medium text-slate-950">{row.modelName}</TableCell>}
+                  {visibleColumns.has('modelName') && (
+                    <TableCell className={cn(ui.tableCell, 'font-medium text-[color:var(--foreground)]')}>
+                      {row.modelName}
+                    </TableCell>
+                  )}
                   {visibleColumns.has('option') && <TableCell>{row.option}</TableCell>}
                   {visibleColumns.has('warehouseName') && <TableCell>{row.warehouseName}</TableCell>}
                   {visibleColumns.has('quantity') && (
-                    <TableCell className="text-right font-semibold text-slate-950">{row.quantity}</TableCell>
+                    <TableCell className={cn(ui.tableCell, 'text-right font-semibold text-[color:var(--foreground)]')}>
+                      {row.quantity}
+                    </TableCell>
                   )}
                   {visibleColumns.has('latestInbound') && <TableCell>{row.latestInbound}</TableCell>}
                   {visibleColumns.has('latestOutbound') && <TableCell>{row.latestOutbound}</TableCell>}
                   {visibleColumns.has('status') && (
                     <TableCell>
-                      <StatusBadge
-                        tone={
-                          row.status.variant === 'success'
-                            ? 'success'
-                            : row.status.variant === 'warning'
-                              ? 'warning'
-                              : 'danger'
-                        }
-                        className="px-2.5 py-1"
-                      >
+                      <StatusBadge tone={row.status.variant}>
                         {row.status.label}
                       </StatusBadge>
                     </TableCell>
@@ -113,7 +112,7 @@ export function InventoryDataTable({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={visibleColumns.size} className="h-24 text-center">
+                <TableCell colSpan={visibleColumns.size} className="px-4 py-10 text-center text-sm text-[color:var(--muted-foreground)]">
                   조회 조건에 맞는 재고가 없습니다.
                 </TableCell>
               </TableRow>

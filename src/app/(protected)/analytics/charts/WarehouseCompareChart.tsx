@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { ui } from '@/app/components/ui'
 const BAR_COLORS = ['#334155', '#94a3b8', '#0ea5e9', '#f59e0b', '#10b981', '#ec4899', '#14b8a6', '#8b5cf6']
 
 type WarehouseTotal = {
@@ -49,9 +50,7 @@ export default function WarehouseCompareChart({ data }: Props) {
 
   if (data.length === 0) {
     return (
-      <div className="flex h-[300px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 text-sm text-slate-400">
-        데이터가 없습니다.
-      </div>
+      <div className={ui.emptyState}>데이터가 없습니다.</div>
     )
   }
 
@@ -71,7 +70,8 @@ export default function WarehouseCompareChart({ data }: Props) {
           <Tooltip
             contentStyle={{
               borderRadius: '8px',
-              border: '1px solid #e2e8f0',
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
               fontSize: '13px',
             }}
           />

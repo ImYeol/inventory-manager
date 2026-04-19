@@ -2,6 +2,9 @@
 
 import { useMemo, useState } from 'react'
 import { addTransaction, adjustInventory } from '@/lib/actions'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cx, ui } from './ui'
 
@@ -272,17 +275,16 @@ export default function InventoryView({ models, warehouses, recentMovements = []
   return (
     <div className="space-y-4">
       {message && (
-        <div
-          className={`rounded-xl px-4 py-3 text-center text-sm border ${
-            message.type === 'ok'
-              ? 'bg-slate-50 border-slate-200 text-slate-700'
-              : 'bg-red-50 border-red-200 text-red-700'
-          }`}
+        <Card
+          variant={message.type === 'ok' ? 'muted' : 'default'}
+          className={cx('overflow-hidden', message.type === 'error' && 'border-red-200')}
           role="status"
           aria-live="polite"
         >
-          {message.text}
-        </div>
+          <CardContent className={cx('px-4 py-3 text-center text-sm', message.type === 'error' ? 'text-red-700' : 'text-slate-700')}>
+            {message.text}
+          </CardContent>
+        </Card>
       )}
 
       {models.map((model) => {
@@ -296,20 +298,24 @@ export default function InventoryView({ models, warehouses, recentMovements = []
         const currentEditValues = adjustEdits[model.id] || {}
 
         return (
-          <div key={model.id} className={cx(ui.panel, 'overflow-hidden')}>
-            <button
-              onClick={() => setExpanded(isOpen ? null : model.id)}
-              className="flex w-full items-center justify-between px-4 py-4 text-left transition-colors hover:bg-slate-50 md:px-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-inset"
-            >
-              <span className="text-base font-semibold tracking-tight text-slate-950 md:text-lg">{model.name}</span>
-              <div className="flex items-center gap-3">
-                <span className="ui-pill text-slate-700">{totalQty}개</span>
-                <span className="text-slate-400 text-lg">{isOpen ? '▴' : '▾'}</span>
-              </div>
-            </button>
+          <Card key={model.id} variant="default" className="overflow-hidden">
+            <CardHeader className="px-0 py-0">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setExpanded(isOpen ? null : model.id)}
+                className="flex h-auto w-full items-center justify-between rounded-none px-4 py-4 text-left transition-colors hover:bg-slate-50 md:px-6"
+              >
+                <span className="text-base font-semibold tracking-tight text-slate-950 md:text-lg">{model.name}</span>
+                <div className="flex items-center gap-3">
+                  <span className="ui-pill text-slate-700">{totalQty}개</span>
+                  <span className="text-lg text-slate-400">{isOpen ? '▴' : '▾'}</span>
+                </div>
+              </Button>
+            </CardHeader>
 
             {isOpen && (
-              <div className="border-t border-slate-200 bg-slate-50/60">
+              <div className="border-t border-[color:var(--border)] bg-[color:var(--surface-muted)]/60">
                 <div className="flex items-center justify-between gap-2 px-4 py-3">
                   <div className="flex items-center gap-2 text-sm text-slate-600">
                     <span>창고 보기</span>
@@ -327,27 +333,25 @@ export default function InventoryView({ models, warehouses, recentMovements = []
                     />
                   </div>
 
-                  <button
+                  <Button
                     type="button"
                     onClick={() => (adjusting ? closeAdjust(model.id) : openAdjust(model))}
                     disabled={hasWarehouses === false}
-                    className={cx(
-                      ui.buttonSecondary,
-                      'text-sm h-9 px-3 whitespace-nowrap',
-                      hasWarehouses ? '' : 'opacity-50 cursor-not-allowed',
-                    )}
+                    variant="secondary"
+                    size="sm"
+                    className={cx('h-9 px-3 whitespace-nowrap', hasWarehouses ? '' : 'opacity-50 cursor-not-allowed')}
                   >
                     {adjusting ? '조정 닫기' : '조정'}
-                  </button>
+                  </Button>
                 </div>
 
                 <div className="px-4 pb-3">
                   {isEmptySize ? (
-                    <div className="px-4 py-8 text-center text-sm text-slate-400">
+                    <div className={ui.emptyState}>
                       사이즈 또는 색상 데이터가 없습니다.
                     </div>
                   ) : (
-                    <div className="overflow-x-auto scrollbar-thin rounded-2xl border border-slate-200 bg-white">
+                    <div className={cx(ui.tableShell, 'overflow-x-auto scrollbar-thin')}>
                       <table className="w-full border-collapse min-w-max">
                         <thead>
                           <tr>
@@ -383,7 +387,7 @@ export default function InventoryView({ models, warehouses, recentMovements = []
                                 >
                                   <td
                                     className={cx(
-                                      'ui-table-cell sticky left-0 z-10 bg-white text-sm text-slate-700',
+                                      'ui-table-cell sticky left-0 z-10 bg-[color:var(--surface)] text-sm text-slate-700',
                                       row.total === 0
                                         ? 'font-medium text-slate-400'
                                         : row.total <= 10
@@ -448,7 +452,7 @@ export default function InventoryView({ models, warehouses, recentMovements = []
                 </div>
 
                 {adjusting && (
-                  <div className="border-t border-slate-200 px-4 py-4">
+                  <div className="border-t border-[color:var(--border)] px-4 py-4">
                     <div className="mb-3 flex items-center justify-between">
                       <div>
                         <label className="text-sm text-slate-600">조정 창고</label>
@@ -474,7 +478,7 @@ export default function InventoryView({ models, warehouses, recentMovements = []
                     </div>
 
                     {isEmptySize ? null : (
-                      <div className="overflow-x-auto scrollbar-thin">
+                      <div className={cx(ui.tableShell, 'overflow-x-auto scrollbar-thin')}>
                         <table className="w-full border-collapse min-w-max">
                           <thead>
                             <tr>
@@ -515,7 +519,7 @@ export default function InventoryView({ models, warehouses, recentMovements = []
                                     const display = edited === undefined ? defaultQty : edited
                                     return (
                                       <td key={size.id} className="ui-table-cell px-1 py-1 text-center">
-                                        <input
+                                        <Input
                                           type="number"
                                           value={display}
                                           min={0}
@@ -541,20 +545,20 @@ export default function InventoryView({ models, warehouses, recentMovements = []
                     )}
 
                     <div className="mt-3 flex items-center justify-end">
-                      <button
+                      <Button
                         type="button"
                         onClick={() => handleSaveAdjust(model)}
                         disabled={submitting || editCount === 0}
-                        className={cx(ui.buttonPrimary, 'h-11 px-5 text-sm whitespace-nowrap')}
+                        className={cx('h-11 px-5 text-sm whitespace-nowrap')}
                       >
                         {submitting ? '저장 중...' : '조정 저장'}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
               </div>
             )}
-          </div>
+          </Card>
         )
       })}
     </div>

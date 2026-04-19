@@ -9,6 +9,8 @@ const buttonVariants = cva(ui.button, {
   variants: {
     variant: {
       default: ui.buttonPrimary,
+      success: ui.buttonSuccess,
+      warning: ui.buttonWarning,
       destructive: ui.buttonDanger,
       outline: ui.buttonOutline,
       secondary: ui.buttonSecondary,

@@ -147,5 +147,7 @@ describe('InventoryWorkspace', () => {
     expect(screen.getByText('HistoryView:all')).toBeTruthy()
     expect(screen.queryByRole('heading', { name: '이력 필터' })).toBeNull()
     expect(screen.queryByRole('combobox', { name: '창고' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '입고' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '출고' })).toBeNull()
   })
 })

@@ -3,16 +3,22 @@ import { cn } from '@/lib/utils'
 export function StoreConnectionStatus({
   configured,
   compact = false,
+  framed = true,
 }: {
   configured: boolean
   compact?: boolean
+  framed?: boolean
 }) {
   const label = configured ? '연결됨' : '미연결'
 
   return (
     <span
       aria-label={label}
-      className={cn('inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700', compact && 'gap-0')}
+      className={cn(
+        'inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700',
+        framed && !compact && 'rounded-full border border-slate-200 bg-white px-2.5 py-1',
+        compact && 'gap-0',
+      )}
     >
       <span
         aria-hidden="true"

@@ -16,7 +16,7 @@ const cardVariantClasses: Record<CardVariant, string> = {
 }
 
 const Card = React.forwardRef<HTMLElement, CardProps>(({ className, variant = 'default', ...props }, ref) => (
-  <section ref={ref} className={cn(cardVariantClasses[variant], className)} {...props} />
+  <section ref={ref} className={cn(cardVariantClasses[variant], className, variant === 'strong' && 'overflow-hidden')} {...props} />
 ))
 Card.displayName = 'Card'
 

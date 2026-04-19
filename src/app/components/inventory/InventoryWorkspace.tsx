@@ -200,22 +200,21 @@ export default function InventoryWorkspace({
           <TabsTrigger value="history">이력</TabsTrigger>
         </TabsList>
 
-        <InventoryTableToolbar
-          warehouses={warehouses}
-          selectedWarehouseId={selectedWarehouseId}
-          onWarehouseChange={setSelectedWarehouseId}
-          search={search}
-          onSearchChange={setSearch}
-          statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
-          columns={ALL_COLUMNS}
-          visibleColumns={visibleColumns}
-          onToggleColumn={toggleColumn}
-          onInbound={() => setOverlayMode('입고')}
-          onOutbound={() => setOverlayMode('출고')}
-        />
-
         <TabsContent value="list" className="m-0">
+          <InventoryTableToolbar
+            warehouses={warehouses}
+            selectedWarehouseId={selectedWarehouseId}
+            onWarehouseChange={setSelectedWarehouseId}
+            search={search}
+            onSearchChange={setSearch}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            columns={ALL_COLUMNS}
+            visibleColumns={visibleColumns}
+            onToggleColumn={toggleColumn}
+            onInbound={() => setOverlayMode('입고')}
+            onOutbound={() => setOverlayMode('출고')}
+          />
           <InventoryDataTable rows={filteredRows} visibleColumns={visibleColumns} />
         </TabsContent>
 

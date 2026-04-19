@@ -32,7 +32,9 @@ export const ui = {
   selectScrollButton: 'ui-select-scroll-button',
   button: 'ui-button',
   buttonPrimary: 'ui-button ui-button-primary',
+  buttonSuccess: 'ui-button ui-button-success',
   buttonSecondary: 'ui-button ui-button-secondary',
+  buttonWarning: 'ui-button ui-button-warning',
   buttonOutline: 'ui-button ui-button-outline',
   buttonGhost: 'ui-button ui-button-ghost',
   buttonDanger: 'ui-button ui-button-danger',
@@ -67,6 +69,8 @@ export const ui = {
     'border-slate-200 bg-slate-50 text-slate-950 shadow-[0_1px_1px_rgba(15,23,42,0.03)]',
   navSubItem:
     'group flex items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:border-slate-200 hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+  desktopSidebar:
+    'fixed left-0 top-0 z-30 hidden h-screen w-[17rem] border-r border-[color:var(--border)] bg-[color:var(--surface)] md:flex md:flex-col',
   mobileTopbar:
     'fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur md:hidden',
   mobileDrawerScrim: 'fixed inset-0 z-40 bg-slate-950/35 md:hidden',

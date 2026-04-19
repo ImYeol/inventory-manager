@@ -84,3 +84,23 @@
 **결정**: 운영 콘솔 내 선택형 입력은 `src/components/ui/select.tsx`를 canonical primitive로 사용하고 native `<select>` 또는 화면별 개별 dropdown 구현은 남기지 않는다.  
 **이유**: 재고 운영, 상품 관리, 운송장, 소싱, dashboard에서 서로 다른 dropdown 언어가 섞이면 interaction 품질과 시각 일관성이 무너진다.  
 **트레이드오프**: 테스트 환경에서는 portal/scroll 동작을 고려한 보강이 필요하다.
+
+## ADR-018: UI 변경과 검사 스크립트는 shared design system 사용 여부를 함께 검토한다
+**결정**: `docs/UI_GUIDE.md`와 hooks/검사 스크립트는 UI 변경 시 shared theme, component, primitive, design token 사용 여부를 함께 검토하도록 유지한다.  
+**이유**: 문서와 검사 로직이 같은 기준을 보지 않으면 UI 원칙이 코드보다 먼저 느슨해진다.  
+**트레이드오프**: hooks와 문서의 수정 범위가 함께 움직여야 한다.
+
+## ADR-019: page-level self-themed UI를 금지하고 shared primitive variant로 올린다
+**결정**: 페이지 안에서 inline style이나 ad-hoc class 조합으로 새로운 색상/보더/배경 언어를 만들지 않는다. 필요한 시맨틱은 shared primitive variant와 design token에 먼저 추가한다.  
+**이유**: inventory toolbar처럼 같은 의미의 액션이 페이지별로 다른 inline style을 쓰기 시작하면 디자인 시스템이 깨지고, hooks가 검출할 수 있는 기준도 약해진다.  
+**트레이드오프**: 간단한 화면 수정도 먼저 primitive 계층을 손봐야 할 수 있지만, 전체 surface의 일관성은 유지된다.
+
+## ADR-020: list-management screens는 toolbar 다음 primary table을 기본 surface로 둔다
+**결정**: inventory처럼 목록 관리가 주된 화면은 `compact filter/action toolbar -> primary table`을 기본 구조로 사용하고, 같은 표를 설명하는 title/subtitle/count chrome을 중복으로 올리지 않는다.  
+**이유**: 운영자가 빠르게 필터를 바꾸고 표를 읽는 화면에서는 설명 chrome이 반복될수록 작업 표면이 늦게 보인다.  
+**트레이드오프**: page-level context가 필요한 경우에도 한 번만 보여주도록 헤더와 toolbar 메타를 정리해야 한다.
+
+## ADR-021: strong card seam 문제는 shared primitive로 해결한다
+**결정**: header/body를 함께 담는 strong card는 하나의 clipped surface로 읽혀야 하며, corner gap이나 segmented seam을 page-local border patch로 땜질하지 않는다. 대신 shared card/surface primitive의 variant, padding, token을 고친다.  
+**이유**: settings-card처럼 카드가 두 개로 쪼개져 보이면 동일 surface가 아니라 임시 조립물처럼 읽힌다. 이런 문제를 페이지별 border 수정으로 막으면 재발한다.  
+**트레이드오프**: 카드가 어색하면 개별 화면에서 고치는 대신 shared primitive까지 올라가야 하므로 수정 범위가 커질 수 있다.

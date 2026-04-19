@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { History } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/badge-1'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { FilterToolbar } from '@/components/ui/filter-toolbar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import InventoryTrendChart from '@/app/(protected)/analytics/charts/InventoryTrendChart'
@@ -111,81 +112,87 @@ function ControlStrip({
   loading: boolean
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
-      <div className={cx('grid gap-3', showPeriod ? 'lg:grid-cols-4' : 'lg:grid-cols-3')}>
-        {showPeriod ? (
-          <div className="space-y-2">
-            <label className={ui.label}>{title} 기간</label>
-            <div className="flex flex-wrap gap-1.5">
-              {(Object.keys(periodLabels) as Period[]).map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => onPeriodChange?.(option)}
-                  className={cx('h-9 px-3', period === option ? ui.tabActive : ui.tab)}
-                  aria-pressed={period === option}
-                >
-                  {periodLabels[option]}
-                </button>
-              ))}
-            </div>
+    <FilterToolbar className="gap-3">
+      <div className="flex w-full flex-col gap-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <p className="text-sm font-semibold tracking-tight text-slate-950">{title} 필터</p>
+            <p className="text-xs leading-5 text-slate-500">필터 변경 시 해당 차트만 다시 계산합니다.</p>
           </div>
-        ) : null}
-
-        <div className="space-y-2">
-          <label id={`${idPrefix}-model-label`} className={ui.label}>
-            {title} 모델
-          </label>
-          <Select
-            value={selectedModel !== undefined ? String(selectedModel) : 'all'}
-            onValueChange={(value) => onModelChange(value === 'all' ? undefined : Number(value))}
-          >
-            <SelectTrigger aria-labelledby={`${idPrefix}-model-label`} className={ui.controlSm}>
-              <SelectValue placeholder="전체" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">전체</SelectItem>
-              {models.map((model) => (
-                <SelectItem key={model.id} value={String(model.id)}>
-                  {model.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <StatusBadge tone={loading ? 'warning' : 'neutral'}>{loading ? '갱신 중' : '최신'}</StatusBadge>
         </div>
 
-        <div className="space-y-2">
-          <label htmlFor={`${idPrefix}-from`} className={ui.label}>
-            {title} 시작일
-          </label>
-          <input
-            id={`${idPrefix}-from`}
-            type="date"
-            value={dateFrom}
-            onChange={(event) => onDateFromChange(event.target.value)}
-            className={ui.controlSm}
-          />
-        </div>
+        <div className={cx('grid items-end gap-2.5', showPeriod ? 'lg:grid-cols-4' : 'lg:grid-cols-3')}>
+          {showPeriod ? (
+            <div className="space-y-1.5">
+              <label id={`${idPrefix}-period-label`} className={ui.label}>
+                {title} 기간
+              </label>
+              <Select value={period} onValueChange={(next) => onPeriodChange?.(next as Period)}>
+                <SelectTrigger aria-labelledby={`${idPrefix}-period-label`} className={cx(ui.controlSm, 'w-full')}>
+                  <SelectValue placeholder="기간 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(periodLabels) as Period[]).map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {periodLabels[option]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
 
-        <div className="space-y-2">
-          <label htmlFor={`${idPrefix}-to`} className={ui.label}>
-            {title} 종료일
-          </label>
-          <input
-            id={`${idPrefix}-to`}
-            type="date"
-            value={dateTo}
-            onChange={(event) => onDateToChange(event.target.value)}
-            className={ui.controlSm}
-          />
+          <div className="space-y-1.5">
+            <label id={`${idPrefix}-model-label`} className={ui.label}>
+              {title} 모델
+            </label>
+            <Select
+              value={selectedModel !== undefined ? String(selectedModel) : 'all'}
+              onValueChange={(value) => onModelChange(value === 'all' ? undefined : Number(value))}
+            >
+              <SelectTrigger aria-labelledby={`${idPrefix}-model-label`} className={ui.controlSm}>
+                <SelectValue placeholder="전체" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">전체</SelectItem>
+                {models.map((model) => (
+                  <SelectItem key={model.id} value={String(model.id)}>
+                    {model.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor={`${idPrefix}-from`} className={ui.label}>
+              {title} 시작일
+            </label>
+            <input
+              id={`${idPrefix}-from`}
+              type="date"
+              value={dateFrom}
+              onChange={(event) => onDateFromChange(event.target.value)}
+              className={ui.controlSm}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor={`${idPrefix}-to`} className={ui.label}>
+              {title} 종료일
+            </label>
+            <input
+              id={`${idPrefix}-to`}
+              type="date"
+              value={dateTo}
+              onChange={(event) => onDateToChange(event.target.value)}
+              className={ui.controlSm}
+            />
+          </div>
         </div>
       </div>
-
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <p className={ui.helpText}>필터 변경 시 해당 차트만 다시 계산합니다.</p>
-        <StatusBadge tone={loading ? 'warning' : 'neutral'}>{loading ? '갱신 중' : '최신'}</StatusBadge>
-      </div>
-    </div>
+    </FilterToolbar>
   )
 }
 
@@ -217,12 +224,12 @@ function TrendCard({
   }, [period, selectedModel, dateFrom, dateTo])
 
   return (
-    <Card className="h-full">
+    <Card variant="strong" className="h-full overflow-hidden">
       <CardHeader>
         <CardTitle>재고 추이</CardTitle>
         <CardDescription>선택한 조건의 재고 흐름을 시간 축으로 확인합니다.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 px-3 py-3">
         <ControlStrip
           idPrefix="trend"
           title="재고 추이"
@@ -271,12 +278,12 @@ function FlowCard({
   }, [period, selectedModel, dateFrom, dateTo])
 
   return (
-    <Card className="h-full">
+    <Card variant="strong" className="h-full overflow-hidden">
       <CardHeader>
         <CardTitle>입출고 현황</CardTitle>
         <CardDescription>입고와 출고를 기간별로 나란히 봅니다.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 px-3 py-3">
         <ControlStrip
           idPrefix="flow"
           title="입출고 현황"
@@ -324,12 +331,12 @@ function WarehouseCard({
   }, [selectedModel, dateFrom, dateTo])
 
   return (
-    <Card className="h-full">
+    <Card variant="strong" className="h-full overflow-hidden">
       <CardHeader>
         <CardTitle>창고별 비교</CardTitle>
         <CardDescription>선택한 기간에서 창고별 순변동을 비교합니다.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 px-3 py-3">
         <ControlStrip
           idPrefix="warehouse"
           title="창고별 비교"
@@ -363,27 +370,23 @@ export default function DashboardView({
 
   return (
     <div className="space-y-4">
-      <Card variant="strong">
-        <CardContent className="p-4 md:p-5">
-          <div className="grid gap-3 xl:grid-cols-4">
-            {metrics.map((metric) => (
-              <Card key={metric.label} variant="strong" className="overflow-hidden">
-                <Link
-                  href={metric.href}
-                  aria-label={metric.ariaLabel ?? metric.label}
-                  className="block h-full rounded-[inherit] px-4 py-3 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white md:px-5 md:py-4"
-                >
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{metric.label}</p>
-                  <div className="mt-2 flex items-end justify-between gap-3">
-                    <p className="text-2xl font-semibold tracking-tight text-slate-950">{metric.value}</p>
-                    <span className="max-w-[11rem] text-right text-xs leading-5 text-slate-500">{metric.description}</span>
-                  </div>
-                </Link>
-              </Card>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid gap-3 xl:grid-cols-4">
+        {metrics.map((metric) => (
+          <Card key={metric.label} variant="strong" className="overflow-hidden">
+            <Link
+              href={metric.href}
+              aria-label={metric.ariaLabel ?? metric.label}
+              className="block h-full rounded-[inherit] px-3.5 py-3 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white md:px-4 md:py-3.5"
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{metric.label}</p>
+              <div className="mt-2 flex items-end justify-between gap-3">
+                <p className="text-2xl font-semibold tracking-tight text-slate-950">{metric.value}</p>
+                <span className="max-w-[11rem] text-right text-xs leading-5 text-slate-500">{metric.description}</span>
+              </div>
+            </Link>
+          </Card>
+        ))}
+      </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
         <TrendCard models={models} initialData={initialInventoryHistory} />
@@ -392,8 +395,8 @@ export default function DashboardView({
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
-        <Card>
-          <CardHeader className="flex flex-row items-start justify-between gap-3">
+        <Card variant="strong" className="overflow-hidden">
+          <CardHeader className="flex flex-row items-start justify-between gap-3 px-4 py-3">
             <div>
               <CardTitle>창고별 재고</CardTitle>
               <CardDescription>창고별 현재 재고를 바로 훑습니다.</CardDescription>
@@ -443,8 +446,8 @@ export default function DashboardView({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-start justify-between gap-3">
+        <Card variant="strong" className="overflow-hidden">
+          <CardHeader className="flex flex-row items-start justify-between gap-3 px-4 py-3">
             <div>
               <CardTitle>주의 품목</CardTitle>
               <CardDescription>재고가 낮은 항목만 먼저 확인합니다.</CardDescription>
@@ -486,8 +489,8 @@ export default function DashboardView({
         </Card>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-3">
+      <Card variant="strong" className="overflow-hidden">
+        <CardHeader className="flex flex-row items-start justify-between gap-3 px-4 py-3">
           <div>
             <CardTitle>최근 처리 이력</CardTitle>
             <CardDescription>마지막 작업만 빠르게 훑을 수 있게 정리했습니다.</CardDescription>

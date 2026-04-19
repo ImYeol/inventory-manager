@@ -146,6 +146,8 @@ src/
 
 ### 1. List surface
 - list view는 `filter toolbar + data table`이 중심이다.
+- list-management screen은 toolbar 바로 아래 primary table을 두고, 같은 테이블 위에 별도 section title/subtitle/count chrome을 반복하지 않는다.
+- page header가 필요한 경우에도 table 위에 중복 설명을 다시 붙이지 않는다.
 - 필터 상태는 최소 다음을 가진다.
   - `warehouseId`
   - `search`
@@ -236,6 +238,11 @@ shipping_preview_rows
 - `framer-motion`과 `lucide-react`도 이미 의존성에 포함되어 있다.
 - `@/*` alias가 있으므로 shadcn-style shared primitive 경로는 root `/components/ui`가 아니라 `src/components/ui`가 맞다.
 - `components.json`이 아직 없어도 경로 기준은 바꾸지 않는다.
+- UI 구현은 shared theme, component, primitive, design token을 우선 재사용한다.
+- 새 컴포넌트가 필요하면 먼저 existing shared source로 수렴할 수 있는지 검토하고, 검토 결과는 `docs/UI_GUIDE.md`와 hooks 검사 규칙과 맞춰 본다.
+- page-level UI에서 임의의 색상/보더/배경 inline style을 직접 넣지 않는다. 필요한 시맨틱은 `src/app/components/ui.tsx`, `src/app/globals.css`, `src/components/ui/*`에 variant나 token으로 올린다.
+- hooks는 UI 변경 명령 payload의 `command`와 `cmd`를 모두 해석해 docs 동반 검토를 확인한다.
+- strong card가 header/body를 함께 담는 경우, 절반만 살아 있는 seam이나 corner gap을 page-local border patch로 메우지 않는다. shared card/surface primitive의 variant와 padding/token을 고쳐서 하나의 clipped surface로 정리한다.
 
 ### External table example adaptation
 - 제공된 `project-data-table.tsx` 예시는 그대로의 도메인 필드가 아니라 `table layout`, `column visibility`, `row motion`, `dropdown interaction` 패턴만 가져온다.

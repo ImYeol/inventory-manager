@@ -1,6 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { StatusBadge } from '@/components/ui/badge-1'
 import { BasicDataTable } from '@/components/ui/basic-data-table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -254,7 +256,7 @@ export default function HistoryView({
               />
             </div>
           ) : (
-            <div className={cx(ui.controlSm, 'pointer-events-none flex flex-col justify-center bg-slate-50 text-slate-700')}>
+            <div className={cx(ui.controlSm, ui.surfaceMuted, 'pointer-events-none flex flex-col justify-center text-slate-700')}>
               <span className="text-xs font-medium text-slate-500">창고 컨텍스트</span>
               <span className="text-sm font-semibold text-slate-950">
                 {warehouses.find((warehouse) => warehouse.id === controlledWarehouseId)?.name ?? '전체 창고'}
@@ -266,7 +268,7 @@ export default function HistoryView({
             <label htmlFor="history-date-from" className={ui.label}>
               시작일
             </label>
-            <input
+            <Input
               id="history-date-from"
               type="date"
               value={dateFrom}
@@ -282,7 +284,7 @@ export default function HistoryView({
             <label htmlFor="history-date-to" className={ui.label}>
               종료일
             </label>
-            <input
+            <Input
               id="history-date-to"
               type="date"
               value={dateTo}
@@ -297,9 +299,9 @@ export default function HistoryView({
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
           {(filterModel || filterType || filterSourceChannel || filterWarehouseId || dateFrom || dateTo) ? (
-            <button onClick={resetFilters} className="text-sm font-medium text-slate-600 hover:text-slate-950">
+            <Button type="button" variant="ghost" size="sm" onClick={resetFilters} className="h-9 px-0 text-sm">
               필터 초기화
-            </button>
+            </Button>
           ) : (
             <span />
           )}
@@ -354,7 +356,7 @@ export default function HistoryView({
           <div className={ui.emptyState}>이력이 없습니다.</div>
         ) : (
           paged.map((item) => (
-            <div key={item.id} className="surface px-4 py-3">
+            <div key={item.id} className={cx(ui.surface, 'px-4 py-3')}>
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-sm text-slate-500">{item.date}</span>
                 <StatusBadge tone={item.type === '입고' ? 'success' : item.type === '출고' ? 'danger' : 'neutral'}>
@@ -388,23 +390,29 @@ export default function HistoryView({
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-2">
-          <button
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
             onClick={() => setPage((current) => Math.max(1, current - 1))}
             disabled={currentPage === 1}
-            className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-10 px-4"
           >
             이전
-          </button>
+          </Button>
           <span className="px-3 text-sm text-slate-600">
             {currentPage} / {totalPages}
           </span>
-          <button
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
             onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
             disabled={currentPage === totalPages}
-            className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-10 px-4"
           >
             다음
-          </button>
+          </Button>
         </div>
       )}
     </div>

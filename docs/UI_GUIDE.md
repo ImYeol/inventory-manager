@@ -32,6 +32,15 @@
 11. `상품 관리`의 탭 언어는 `재고 운영`과 같은 밀도와 역할 규칙을 따른다.
 12. label/select/menu/view 안의 텍스트는 컴포넌트 폭에 맞춰 줄바꿈, 잘림, 정렬 기준을 명확히 가진다.
 13. 화면에서 상태를 보여줄 때는 한 번만 말하고, label/배지/문장에 같은 상태명을 반복하지 않는다.
+14. 대시보드 필터는 compact size와 baseline alignment를 기본으로 한다.
+15. 상위 wrapper card를 늘려서 chrome을 덧씌우는 패턴은 금지한다.
+16. 소싱 화면의 primary surface는 table/workspace다. 카드형 summary보다 작업 표면을 먼저 둔다.
+17. legacy primitive와 duplicate primitive는 남기지 않는다. shared primitive로 수렴되지 않는 변형은 제거 후보로 본다.
+18. 독립 메뉴가 다른 surface에 흡수되면, 이전 view container는 alias만 남기거나 삭제한다. dead view file을 보존하지 않는다.
+19. UI 관련 변경과 검사 스크립트는 항상 shared theme, component, primitive, design token 사용 여부를 함께 검토해야 한다.
+20. 검토 대상은 `src/app`, `src/components/ui`, `docs/UI_GUIDE.md`, `docs/ARCHITECTURE.md`, `docs/ADR.md`, 그리고 이를 검사하는 hooks/scripts까지 포함한다.
+21. 개별 화면에서 `style={{ ... }}`로 색상, border, 배경을 직접 입히는 self-themed UI는 금지한다. semantic variant나 design token을 shared primitive에 추가해 해결한다. 데이터 기반 색상 chip, 진행률 width 같은 표현만 예외로 둔다.
+22. 페이지별 검색창, 툴바, table shell, empty state는 ad-hoc wrapper를 새로 만들지 말고 shared primitive를 재사용한다.
 
 ## 디자인 토큰
 - `--background`
@@ -82,6 +91,11 @@ src/components/ui/
 - `card`
   - canonical border language for bordered surfaces
   - `default`, `muted`, `strong` variants
+  - dashboard KPI, analytics, operational table shell은 모두 card variant를 통해 border 강도를 맞춘다
+- `button`
+  - semantic variant는 shared primitive에만 추가한다
+  - page component에서 inline background/border color를 직접 지정하지 않는다
+  - `success`, `warning`, `danger` 같은 상태형 액션도 tokenized variant로만 표현한다
 - `tabs`
   - upper view switch only
   - do not use for filter chips or action toggles
@@ -97,10 +111,16 @@ src/components/ui/
   - `ambiguous`
 - `store-connection-row`
   - provider label
-  - dot + label status
+  - bordered status badge
   - masked summary
   - updated time
-  - connect/change action
+  - save action
+
+## Review Contract
+- UI work를 할 때는 shared theme, component, primitive, design token 사용 여부를 먼저 확인한다.
+- hooks와 검사 스크립트는 UI 변경을 감지하면 이 문서와 `docs/ARCHITECTURE.md`, `docs/ADR.md`의 원칙을 함께 점검해야 한다.
+- theme, tokens, primitive, component가 분리되어 보이면 우선 shared source로 수렴시킨다.
+- hook은 UI 변경 payload에서 `command`와 `cmd` 둘 다 읽을 수 있어야 하며, UI 파일 수정 시 docs 검토를 같이 강제한다.
 
 ## 현재 구조의 실패 패턴
 - 입고 버튼으로 연 팝업에서 다시 입고/출고를 고르게 하는 패턴
@@ -129,6 +149,10 @@ src/components/ui/
 - analytics는 독립 메뉴가 아니라 dashboard 내부 section이다.
 - 차트는 `거래 추이`, `재고 추이`, `창고별 변동 비교` 3개만 유지한다.
 - 각 차트는 자기 전용 control strip를 가진다.
+- control strip은 큰 segmented button rail이 아니라 compact filter row를 기본으로 한다.
+- 기간, 모델, 시작일, 종료일 control은 같은 baseline과 compact height를 유지해야 한다.
+- KPI strip은 바깥 wrapper card 없이 개별 card를 바로 grid에 둔다. card 안에 card를 넣어 border가 끊겨 보이게 만들지 않는다.
+- dashboard card surface는 끊기지 않는 shared card border language를 사용해야 한다.
 
 ## Layout Rules
 - 기본 구조는 `header -> compact toolbar -> primary table`이다.
@@ -137,6 +161,10 @@ src/components/ui/
 - title 위 kicker/eyebrow/tag cluster는 기본적으로 사용하지 않는다.
 - 상단 tabs는 같은 page 안의 view switch에만 사용하고, filter/action cluster는 toolbar로 둔다.
 - 탭과 버튼은 compact size를 기본으로 한다.
+- list-management screen은 `compact filter/action toolbar -> primary table` 순서를 기본으로 하고, 같은 표 위에 redundant section title/subtitle/count chrome을 덧씌우지 않는다.
+- 표 위 설명이 꼭 필요하면 page header 또는 toolbar 메타 중 하나만 사용하고 둘을 동시에 반복하지 않는다.
+- dashboard filter는 compact size와 baseline alignment를 유지한다.
+- wrapper card는 chrome을 위한 기본 장치가 아니다. surface가 필요한 경우에만 사용한다.
 
 ## Text Fitting Rules
 - `label`, `select`, `menu`, `view` 안의 텍스트는 해당 컴포넌트 폭을 먼저 따른다.
@@ -170,12 +198,14 @@ src/components/ui/
   - `출고`
   - 필요 시 `CSV`, `이력`
 - summary 숫자는 큰 카드 대신 compact badge strip 또는 표 상단 메타로 축소한다.
+- `입고`, `출고` action rail은 `목록` 탭 전용이다. `이력` 탭에 같은 action rail을 복제하지 않는다.
 
 ### 목록 표
 - 기본 컬럼은 현재 작업에 필요한 정보만 둔다.
 - 상품명, 옵션, 창고, 현재 재고, 최근 입고, 최근 출고, 상태를 우선한다.
 - 컬럼 숨김/표시를 지원한다.
 - 행 애니메이션은 짧은 fade/slide-in 정도만 허용한다.
+- 목록 표는 filter/action toolbar 바로 아래에 붙어야 하고, 위에 별도 summary section을 하나 더 끼워 넣지 않는다.
 
 ### 이력 표
 - 목록과 같은 필터 감각을 유지하되, 변동 시각과 출처 메타를 더 먼저 보여준다.
@@ -198,6 +228,14 @@ src/components/ui/
 ### CSV / 이력
 - 목록/입고/출고와 한 화면에 둘 때 UX가 무너지면 재고 운영 하위 페이지로 올린다.
 - child route가 생겨도 top-level IA는 `재고 운영` 하나로 유지한다.
+- action section은 목록 탭 전용이다. history 또는 보조 탭에 동일 action rail을 복제하지 않는다.
+
+## 소싱 패턴
+- 소싱 화면의 primary surface는 table/workspace다.
+- 외부 공장과 입고 예정은 카드형 요약보다 필터 가능한 table/workspace로 먼저 구성한다.
+- register/detail 같은 짧은 editing flow는 modal로 보조하고, surface 자체를 card summary로 대체하지 않는다.
+- header 다음에 `toolbar -> section title -> table/list`가 바로 이어져야 한다.
+- table/list를 설명용 wrapper card로 한 번 더 감싸지 않는다. shell이 필요하면 table shell 하나만 둔다.
 
 ## 운송장 패턴
 
@@ -230,9 +268,12 @@ src/components/ui/
   - 연결 상태 badge
   - 마스킹된 요약
   - 최근 변경 시각
-  - `연결` 또는 `변경`
 - provider 요약과 실제 입력 form을 다른 카드로 갈라놓지 않는다.
 - 이미 연결된 provider도 값 변경이 가능해야 한다.
+- 저장 버튼은 provider row 우측 상단의 단일 primary action으로 둔다.
+- 별도의 `연결` 버튼은 두지 않는다. 저장 성공 후 상태 badge가 `미연결 -> 연결됨`으로 바뀌어야 한다.
+- 상태 badge는 연결 여부만 말하고, 같은 상태를 label과 문장에 다시 적지 않는다.
+- 상태 badge는 아이콘 + label + border를 가진 compact view여야 한다.
 
 ## 타이포그래피와 밀도
 - body/control text는 14px 이상 유지한다.
@@ -253,6 +294,9 @@ src/components/ui/
 - 카드 안에 다시 설명 카드, 그 안에 상태 카드가 중첩되면 실패 신호다.
 - 정보가 많아질수록 새 카드를 더하는 대신 표, inline disclosure, drawer를 쓴다.
 - “상태를 설명하기 위한 카드”는 기본적으로 만들지 않는다.
+- strong card는 header와 body가 나뉘어도 하나의 clipped surface로 읽혀야 한다.
+- hollow corner, segmented seam, 이질적인 border split이 보이면 card variant가 아니라 shared primitive 구조를 다시 봐야 한다.
+- page-local border patch로 임시 봉합하지 말고 shared card/surface primitive의 variant와 padding/token을 고쳐서 해결한다.
 
 ## 모션
 - 허용:

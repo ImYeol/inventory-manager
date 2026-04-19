@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState, useTransition, type FormEvent } from 'react'
 import { getShippingSettingsSummary, saveCoupangSettings, saveNaverSettings } from '@/lib/actions/shipping-settings'
 import type { ShippingSettingsSummary } from '@/lib/shipping-credentials'
-import { StoreConnectionRow, StoreConnectionStatus } from '@/components/ui/store-connection-row'
-import { ui } from '../../components/ui'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { StoreConnectionRow } from '@/components/ui/store-connection-row'
+import { cx, ui } from '../../components/ui'
 
 type SettingsViewProps = {
   summary: ShippingSettingsSummary
@@ -126,14 +128,15 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
         configured={currentSummary.naver.configured}
         summary={[{ label: 'Client ID', value: currentSummary.naver.masked.clientId }]}
         updatedAt={currentSummary.naver.updatedAt}
-        href="#naver-settings"
+        action={
+          <Button type="submit" form="naver-settings" disabled={naverPending}>
+            {naverPending ? '네이버 저장 중…' : '네이버 저장'}
+          </Button>
+        }
       >
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-slate-950">네이버 API</p>
-            <p className="text-sm text-slate-500">Client ID와 Secret을 직접 갱신합니다.</p>
-          </div>
-          <StoreConnectionStatus configured={currentSummary.naver.configured} compact />
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-slate-950">네이버 API</p>
+          <p className="text-sm text-slate-500">Client ID와 Secret을 직접 갱신합니다.</p>
         </div>
         <form id="naver-settings" className="space-y-4" onSubmit={handleNaverSave}>
           <div className="grid gap-4">
@@ -141,7 +144,7 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
               <label htmlFor="naver-client-id" className={ui.label}>
                 네이버 Client ID
               </label>
-              <input
+              <Input
                 ref={naverClientIdRef}
                 id="naver-client-id"
                 type="text"
@@ -149,14 +152,13 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
                 spellCheck={false}
                 value={naverValues.clientId}
                 onChange={(event) => setNaverValues((prev) => ({ ...prev, clientId: event.target.value }))}
-                className={ui.control}
               />
             </div>
             <div>
               <label htmlFor="naver-client-secret" className={ui.label}>
                 네이버 Client Secret
               </label>
-              <input
+              <Input
                 ref={naverClientSecretRef}
                 id="naver-client-secret"
                 type="password"
@@ -164,17 +166,11 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
                 spellCheck={false}
                 value={naverValues.clientSecret}
                 onChange={(event) => setNaverValues((prev) => ({ ...prev, clientSecret: event.target.value }))}
-                className={ui.control}
               />
             </div>
           </div>
-          {naverError ? <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{naverError}</p> : null}
-          {naverMessage ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{naverMessage}</p> : null}
-          <div className="flex justify-end">
-            <button type="submit" disabled={naverPending} className={ui.buttonPrimary}>
-              {naverPending ? '네이버 저장 중…' : '네이버 저장'}
-            </button>
-          </div>
+          {naverError ? <p className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm text-red-700')}>{naverError}</p> : null}
+          {naverMessage ? <p className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm text-emerald-700')}>{naverMessage}</p> : null}
         </form>
       </StoreConnectionRow>
 
@@ -186,14 +182,15 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
           { label: 'Vendor ID', value: currentSummary.coupang.masked.vendorId },
         ]}
         updatedAt={currentSummary.coupang.updatedAt}
-        href="#coupang-settings"
+        action={
+          <Button type="submit" form="coupang-settings" disabled={coupangPending}>
+            {coupangPending ? '쿠팡 저장 중…' : '쿠팡 저장'}
+          </Button>
+        }
       >
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-slate-950">쿠팡 API</p>
-            <p className="text-sm text-slate-500">Access Key, Secret Key, Vendor ID를 관리합니다.</p>
-          </div>
-          <StoreConnectionStatus configured={currentSummary.coupang.configured} compact />
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-slate-950">쿠팡 API</p>
+          <p className="text-sm text-slate-500">Access Key, Secret Key, Vendor ID를 관리합니다.</p>
         </div>
         <form id="coupang-settings" className="space-y-4" onSubmit={handleCoupangSave}>
           <div className="grid gap-4">
@@ -201,7 +198,7 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
               <label htmlFor="coupang-access-key" className={ui.label}>
                 쿠팡 Access Key
               </label>
-              <input
+              <Input
                 ref={coupangAccessKeyRef}
                 id="coupang-access-key"
                 type="text"
@@ -209,14 +206,13 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
                 spellCheck={false}
                 value={coupangValues.accessKey}
                 onChange={(event) => setCoupangValues((prev) => ({ ...prev, accessKey: event.target.value }))}
-                className={ui.control}
               />
             </div>
             <div>
               <label htmlFor="coupang-secret-key" className={ui.label}>
                 쿠팡 Secret Key
               </label>
-              <input
+              <Input
                 ref={coupangSecretKeyRef}
                 id="coupang-secret-key"
                 type="password"
@@ -224,14 +220,13 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
                 spellCheck={false}
                 value={coupangValues.secretKey}
                 onChange={(event) => setCoupangValues((prev) => ({ ...prev, secretKey: event.target.value }))}
-                className={ui.control}
               />
             </div>
             <div>
               <label htmlFor="coupang-vendor-id" className={ui.label}>
                 쿠팡 Vendor ID
               </label>
-              <input
+              <Input
                 ref={coupangVendorIdRef}
                 id="coupang-vendor-id"
                 type="text"
@@ -239,17 +234,11 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
                 spellCheck={false}
                 value={coupangValues.vendorId}
                 onChange={(event) => setCoupangValues((prev) => ({ ...prev, vendorId: event.target.value }))}
-                className={ui.control}
               />
             </div>
           </div>
-          {coupangError ? <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{coupangError}</p> : null}
-          {coupangMessage ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{coupangMessage}</p> : null}
-          <div className="flex justify-end">
-            <button type="submit" disabled={coupangPending} className={ui.buttonPrimary}>
-              {coupangPending ? '쿠팡 저장 중…' : '쿠팡 저장'}
-            </button>
-          </div>
+          {coupangError ? <p className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm text-red-700')}>{coupangError}</p> : null}
+          {coupangMessage ? <p className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm text-emerald-700')}>{coupangMessage}</p> : null}
         </form>
       </StoreConnectionRow>
     </div>

@@ -7,6 +7,8 @@ import { PageHeader } from '@/app/components/ui'
 import { StatusBadge } from '@/components/ui/badge-1'
 import { Button } from '@/components/ui/button'
 import { BasicDataTable } from '@/components/ui/basic-data-table'
+import { FilterToolbar } from '@/components/ui/filter-toolbar'
+import { Input } from '@/components/ui/input'
 import {
   Card,
   CardContent,
@@ -46,18 +48,35 @@ afterEach(() => {
 describe('shared action and status primitives', () => {
   it('maps button variants onto the repo token system', () => {
     render(
-      React.createElement(
-        'div',
-        null,
-        React.createElement(Button, null, '저장'),
-        React.createElement(Button, { variant: 'secondary', size: 'sm' }, '취소'),
-        React.createElement(Button, { variant: 'outline' }, '필터'),
-      ),
+        React.createElement(
+          'div',
+          null,
+          React.createElement(Button, null, '저장'),
+          React.createElement(Button, { variant: 'success', size: 'sm' }, '입고'),
+          React.createElement(Button, { variant: 'warning', size: 'sm' }, '출고'),
+          React.createElement(Button, { variant: 'secondary', size: 'sm' }, '취소'),
+          React.createElement(Button, { variant: 'outline' }, '필터'),
+        ),
     )
 
     expect(screen.getByRole('button', { name: '저장' }).className).toContain('ui-button-primary')
+    expect(screen.getByRole('button', { name: '입고' }).className).toContain('ui-button-success')
+    expect(screen.getByRole('button', { name: '출고' }).className).toContain('ui-button-warning')
     expect(screen.getByRole('button', { name: '취소' }).className).toContain('ui-button-secondary')
     expect(screen.getByRole('button', { name: '필터' }).className).toContain('ui-button-outline')
+  })
+
+  it('keeps input and filter toolbar on shared control and surface tokens', () => {
+    render(
+      React.createElement(
+        FilterToolbar,
+        null,
+        React.createElement(Input, { 'aria-label': '검색', placeholder: '검색' }),
+      ),
+    )
+
+    expect(screen.getByLabelText('검색').className).toContain('ui-control')
+    expect(screen.getByLabelText('검색').closest('div')?.className).toContain('ui-surface-muted')
   })
 
   it('switches tabs as an intra-page view primitive', () => {

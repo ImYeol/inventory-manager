@@ -384,10 +384,11 @@ export default function MasterDataManager({
       {message ? (
         <div
           className={cx(
-            'rounded-xl border px-4 py-3 text-sm font-medium',
+            ui.surfaceMuted,
+            'px-4 py-3 text-sm font-medium',
             message.type === 'success'
-              ? 'border-slate-200 bg-slate-50 text-slate-700'
-              : 'border-red-200 bg-red-50 text-red-700',
+              ? 'text-slate-700'
+              : 'text-red-700',
           )}
           role="status"
           aria-live="polite"
@@ -396,26 +397,6 @@ export default function MasterDataManager({
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <ActionToolbar>
-          <StatusBadge tone="neutral">{modelCount}개 모델</StatusBadge>
-          <StatusBadge tone="neutral">{totalSizes}개 사이즈</StatusBadge>
-          <StatusBadge tone="neutral">{totalColors}개 색상</StatusBadge>
-          <StatusBadge tone="neutral">{warehouseCount}개 창고</StatusBadge>
-          <StatusBadge tone="neutral">SKU {totalWarehouseSku.toLocaleString()}개</StatusBadge>
-          <StatusBadge tone="neutral">총 재고 {totalWarehouseStock.toLocaleString()}개</StatusBadge>
-        </ActionToolbar>
-
-        <ActionToolbar>
-          <Button type="button" variant="secondary" size="sm" className="h-10 px-3" onClick={openModelModal}>
-            모델 등록
-          </Button>
-          <Button type="button" variant="secondary" size="sm" className="h-10 px-3" onClick={openWarehouseModal}>
-            창고 등록
-          </Button>
-        </ActionToolbar>
-      </div>
-
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)} className="mt-4 space-y-4">
         <TabsList aria-label="상품 관리 보기 전환">
           <TabsTrigger value="product">상품</TabsTrigger>
@@ -423,6 +404,20 @@ export default function MasterDataManager({
         </TabsList>
 
         <TabsContent value="product" className="m-0">
+          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <ActionToolbar>
+              <StatusBadge tone="neutral">{modelCount}개 모델</StatusBadge>
+              <StatusBadge tone="neutral">{totalSizes}개 사이즈</StatusBadge>
+              <StatusBadge tone="neutral">{totalColors}개 색상</StatusBadge>
+            </ActionToolbar>
+
+            <ActionToolbar>
+              <Button type="button" variant="secondary" size="sm" className="h-10 px-3" onClick={openModelModal}>
+                모델 등록
+              </Button>
+            </ActionToolbar>
+          </div>
+
           <BasicDataTable<ProductRow>
             columns={[
               { key: 'name', label: '모델' },
@@ -493,6 +488,20 @@ export default function MasterDataManager({
         </TabsContent>
 
         <TabsContent value="warehouse" className="m-0">
+          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <ActionToolbar>
+              <StatusBadge tone="neutral">{warehouseCount}개 창고</StatusBadge>
+              <StatusBadge tone="neutral">SKU {totalWarehouseSku.toLocaleString()}개</StatusBadge>
+              <StatusBadge tone="neutral">총 재고 {totalWarehouseStock.toLocaleString()}개</StatusBadge>
+            </ActionToolbar>
+
+            <ActionToolbar>
+              <Button type="button" variant="secondary" size="sm" className="h-10 px-3" onClick={openWarehouseModal}>
+                창고 등록
+              </Button>
+            </ActionToolbar>
+          </div>
+
           <BasicDataTable<WarehouseRow>
             columns={[
               { key: 'warehouse', label: '창고' },
@@ -714,7 +723,7 @@ export default function MasterDataManager({
               </Select>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+            <div className={cx(ui.surfaceMuted, 'px-3 py-2 text-sm text-slate-600')}>
               기본 텍스트: {describeColorTone(modelDraft.defaultTextWhite)}
             </div>
           </div>

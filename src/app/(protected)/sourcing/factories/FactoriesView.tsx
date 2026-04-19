@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createFactory, setFactoryActive } from '@/lib/actions'
 import { StatusBadge } from '@/components/ui/badge-1'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { FilterToolbar } from '@/components/ui/filter-toolbar'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
@@ -58,7 +59,7 @@ function SelectField<Value extends string | number>({
         onValueChange={(next) => onValueChange(next ? (next as Value) : null)}
         disabled={disabled}
       >
-        <SelectTrigger aria-label={label} className={cx(ui.controlSm, 'w-full bg-white')}>
+        <SelectTrigger aria-label={label} className={ui.controlSm}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
@@ -160,9 +161,9 @@ export default function FactoriesView({ factories }: { factories: FactoryData[] 
       />
 
       {message ? (
-        <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-          {message}
-        </div>
+        <Card variant="muted" className="mb-4 overflow-hidden">
+          <CardContent className="px-4 py-3 text-sm text-slate-700">{message}</CardContent>
+        </Card>
       ) : null}
 
       <div className="space-y-4">
@@ -200,17 +201,7 @@ export default function FactoriesView({ factories }: { factories: FactoryData[] 
           </div>
         </FilterToolbar>
 
-        <section className={cx(ui.panel, 'overflow-hidden')}>
-          <div className={ui.panelHeader}>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold tracking-tight text-slate-950">공장 목록</h2>
-                <p className="mt-1 text-sm text-slate-500">행의 상세 버튼으로 공장 정보를 확인하고 상태를 변경합니다.</p>
-              </div>
-              <span className={ui.pill}>총 {filteredFactories.length}개</span>
-            </div>
-          </div>
-
+        <div className={ui.tableShell}>
           <div className="overflow-x-auto">
             <Table aria-label="공장 목록">
               <TableHeader>
@@ -264,7 +255,7 @@ export default function FactoriesView({ factories }: { factories: FactoryData[] 
               </TableBody>
             </Table>
           </div>
-        </section>
+        </div>
       </div>
 
       <Modal
@@ -296,24 +287,40 @@ export default function FactoriesView({ factories }: { factories: FactoryData[] 
               <span className={ui.pillMuted}>잔여 {selectedFactory.pendingQuantity}개</span>
             </div>
 
-            <dl className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">담당자</dt>
-                <dd className="mt-1 text-sm font-medium text-slate-950">{selectedFactory.contactName || '없음'}</dd>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">전화번호</dt>
-                <dd className="mt-1 text-sm font-medium text-slate-950">{selectedFactory.phone || '없음'}</dd>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">이메일</dt>
-                <dd className="mt-1 text-sm font-medium text-slate-950">{selectedFactory.email || '없음'}</dd>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">메모</dt>
-                <dd className="mt-1 text-sm font-medium text-slate-950">{selectedFactory.notes || '없음'}</dd>
-              </div>
-            </dl>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Card variant="default" className="overflow-hidden">
+                <CardContent className="px-4 py-3">
+                  <dl className="space-y-1">
+                    <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">담당자</dt>
+                    <dd className="text-sm font-medium text-slate-950">{selectedFactory.contactName || '없음'}</dd>
+                  </dl>
+                </CardContent>
+              </Card>
+              <Card variant="default" className="overflow-hidden">
+                <CardContent className="px-4 py-3">
+                  <dl className="space-y-1">
+                    <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">전화번호</dt>
+                    <dd className="text-sm font-medium text-slate-950">{selectedFactory.phone || '없음'}</dd>
+                  </dl>
+                </CardContent>
+              </Card>
+              <Card variant="default" className="overflow-hidden">
+                <CardContent className="px-4 py-3">
+                  <dl className="space-y-1">
+                    <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">이메일</dt>
+                    <dd className="text-sm font-medium text-slate-950">{selectedFactory.email || '없음'}</dd>
+                  </dl>
+                </CardContent>
+              </Card>
+              <Card variant="default" className="overflow-hidden">
+                <CardContent className="px-4 py-3">
+                  <dl className="space-y-1">
+                    <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">메모</dt>
+                    <dd className="text-sm font-medium text-slate-950">{selectedFactory.notes || '없음'}</dd>
+                  </dl>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         ) : null}
       </Modal>

@@ -85,7 +85,11 @@ describe('MasterDataManager', () => {
     expect(screen.getByRole('tab', { name: '창고' })).toBeTruthy()
     expect(screen.getByRole('tablist', { name: '상품 관리 보기 전환' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '모델 등록' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '창고 등록' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '창고 등록' })).toBeNull()
+    expect(screen.getByText('1개 모델')).toBeTruthy()
+    expect(screen.getByText('1개 사이즈')).toBeTruthy()
+    expect(screen.getByText('1개 색상')).toBeTruthy()
+    expect(screen.queryByText('2개 창고')).toBeNull()
     expect(screen.getByRole('row', { name: /LP01/ })).toBeTruthy()
 
     fireEvent.mouseDown(screen.getByRole('tab', { name: '창고' }))
@@ -93,6 +97,13 @@ describe('MasterDataManager', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: '오금동 삭제' })).toBeTruthy()
     })
+
+    expect(screen.queryByRole('button', { name: '모델 등록' })).toBeNull()
+    expect(screen.getByRole('button', { name: '창고 등록' })).toBeTruthy()
+    expect(screen.getByText('2개 창고')).toBeTruthy()
+    expect(screen.getByText('SKU 4개')).toBeTruthy()
+    expect(screen.getByText('총 재고 50개')).toBeTruthy()
+    expect(screen.queryByText('1개 모델')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '창고 등록' }))
 
@@ -116,6 +127,7 @@ describe('MasterDataManager', () => {
     fireEvent.click(screen.getByRole('button', { name: '모델 등록' }))
 
     const dialog = screen.getByRole('dialog', { name: '모델 등록' })
+    expect(within(dialog).getByText('기본 텍스트: 검정')).toBeTruthy()
     fireEvent.change(within(dialog).getByLabelText('모델명'), { target: { value: '블루종 A' } })
     fireEvent.change(within(dialog).getByLabelText('사이즈'), { target: { value: '230, 240' } })
     fireEvent.change(within(dialog).getByLabelText('색상'), {

@@ -71,7 +71,7 @@
   .surface,
   .ui-surface,
   .ui-card {
-    border: 1px solid var(--border);
+    border: 1.5px solid var(--border-strong);
     border-radius: 1.25rem;
     background: var(--surface);
     box-shadow: var(--shadow);
@@ -99,6 +99,7 @@
   .ui-card-strong {
     background: var(--surface-strong);
     border-color: var(--border-strong);
+    border-width: 2px;
   }
 
   .ui-label {
@@ -147,9 +148,9 @@
   }
 
   .ui-control-sm {
-    height: 2.5rem;
-    border-radius: 0.8rem;
-    font-size: 0.875rem;
+    height: 2.25rem;
+    border-radius: 0.75rem;
+    font-size: 0.8125rem;
   }
 
   .ui-select-trigger {
@@ -288,6 +289,16 @@
     background: color-mix(in srgb, var(--accent) 88%, black);
   }
 
+  .ui-button-success {
+    border-color: color-mix(in srgb, #16a34a 26%, var(--border));
+    background: #16a34a;
+    color: white;
+  }
+
+  .ui-button-success:hover {
+    background: #15803d;
+  }
+
   .ui-button-secondary {
     border-color: var(--border);
     background: var(--surface);
@@ -296,6 +307,16 @@
 
   .ui-button-secondary:hover {
     background: var(--surface-muted);
+  }
+
+  .ui-button-warning {
+    border-color: color-mix(in srgb, #f59e0b 26%, var(--border));
+    background: #fffbeb;
+    color: #92400e;
+  }
+
+  .ui-button-warning:hover {
+    background: #fef3c7;
   }
 
   .ui-button-outline {

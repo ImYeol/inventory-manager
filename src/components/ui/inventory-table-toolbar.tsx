@@ -99,27 +99,18 @@ export function InventoryTableToolbar<T extends string>({
         <Button
           type="button"
           onClick={onInbound}
+          variant="success"
           size="sm"
           className="h-10 gap-2 rounded-xl px-3"
-          style={{
-            borderColor: 'color-mix(in srgb, #16a34a 26%, var(--border))',
-            backgroundColor: '#16a34a',
-            color: '#ffffff',
-          }}
         >
           입고
         </Button>
         <Button
           type="button"
-          variant="secondary"
+          variant="warning"
           onClick={onOutbound}
           size="sm"
           className="h-10 gap-2 rounded-xl px-3"
-          style={{
-            borderColor: 'color-mix(in srgb, #f59e0b 26%, var(--border))',
-            backgroundColor: '#fffbeb',
-            color: '#92400e',
-          }}
         >
           출고
         </Button>
