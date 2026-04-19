@@ -72,7 +72,7 @@ describe('InOutForm', () => {
     expect((warehouseSelect as HTMLSelectElement).value).toBe('9')
   })
 
-  it('duplicates a row and imports delimited text into the editor', () => {
+  it('keeps the editor manual-only and removes the old paste-import panel', () => {
     render(
       React.createElement(InOutForm, {
         warehouses: [{ id: 7, name: '본사 창고' }],
@@ -87,17 +87,9 @@ describe('InOutForm', () => {
       }),
     )
 
-    fireEvent.click(screen.getByRole('button', { name: '표 붙여넣기' }))
-    fireEvent.change(screen.getByLabelText('붙여넣기'), {
-      target: { value: '모델,사이즈,색상,수량\nLP01,S,네이비,3' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: '행으로 가져오기' }))
-
-    expect(screen.getByText('1개 행을 가져왔습니다.')).toBeTruthy()
-    expect(screen.getAllByDisplayValue('3')).toHaveLength(2)
-
-    fireEvent.click(screen.getAllByRole('button', { name: '행 복제' })[0])
-
-    expect(screen.getAllByDisplayValue('3')).toHaveLength(4)
+    expect(screen.queryByRole('button', { name: '표 붙여넣기' })).toBeNull()
+    expect(screen.queryByLabelText('붙여넣기')).toBeNull()
+    expect(screen.queryByRole('button', { name: '행으로 가져오기' })).toBeNull()
+    expect(screen.getAllByRole('button', { name: '행 복제' }).length).toBeGreaterThan(0)
   })
 })

@@ -40,7 +40,7 @@ afterEach(() => {
 })
 
 describe('Nav', () => {
-  it('renders the simplified primary navigation without the old kicker copy', () => {
+  it('renders the task-oriented primary navigation without the old store-connections singleton item', () => {
     render(React.createElement(Nav))
 
     expect(screen.queryByText('Warehouse Console')).toBeNull()
@@ -48,13 +48,12 @@ describe('Nav', () => {
     expect(screen.getByRole('heading', { name: 'Seleccase Inventory' })).toBeTruthy()
     expect(screen.getByRole('link', { name: '대시보드' }).getAttribute('href')).toBe('/')
     expect(screen.getByRole('link', { name: '재고 운영' }).getAttribute('href')).toBe('/inventory')
-    expect(screen.getByRole('button', { name: '소싱' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: '외부 공장' }).getAttribute('href')).toBe('/sourcing/factories')
-    expect(screen.getByRole('link', { name: '입고 예정' }).getAttribute('href')).toBe('/sourcing/arrivals')
+    expect(screen.getByRole('link', { name: '상품 관리' }).getAttribute('href')).toBe('/products')
+    expect(screen.getByRole('link', { name: '소싱' }).getAttribute('href')).toBe('/sourcing')
     expect(screen.getByRole('link', { name: '운송장' }).getAttribute('href')).toBe('/shipping')
     expect(screen.getByRole('link', { name: '분석' }).getAttribute('href')).toBe('/analytics')
-    expect(screen.getByRole('link', { name: '스토어 연결' }).getAttribute('href')).toBe('/integrations')
-    expect(screen.getAllByRole('link', { name: '설정' })[0].getAttribute('href')).toBe('/settings')
+    expect(screen.queryByRole('link', { name: '스토어 연결' })).toBeNull()
+    expect(screen.getByRole('link', { name: '설정' }).getAttribute('href')).toBe('/settings')
   })
 
   it('opens the mobile drawer and renders the same information architecture', () => {
@@ -64,8 +63,8 @@ describe('Nav', () => {
 
     expect(screen.getByRole('dialog', { name: '모바일 메뉴' })).toBeTruthy()
     expect(screen.getAllByRole('link', { name: '재고 운영' })).toHaveLength(2)
-    expect(screen.getAllByRole('link', { name: '스토어 연결' })).toHaveLength(2)
-    expect(screen.getAllByRole('link', { name: '외부 공장' })).toHaveLength(2)
+    expect(screen.getAllByRole('link', { name: '상품 관리' })).toHaveLength(2)
+    expect(screen.getAllByRole('link', { name: '소싱' })).toHaveLength(2)
   })
 
   it('marks the active analytics route with the highlighted styles', () => {
@@ -75,15 +74,13 @@ describe('Nav', () => {
     expect(activeLink.getAttribute('aria-current')).toBe('page')
   })
 
-  it('marks sourcing as active on the sourcing child route', () => {
+  it('marks sourcing as active on sourcing routes', () => {
     mocks.pathname = '/sourcing/arrivals'
 
     render(React.createElement(Nav))
 
-    const activeChildLink = screen.getByRole('link', { name: '입고 예정' })
-    const sourcingButton = screen.getByRole('button', { name: '소싱' })
-    expect(activeChildLink.getAttribute('aria-current')).toBe('page')
-    expect(sourcingButton.getAttribute('aria-expanded')).toBe('true')
+    const sourcingLink = screen.getByRole('link', { name: '소싱' })
+    expect(sourcingLink.getAttribute('aria-current')).toBe('page')
   })
 
   it('marks settings as active when the settings route is open', () => {

@@ -40,7 +40,7 @@ vi.mock('@/app/(protected)/history/HistoryView', () => ({
 import InventoryWorkspace from '@/app/components/inventory/InventoryWorkspace'
 
 describe('InventoryWorkspace', () => {
-  it('keeps the hub chrome to one header/context block and a compact utility row', () => {
+  it('renders a table-first workspace with compact filters and action buttons', () => {
     render(
       React.createElement(InventoryWorkspace, {
         warehouses: [
@@ -79,45 +79,29 @@ describe('InventoryWorkspace', () => {
 
     expect(screen.getByRole('heading', { name: '재고 운영' })).toBeTruthy()
     expect(screen.getAllByRole('heading', { name: '재고 운영' })).toHaveLength(1)
-    expect(
-      screen.getByText('선택한 창고를 기준으로 개요, 입고, 출고, CSV, 이력을 한 화면에서 다룹니다.'),
-    ).toBeTruthy()
-    expect(
-      screen.getAllByText('선택한 창고를 기준으로 개요, 입고, 출고, CSV, 이력을 한 화면에서 다룹니다.'),
-    ).toHaveLength(1)
     expect((screen.getByRole('combobox', { name: '창고 선택' }) as HTMLSelectElement).value).toBe('1')
-
-    expect(screen.queryByLabelText('검색')).toBeNull()
-    expect(screen.queryByLabelText('상태')).toBeNull()
-    expect(screen.queryByText('Warehouse Operations')).toBeNull()
-    expect(screen.queryByText('창고 컨텍스트')).toBeNull()
-    expect(screen.queryByText('현재 재고와 상태를 창고 기준으로 확인합니다.')).toBeNull()
-    expect(screen.queryByText('선택된 창고:')).toBeNull()
-    expect(screen.queryByText('운영 SKU')).toBeNull()
-    expect(screen.queryByText('주의 항목')).toBeNull()
-    expect(screen.queryByText('금일 흐름')).toBeNull()
-    expect(screen.queryByText('예정 입고')).toBeNull()
-
-    expect(screen.getByRole('button', { name: '개요' })).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: '입고' }).length).toBe(2)
-    expect(screen.getAllByRole('button', { name: '출고' }).length).toBe(2)
-    expect(screen.getAllByRole('button', { name: 'CSV' }).length).toBe(2)
+    expect(screen.getByLabelText('상품 검색')).toBeTruthy()
+    expect(screen.getByLabelText('상태 필터')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '컬럼' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '재고 목록' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '이력' })).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: '이력' })).toHaveLength(1)
+    expect(screen.getByRole('button', { name: '입고' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '출고' })).toBeTruthy()
 
-    fireEvent.click(screen.getAllByRole('button', { name: '입고' })[0])
+    fireEvent.change(screen.getByLabelText('상품 검색'), { target: { value: 'LP01' } })
+    expect(screen.getByText('LP01')).toBeTruthy()
+    expect(screen.queryByText('LP02')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '입고' }))
     expect(screen.getByRole('heading', { name: '빠른 입고' })).toBeTruthy()
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'CSV' })[0])
-    expect(screen.getByRole('heading', { name: 'CSV' })).toBeTruthy()
-
     fireEvent.change(screen.getByLabelText('창고 선택'), { target: { value: '2' } })
-
-    fireEvent.click(screen.getAllByRole('button', { name: '입고' })[1])
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+    fireEvent.click(screen.getByRole('button', { name: '입고' }))
     expect(screen.getByText('InOutForm:입고:2:manual')).toBeTruthy()
   })
 
-  it('does not render placeholder summary or inbound metric blocks', () => {
+  it('does not render oversized summary chrome when the table is empty', () => {
     render(
       React.createElement(InventoryWorkspace, {
         warehouses: [{ id: 1, name: '오금동' }],
@@ -126,15 +110,12 @@ describe('InventoryWorkspace', () => {
       }),
     )
 
-    expect(screen.getAllByText('조회 조건에 맞는 재고가 없습니다.')).toHaveLength(2)
+    expect(screen.getByText('조회 조건에 맞는 재고가 없습니다.')).toBeTruthy()
     expect(screen.queryByText('운영 SKU')).toBeNull()
     expect(screen.queryByText('주의 항목')).toBeNull()
-    expect(screen.queryByText('금일 흐름')).toBeNull()
-    expect(screen.queryByRole('columnheader', { name: '예정 입고' })).toBeNull()
-    expect(screen.queryByText('창고 컨텍스트')).toBeNull()
   })
 
-  it('renders the embedded history compactly without duplicating the top-level chrome', () => {
+  it('renders history as an internal view without duplicating top-level filters', () => {
     render(
       React.createElement(InventoryWorkspace, {
         warehouses: [{ id: 1, name: '오금동' }],
@@ -147,8 +128,5 @@ describe('InventoryWorkspace', () => {
     expect(screen.getByText('HistoryView:1')).toBeTruthy()
     expect(screen.queryByRole('heading', { name: '이력 필터' })).toBeNull()
     expect(screen.queryByRole('combobox', { name: '창고' })).toBeNull()
-
-    fireEvent.click(screen.getAllByRole('button', { name: /CSV/ })[1])
-    expect(screen.getByText('InOutForm:입고:1:csv')).toBeTruthy()
   })
 })

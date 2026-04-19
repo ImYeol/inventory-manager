@@ -1,0 +1,54 @@
+import { getCatalogData, getTransactionsWithRelations } from '@/lib/data'
+import { PageHeader, ui } from '../../components/ui'
+import MasterDataManager from '../master-data/MasterDataManager'
+
+export const dynamic = 'force-dynamic'
+
+export default async function ProductsPage() {
+  const [{ models, warehouses }, txData] = await Promise.all([
+    getCatalogData(),
+    getTransactionsWithRelations(),
+  ])
+
+  const warehouseStats = warehouses.map((warehouse) => {
+    const warehouseInventory = models.reduce(
+      (sum, model) =>
+        sum +
+        model.inventory
+          .filter((item) => item.warehouseId === warehouse.id)
+          .reduce((inventorySum, item) => inventorySum + item.quantity, 0),
+      0,
+    )
+
+    const warehouseTransactions = txData.transactions.filter((transaction) => transaction.warehouseId === warehouse.id)
+    const latestInbound = warehouseTransactions.find((transaction) => transaction.type === '입고') ?? null
+    const latestOutbound = warehouseTransactions.find((transaction) => transaction.type === '출고') ?? null
+    const latestMovement = warehouseTransactions[0] ?? null
+
+    return {
+      id: warehouse.id,
+      name: warehouse.name,
+      stockQty: warehouseInventory,
+      inboundQty: warehouseTransactions
+        .filter((transaction) => transaction.type === '입고')
+        .reduce((sum, transaction) => sum + transaction.quantity, 0),
+      outboundQty: warehouseTransactions
+        .filter((transaction) => transaction.type === '출고')
+        .reduce((sum, transaction) => sum + transaction.quantity, 0),
+      latestInbound: latestInbound
+        ? { quantity: latestInbound.quantity, date: latestInbound.date }
+        : null,
+      latestOutbound: latestOutbound
+        ? { quantity: latestOutbound.quantity, date: latestOutbound.date }
+        : null,
+      latestMovementDate: latestMovement?.date ?? null,
+    }
+  })
+
+  return (
+    <div className={ui.shell}>
+      <PageHeader title="상품 관리" description="상품과 창고 기준정보를 함께 관리합니다." />
+      <MasterDataManager models={models} warehouses={warehouses} warehouseStats={warehouseStats} />
+    </div>
+  )
+}

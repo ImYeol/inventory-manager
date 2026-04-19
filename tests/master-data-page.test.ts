@@ -15,9 +15,9 @@ beforeEach(() => {
 })
 
 describe('MasterDataPage', () => {
-  it('redirects legacy master-data requests to settings master-data', async () => {
+  it('redirects legacy master-data requests to products', async () => {
     await MasterDataPage()
 
-    expect(mocks.redirect).toHaveBeenCalledWith('/settings/master-data')
+    expect(mocks.redirect).toHaveBeenCalledWith('/products')
   })
 })

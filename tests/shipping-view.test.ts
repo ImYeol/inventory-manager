@@ -56,7 +56,7 @@ function makeExcelFile() {
 }
 
 describe('ShippingView', () => {
-  it('surfaces readiness state without blocking upload when both provider keys are missing', () => {
+  it('keeps upload available and exposes provider deep links when both provider keys are missing', () => {
     render(
       React.createElement(ShippingView, {
         settingsSummary: {
@@ -66,21 +66,13 @@ describe('ShippingView', () => {
       })
     )
 
-    expect(screen.getByText('운송장 엑셀 업로드')).toBeTruthy()
-    expect(screen.getByText('연동 준비 상태')).toBeTruthy()
-    expect(
-      screen.getByText('연결 준비와 키 관리는 스토어 연결에서만 처리합니다. 여기서는 업로드와 발송만 진행합니다.')
-    ).toBeTruthy()
-    expect(screen.getByText('엑셀 업로드')).toBeTruthy()
+    expect(screen.queryByText('연동 준비 상태')).toBeNull()
     expect(screen.getByLabelText('운송장 엑셀 업로드')).toBeTruthy()
-    expect(screen.getByRole('link', { name: '스토어 연결로 이동' }).getAttribute('href')).toBe('/integrations')
-    expect(screen.queryByLabelText('네이버 Client ID')).toBeNull()
-    expect(screen.queryByLabelText('쿠팡 Access Key')).toBeNull()
-    expect(screen.queryByText('네이버 저장')).toBeNull()
-    expect(screen.queryByText('쿠팡 저장')).toBeNull()
+    expect(screen.getByRole('link', { name: '네이버 연결' }).getAttribute('href')).toBe('/settings?section=store-connections&provider=naver')
+    expect(screen.getByRole('link', { name: '쿠팡 연결' }).getAttribute('href')).toBe('/settings?section=store-connections&provider=coupang')
   })
 
-  it('keeps the upload flow execution-focused while surfacing partial setup gaps', () => {
+  it('shows a provider link only for the missing provider and avoids the old readiness section', () => {
     render(
       React.createElement(ShippingView, {
         settingsSummary: {
@@ -94,19 +86,26 @@ describe('ShippingView', () => {
       })
     )
 
-    expect(screen.getByText('연동 준비 상태')).toBeTruthy()
-    expect(
-      screen.getByText('연결 준비와 키 관리는 스토어 연결에서만 처리합니다. 여기서는 업로드와 발송만 진행합니다.')
-    ).toBeTruthy()
-    expect(screen.getAllByText('네이버 연결됨').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('쿠팡 미연결').length).toBeGreaterThan(0)
-    expect(screen.getByRole('link', { name: '스토어 연결로 이동' }).getAttribute('href')).toBe('/integrations')
+    expect(screen.queryByText('연동 준비 상태')).toBeNull()
+    expect(screen.queryByRole('link', { name: '네이버 연결' })).toBeNull()
+    expect(screen.getByRole('link', { name: '쿠팡 연결' }).getAttribute('href')).toBe('/settings?section=store-connections&provider=coupang')
   })
 
-  it('handles drag-and-drop upload and renders 엑셀뷰 table from uploaded sheet', async () => {
+  it('classifies uploaded rows and filters the preview by badge state', async () => {
     shippingActions.fetchNaverOrders.mockResolvedValue({
       success: true,
-      orders: [],
+      orders: [
+        {
+          productOrderId: 'PO-1',
+          orderId: 'ORDER-1',
+          productName: '테스트 상품',
+          recipientName: '홍길동',
+          recipientAddress: '서울특별시 송파구 오금동',
+          quantity: 1,
+          orderDate: '2026-04-12T09:00:00.000Z',
+          productOrderStatus: 'PAYED',
+        },
+      ],
     })
     shippingActions.fetchCoupangOrders.mockResolvedValue({
       success: true,
@@ -131,11 +130,16 @@ describe('ShippingView', () => {
     })
 
     await waitFor(() => {
-      expect(screen.getByRole('cell', { name: '서울특별시' })).toBeTruthy()
+      expect(screen.getByRole('cell', { name: '네이버' })).toBeTruthy()
     })
 
-    expect(screen.getByText('운송장번호')).toBeTruthy()
-    expect(screen.getByText('받는분')).toBeTruthy()
-    expect(screen.getByText('123456789')).toBeTruthy()
+    expect(screen.getByText('분류 미리보기')).toBeTruthy()
+    expect(screen.getByRole('cell', { name: '홍길동' })).toBeTruthy()
+    expect(screen.getByRole('cell', { name: '미분류' })).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('분류 필터'), { target: { value: 'unclassified' } })
+
+    expect(screen.queryByRole('cell', { name: '홍길동' })).toBeNull()
+    expect(screen.getByRole('cell', { name: '김철수' })).toBeTruthy()
   })
 })

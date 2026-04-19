@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
+  getShippingSettingsSummary: vi.fn(),
   settingsView: vi.fn(),
 }))
 
@@ -19,9 +20,13 @@ vi.mock('next/link', () => ({
   }) => React.createElement('a', { href, className }, children),
 }))
 
+vi.mock('@/lib/actions/shipping-settings', () => ({
+  getShippingSettingsSummary: mocks.getShippingSettingsSummary,
+}))
+
 vi.mock('@/app/(protected)/settings/SettingsView', () => ({
-  default: () => {
-    mocks.settingsView()
+  default: (props: unknown) => {
+    mocks.settingsView(props)
     return React.createElement('div', {
       'data-testid': 'settings-view',
     })
@@ -32,16 +37,25 @@ import SettingsPage from '@/app/(protected)/settings/page'
 
 afterEach(() => {
   cleanup()
+  mocks.getShippingSettingsSummary.mockReset()
   mocks.settingsView.mockReset()
 })
 
 describe('SettingsPage', () => {
-  it('renders the admin hub entry point and points store connections to /integrations', async () => {
+  it('renders the consolidated store-connection settings owner', async () => {
+    const summary = {
+      naver: { configured: false, masked: {}, updatedAt: null },
+      coupang: { configured: true, masked: { accessKey: 'cp-••••', vendorId: 'V-••' }, updatedAt: '2026-04-12T10:00:00.000Z' },
+    }
+    mocks.getShippingSettingsSummary.mockResolvedValue(summary)
+
     render(await SettingsPage())
 
+    expect(mocks.getShippingSettingsSummary).toHaveBeenCalledTimes(1)
     expect(mocks.settingsView).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole('link', { name: '기준 데이터' }).getAttribute('href')).toBe('/settings/master-data')
-    expect(screen.getByText('기준 데이터와 관리자 진입점만 제공합니다. 스토어 연결은 `/integrations`에서 관리합니다.')).toBeTruthy()
+    expect(mocks.settingsView).toHaveBeenCalledWith(expect.objectContaining({ summary }))
+    expect(screen.queryByRole('link', { name: '기준 데이터' })).toBeNull()
+    expect(screen.getByText('스토어 연결 상태와 연결 정보를 관리합니다.')).toBeTruthy()
     expect(screen.getByRole('button', { name: '로그아웃' })).toBeTruthy()
     expect(screen.getByTestId('settings-view')).toBeTruthy()
   })

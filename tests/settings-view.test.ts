@@ -10,13 +10,28 @@ afterEach(() => {
 })
 
 describe('SettingsView', () => {
-  it('renders settings as an admin hub and points store connections to /integrations', () => {
-    render(React.createElement(SettingsView))
+  it('renders store connections directly inside settings without the old redirect-only guidance', () => {
+    render(
+      React.createElement(SettingsView, {
+        summary: {
+          naver: {
+            configured: false,
+            masked: {},
+            updatedAt: null,
+          },
+          coupang: {
+            configured: true,
+            masked: { accessKey: 'cp-••••1111', vendorId: 'V-••••22' },
+            updatedAt: '2026-04-11T08:30:00.000Z',
+          },
+        },
+      }),
+    )
 
-    expect(screen.getByText('설정은 기준 데이터와 운영 진입점만 제공합니다.')).toBeTruthy()
-    expect(screen.getByText('네이버와 쿠팡 연결 정보는 `/integrations`에서만 수정합니다.')).toBeTruthy()
-    expect(screen.getByRole('heading', { name: '기준 데이터' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: '스토어 연결' })).toBeTruthy()
-    expect(screen.getByText('연결 상태와 자격증명 편집은 `/integrations`에서만 처리합니다.')).toBeTruthy()
+    expect(screen.queryByText('설정은 기준 데이터와 운영 진입점만 제공합니다.')).toBeNull()
+    expect(screen.getByRole('heading', { name: '네이버' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '쿠팡' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '네이버 저장' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '쿠팡 저장' })).toBeTruthy()
   })
 })

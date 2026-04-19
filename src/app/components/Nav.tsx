@@ -6,13 +6,12 @@ import { type ReactNode, useState } from 'react'
 import {
   Boxes,
   ChartColumn,
-  Factory,
-  Inbox,
+  Database,
   LayoutDashboard,
   LogOut,
   Menu,
+  PackageSearch,
   Settings2,
-  Store,
   Truck,
 } from 'lucide-react'
 import { logout } from '@/app/login/actions'
@@ -35,15 +34,11 @@ type NavItem = {
 const directItems: NavItem[] = [
   { href: '/', label: '대시보드', icon: <LayoutDashboard className="h-4 w-4" /> },
   { href: '/inventory', label: '재고 운영', icon: <Boxes className="h-4 w-4" /> },
+  { href: '/products', label: '상품 관리', icon: <Database className="h-4 w-4" /> },
+  { href: '/sourcing', label: '소싱', icon: <PackageSearch className="h-4 w-4" /> },
   { href: '/shipping', label: '운송장', icon: <Truck className="h-4 w-4" /> },
   { href: '/analytics', label: '분석', icon: <ChartColumn className="h-4 w-4" /> },
-  { href: '/integrations', label: '스토어 연결', icon: <Store className="h-4 w-4" /> },
   { href: '/settings', label: '설정', icon: <Settings2 className="h-4 w-4" /> },
-]
-
-const sourcingItems: NavItem[] = [
-  { href: '/sourcing/factories', label: '외부 공장', icon: <Factory className="h-4 w-4" /> },
-  { href: '/sourcing/arrivals', label: '입고 예정', icon: <Inbox className="h-4 w-4" /> },
 ]
 
 function isActivePath(pathname: string, href: string) {
@@ -70,40 +65,12 @@ function NavLink({
   return <MenuLink href={item.href} label={item.label} icon={item.icon} active={isActive} compact={compact} onClick={onNavigate} />
 }
 
-function SourcingSection({
-  pathname,
-  open,
-  onToggle,
-  onNavigate,
-}: {
-  pathname: string
-  open: boolean
-  onToggle: () => void
-  onNavigate?: () => void
-}) {
-  const isSectionActive = pathname.startsWith('/sourcing')
-
-  return (
-    <MenuSection title="소싱" icon={<Factory className="h-4 w-4" />} open={open || isSectionActive} onToggle={onToggle}>
-      <div id="sourcing-navigation-group" className="space-y-1">
-        {sourcingItems.map((item) => (
-          <NavLink key={item.href} item={item} pathname={pathname} compact onNavigate={onNavigate} />
-        ))}
-      </div>
-    </MenuSection>
-  )
-}
-
 function NavigationContent({
   pathname,
-  sourcingOpen,
-  onToggleSourcing,
   user,
   onNavigate,
 }: {
   pathname: string
-  sourcingOpen: boolean
-  onToggleSourcing: () => void
   user?: NavProps['user']
   onNavigate?: () => void
 }) {
@@ -117,16 +84,7 @@ function NavigationContent({
       </div>
 
       <nav className="flex-1 space-y-1.5 overflow-y-auto px-3 py-3.5" aria-label="주요 메뉴">
-        {directItems.slice(0, 2).map((item) => (
-          <NavLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />
-        ))}
-        <SourcingSection
-          pathname={pathname}
-          open={sourcingOpen}
-          onToggle={onToggleSourcing}
-          onNavigate={onNavigate}
-        />
-        {directItems.slice(2).map((item) => (
+        {directItems.map((item) => (
           <NavLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />
         ))}
       </nav>
@@ -157,20 +115,12 @@ function NavigationContent({
 
 export default function Nav({ user }: NavProps) {
   const pathname = usePathname()
-  const sourcingActive = pathname.startsWith('/sourcing')
-  const [desktopSourcingOpen, setDesktopSourcingOpen] = useState(true)
-  const [mobileSourcingOpen, setMobileSourcingOpen] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
     <>
       <aside className="fixed left-0 top-0 z-30 hidden h-screen w-[17rem] border-r border-slate-200 bg-white/90 backdrop-blur md:flex md:flex-col">
-        <NavigationContent
-          pathname={pathname}
-          sourcingOpen={sourcingActive || desktopSourcingOpen}
-          onToggleSourcing={() => setDesktopSourcingOpen((current) => !current)}
-          user={user}
-        />
+        <NavigationContent pathname={pathname} user={user} />
       </aside>
 
       <div className={ui.mobileTopbar}>
@@ -215,8 +165,6 @@ export default function Nav({ user }: NavProps) {
             </div>
             <NavigationContent
               pathname={pathname}
-              sourcingOpen={sourcingActive || mobileSourcingOpen}
-              onToggleSourcing={() => setMobileSourcingOpen((current) => !current)}
               user={user}
               onNavigate={() => setMobileOpen(false)}
             />

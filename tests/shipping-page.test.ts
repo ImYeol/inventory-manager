@@ -63,7 +63,7 @@ describe('ShippingPage', () => {
 
     expect(mocks.getShippingSettingsSummary).toHaveBeenCalledTimes(1)
     expect(mocks.shippingView).toHaveBeenCalledWith(expect.objectContaining({ settingsSummary: summary }))
-    expect(screen.getByRole('link', { name: '스토어 연결로 이동' }).getAttribute('href')).toBe('/integrations')
+    expect(screen.queryByRole('link', { name: '스토어 연결로 이동' })).toBeNull()
     expect(screen.getByTestId('shipping-view')).toBeTruthy()
   })
 })

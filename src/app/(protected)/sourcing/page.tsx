@@ -2,6 +2,6 @@ import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
-export default async function MasterDataPage() {
-  redirect('/products')
+export default function SourcingPage() {
+  redirect('/sourcing/factories')
 }
