@@ -5,7 +5,6 @@
 - `/Users/yeol-mac/Development/seleccase-inventory/docs/PRD.md`
 - `/Users/yeol-mac/Development/seleccase-inventory/docs/ARCHITECTURE.md`
 - `/Users/yeol-mac/Development/seleccase-inventory/docs/UI_GUIDE.md`
-- `/Users/yeol-mac/Development/seleccase-inventory/DESIGN_SYSTEM.md`
 - `/Users/yeol-mac/Development/seleccase-inventory/src/app/components/Nav.tsx`
 - `/Users/yeol-mac/Development/seleccase-inventory/src/app/components/ui.tsx`
 - `/Users/yeol-mac/Development/seleccase-inventory/src/app/globals.css`

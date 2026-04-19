@@ -1,36 +1,17 @@
 {
   "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "*",
-        "handlers": [
-          {
-            "type": "command",
-            "command": "python3 .codex/hooks/session_start.py",
-            "timeoutSec": 5
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "matcher": "*",
-        "handlers": [
-          {
-            "type": "command",
-            "command": "python3 .codex/hooks/user_prompt_submit.py",
-            "timeoutSec": 5
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
         "handlers": [
           {
             "type": "command",
-            "command": "python3 .codex/hooks/pre_tool_use.py",
+            "command": "zsh .codex/hooks/dangerous-cmd-guard.sh",
+            "timeoutSec": 5
+          },
+          {
+            "type": "command",
+            "command": "zsh .codex/hooks/tdd-guard.sh",
             "timeoutSec": 5
           }
         ]

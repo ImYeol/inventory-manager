@@ -118,7 +118,7 @@ def build_markdown(selected: dict[str, Any], phase_index: dict[str, Any], curren
             "",
             f"- Phase metadata validation: {'PASS' if validation[0] else 'FAIL'}",
             f"- Validation output: {validation[1] or 'no output'}",
-            "- Review against AGENTS.md, docs/ARCHITECTURE.md, docs/ADR.md, docs/UI_GUIDE.md, DESIGN_SYSTEM.md, and the active step file.",
+            "- Review against AGENTS.md, docs/ARCHITECTURE.md, docs/ADR.md, docs/UI_GUIDE.md, and the active step file.",
             "- Findings should be emitted first with absolute file paths and tight ranges.",
         ]
     )

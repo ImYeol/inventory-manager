@@ -8,7 +8,6 @@
 - `/Users/yeol-mac/Development/seleccase-inventory/docs/ARCHITECTURE.md`
 - `/Users/yeol-mac/Development/seleccase-inventory/docs/UI_GUIDE.md`
 - `/Users/yeol-mac/Development/seleccase-inventory/docs/ADR.md`
-- `/Users/yeol-mac/Development/seleccase-inventory/DESIGN_SYSTEM.md`
 
 ## 작업
 - repo-local Codex hooks를 정리한다.
@@ -24,7 +23,7 @@ npm run test
 
 ## 검증 절차
 1. `.codex/config.toml`에 `codex_hooks = true`가 설정되어 있다.
-2. `.codex/hooks.json`이 유효한 JSON이며 `SessionStart`, `UserPromptSubmit`, `PreToolUse`만 사용한다.
+2. `.codex/hooks.json`이 유효한 JSON이며 최소 `PreToolUse` guard 구성을 사용한다.
 3. 문서 전반에서 `재고 운영`이 단일 허브로 정리되어 있다.
 4. phase index의 step 0 이름과 문서 방향이 일치한다.
 

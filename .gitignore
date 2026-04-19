@@ -52,9 +52,10 @@ __pycache__/
 
 # misc dev files
 dbcheck.*
-AGENTS.md
 
-# phase
-
-/phases
-
+# phase artifacts
+/phases/*
+!/phases/index.json
+!/phases/inventory-shipping-settings-reset/
+!/phases/inventory-shipping-settings-reset/index.json
+!/phases/inventory-shipping-settings-reset/step*.md

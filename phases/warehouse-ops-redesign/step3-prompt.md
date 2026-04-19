@@ -27,7 +27,7 @@
 
 ## Repo Contract
 - This file is the single source of truth for repository-specific Codex instructions.
-- For non-trivial work, read `AGENTS.md`, `docs/`, `DESIGN_SYSTEM.md`, `phases/`, `.codex/config.toml`, and `.codex/hooks.json` first.
+- For non-trivial work, read `AGENTS.md`, `docs/`, `phases/`, `.codex/config.toml`, and `.codex/hooks.json` first.
 - Prefer repo-local skills at `.agents/skills/seleccase-harness` and `.agents/skills/seleccase-review` when the task matches them.
 
 ## Project Context
@@ -100,11 +100,11 @@
 - Prefer `surface` blocks, `surface-header`, and `ui-empty` for card layouts, sections, and empty states; avoid nested one-off borders unless the pattern is repeated in multiple places.
 - Follow accessibility defaults already in the codebase: semantic headings, visible focus rings, large click targets, and labels linked to controls.
 - For React UI changes, keep derived state local, avoid unnecessary effects, and prefer server-rendered shells with minimal client interactivity.
-- When adding a new visual pattern, document the token or component in `DESIGN_SYSTEM.md` first and reuse it across at least two screens when possible.
+- When adding a new visual pattern, document the token or component in `docs/UI_GUIDE.md` first and reuse it across at least two screens when possible.
 
 ## Codex Harness Rules
 - Manage repo-local Codex behavior through `.codex/config.toml` and `.codex/hooks.json`.
-- Active hooks are limited to `SessionStart`, `UserPromptSubmit`, and `PreToolUse`.
+- Active hooks are limited to repo-safe guard hooks such as `PreToolUse`.
 - Hooks should only reinforce repo context, planning and navigation context, and destructive-command protection.
 - For plan-only requests, update docs, hooks, skills, and phase files before application code.
 - Phase work should follow `phases/index.json`, `phases/<phase>/index.json`, and the active `step*.md` contract in order.
@@ -665,13 +665,13 @@ repo-local Codex 자동 맥락 주입은 아래로 관리한다.
 ├── config.toml
 ├── hooks.json
 └── hooks/
-    ├── session_start.py
-    ├── user_prompt_submit.py
-    └── pre_tool_use.py
+    ├── dangerous-cmd-guard.sh
+    ├── tdd-guard.sh
+    └── tdd-guard.sh
 ```
 
-- `SessionStart`: 저장소 하네스와 IA 원칙 재주입
-- `UserPromptSubmit`: 계획/네비게이션/스토어 연결 관련 프롬프트 보강
+- `PreToolUse`: 위험 명령과 비테스트 구현 수정을 차단
+- 추가 planning context는 `AGENTS.md`와 `docs/`를 source of truth로 유지
 - `PreToolUse`: 파괴적 Bash 명령 차단
 
 ## 테스트 전략
@@ -1070,25 +1070,25 @@ Seleccase Inventory를 `재고 운영 허브 + 소싱 확장 + 스토어 연결 
 
 {
   "hooks": {
-    "SessionStart": [
+    "PreToolUse": [
       {
         "matcher": "*",
         "handlers": [
           {
             "type": "command",
-            "command": "python3 .codex/hooks/session_start.py",
+            "command": "zsh .codex/hooks/dangerous-cmd-guard.sh",
             "timeoutSec": 5
           }
         ]
       }
     ],
-    "UserPromptSubmit": [
+    "PreToolUse": [
       {
         "matcher": "*",
         "handlers": [
           {
             "type": "command",
-            "command": "python3 .codex/hooks/user_prompt_submit.py",
+            "command": "zsh .codex/hooks/tdd-guard.sh",
             "timeoutSec": 5
           }
         ]
@@ -1100,7 +1100,7 @@ Seleccase Inventory를 `재고 운영 허브 + 소싱 확장 + 스토어 연결 
         "handlers": [
           {
             "type": "command",
-            "command": "python3 .codex/hooks/pre_tool_use.py",
+            "command": "zsh .codex/hooks/tdd-guard.sh",
             "timeoutSec": 5
           }
         ]
