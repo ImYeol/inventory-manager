@@ -14,7 +14,10 @@
     {
       "step": 1,
       "name": "navigation-products-and-settings-ownership",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-04-20T04:30:44+0900",
+      "completed_at": "2026-04-20T04:40:26+0900",
+      "summary": "Reordered the global nav to keep product management visible, removed the stray settings product-management CTA, and consolidated store-connection ownership inside settings with query-param deep links from legacy routes."
     },
     {
       "step": 2,
