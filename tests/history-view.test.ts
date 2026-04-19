@@ -6,7 +6,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import HistoryView from '@/app/(protected)/history/HistoryView'
 
 describe('HistoryView', () => {
-  it('shows source metadata and filters by source channel', () => {
+  it('shows source metadata and keeps the filter chrome compact', () => {
     render(
       React.createElement(HistoryView, {
         models: [{ id: 1, name: 'LP01' }],
@@ -53,6 +53,9 @@ describe('HistoryView', () => {
       }),
     )
 
+    expect(screen.getAllByRole('heading', { name: '이력 필터' })).toHaveLength(1)
+    expect(screen.getAllByText('모델, 창고, 기간을 좁혀 입고·출고·재고조정 이력을 빠르게 확인하세요.')).toHaveLength(1)
+
     fireEvent.change(screen.getByLabelText('등록 방식'), { target: { value: 'factory-arrival' } })
 
     expect(screen.getByText('1건 조회됨')).toBeTruthy()
@@ -64,7 +67,7 @@ describe('HistoryView', () => {
     expect(within(table).queryByText('오금동')).toBeNull()
   })
 
-  it('applies the controlled warehouse context when embedded in the inventory hub', () => {
+  it('applies the controlled warehouse context when embedded in the inventory hub without top-level chrome', () => {
     render(
       React.createElement(HistoryView, {
         models: [{ id: 1, name: 'LP01' }],
@@ -110,5 +113,7 @@ describe('HistoryView', () => {
     expect(screen.getAllByText('오금동').length).toBeGreaterThan(0)
     expect(screen.getByText('1건 조회됨')).toBeTruthy()
     expect(screen.queryByRole('combobox', { name: '창고' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: '이력 필터' })).toBeNull()
+    expect(screen.getByText('창고 컨텍스트')).toBeTruthy()
   })
 })

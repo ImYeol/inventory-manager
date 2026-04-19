@@ -55,7 +55,9 @@ def main() -> None:
         "inventory operations hub, sourcing expansion, store connections, or settings "
         "consolidation. Avoid adding expandable navigation unless the category truly has "
         "multiple child screens. Prefer reusing existing shipping credentials/actions when "
-        "discussing Naver or Coupang integrations."
+        "discussing Naver or Coupang integrations. Prefer shared badges, icon + text actions, "
+        "compact toolbars, and route-level responsibility separation over page-local duplicate "
+        "cards, forms, or CTA links."
     )
     print(json.dumps({"hookSpecificOutput": {"additionalContext": context}}))
 

@@ -10,8 +10,10 @@ def main() -> None:
         "subsections. Use expandable sidebar groups only when a section has 2 or more child "
         "screens; otherwise prefer direct menu items. Keep analytics and shipping intact. "
         "Treat Naver and Coupang as store connections that feed shipping, not as hidden "
-        "settings-only credentials. For plan-only requests, update docs, skills, hooks, and "
-        "phase files before application code."
+        "settings-only credentials. Use shared status badges and icon-bearing action buttons "
+        "instead of page-local status styling. Avoid duplicate route responsibilities, repeated "
+        "CTA clusters, and nested cards that restate the same context. For plan-only requests, "
+        "update docs, skills, hooks, and phase files before application code."
     )
     print(json.dumps({"hookSpecificOutput": {"additionalContext": context}}))
 

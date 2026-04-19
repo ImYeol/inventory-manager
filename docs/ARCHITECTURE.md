@@ -14,7 +14,7 @@
 - `src/lib/api/coupang.ts`
 - `src/lib/actions/shipping.ts`
 
-즉, 이번 작업의 본질은 원장 재작성보다 `정보 구조`, `운영 UX`, `소싱 도메인 확장`, `연동 도메인 재배치`다.
+즉, 이번 작업의 본질은 원장 재작성보다 `정보 구조`, `운영 UX`, `소싱 도메인 확장`, `연동 도메인 재배치`였고, 단계 0-4를 거치며 route ownership과 shared primitive ownership은 이미 정리되었다.
 
 ## 현재 코드베이스 기준선
 ```text
@@ -43,7 +43,7 @@ src/
 └── prisma/schema.prisma
 ```
 
-## 재검토 결과 발견한 문제점
+## 재검토 결과와 정리된 대응
 
 ### 1. 재고 운영 도메인이 과도하게 분리되어 있었다
 - `재고`, `입출고`, `이력`, `창고별 운영`을 별도 1차 목적지로 두면 창고 담당자의 작업 흐름이 여러 페이지 사이에서 끊긴다.
@@ -64,6 +64,21 @@ src/
 ### 4. 네이버/쿠팡이 이미 존재하는데도 IA에서 저평가되어 있었다
 - 현재 코드상 네이버/쿠팡은 단순 설정값이 아니라 주문 조회/발송 액션까지 연결된 실제 도메인이다.
 - 해결: `스토어 연결`을 별도 1차 메뉴로 승격하고, 운송장과 관계를 분리해서 보여준다.
+
+### 5. shared primitive의 소유권이 분리되어 UI가 drift하기 쉬웠다
+- 현재 기준으로 `src/components/ui/*`가 shared primitive의 주 소유권을 갖고 있고, `src/app/components/ui.tsx`는 class preset과 page helper를 담는 얇은 레이어다.
+- 이 구조 덕분에 status pill, menu item, action cluster, section header를 page-local className으로 다시 만드는 drift를 줄였다.
+- 해결: reusable primitive는 `src/components/ui/*`를 기준으로 유지하고, `src/app/components/ui.tsx`는 page helper registry 역할에 둔다.
+
+### 6. `/shipping`, `/integrations`, `/settings`의 route 책임이 겹쳤다
+- `IntegrationsView`와 `SettingsView`는 provider summary와 입력 form이 거의 동일하다.
+- `ShippingView`도 업로드/발송 화면 안에 provider summary, 누락 채널 경고, 연결 유도 CTA를 반복한다.
+- 해결: `/integrations`는 연결 준비와 credential 저장, `/shipping`은 실행 흐름, `/settings`는 관리자 설정으로 역할을 재분리한다.
+
+### 7. 재고 운영 허브는 맞지만 구현 surface가 한 파일에 과밀해졌다
+- `InventoryWorkspace`는 헤더, 창고 컨텍스트, 탭, 액션, 개요 테이블, 빠른 입력, CSV, 이력, overlay까지 한 컴포넌트에 모여 있다.
+- 허브 구조 자체는 맞지만, CTA 반복과 helper copy 누적 때문에 실제 사용 밀도보다 chrome이 먼저 보이게 되었다.
+- 해결: 허브는 유지하되 section component 분리, secondary detail surface, shared toolbar/badge primitive로 밀도를 다시 정리한다.
 
 ## 목표 정보 구조
 ```text
@@ -93,6 +108,15 @@ src/
 - `/analytics`: 분석
 - `/integrations`: 스토어 연결
 - `/settings`: 기준 데이터와 기타 운영 설정
+
+### Screen ownership matrix
+- `/inventory`: 창고 컨텍스트, overview/inbound/outbound/csv/history workspace, quick entry, dense tables
+- `/shipping`: 업로드, 미리보기, provider 주문 조회, 매칭, 발송
+- `/integrations`: provider 연결 상태, masked summary, 최근 갱신 시각, credential 입력/갱신
+- `/settings`: 기준 데이터와 운영 관리자 기능
+- `/analytics`: 리포트 조회와 요약 시각화
+
+이 ownership matrix를 넘는 중복이 생기면 component 재사용 문제가 아니라 route 책임 문제로 본다.
 
 ### 재고 운영 허브 내부 상태
 `/inventory` 안에서 아래 워크스페이스를 탭/세그먼트/query param 기반으로 전환한다.
@@ -166,6 +190,22 @@ src/app/components/
 │   └── ResponsiveDataList.tsx
 └── ui.tsx
 ```
+
+향후 shared primitive 수렴 방향은 아래와 같다.
+
+```text
+src/components/ui/
+├── badge-1.tsx
+├── status-badge.tsx
+├── icon-button.tsx
+├── toolbar.tsx
+├── menu.tsx
+├── basic-data-table.tsx
+└── table.tsx
+```
+
+- 외부 예제를 도입할 때도 root `/components/ui`가 아니라 `src/components/ui`를 사용한다.
+- `components.json`이 아직 없더라도 path 기준은 `src` alias에 맞춰 유지한다.
 
 ## 데이터 모델 전략
 
@@ -249,7 +289,7 @@ transactions (추가 필드 제안)
 → warehouse selector 설정
 → tab 선택(개요/입고/출고/CSV/이력)
 → 공통 warehouse context 기준으로 loader/action 실행
-→ summary + table + form + history 렌더링
+→ table를 중심으로 필요한 summary, form, history를 보조 렌더링
 ```
 
 ### B. 수동/CSV 입출고

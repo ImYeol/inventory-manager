@@ -56,7 +56,7 @@ function makeExcelFile() {
 }
 
 describe('ShippingView', () => {
-  it('shows a blocking empty state when both provider keys are missing', () => {
+  it('surfaces readiness state without blocking upload when both provider keys are missing', () => {
     render(
       React.createElement(ShippingView, {
         settingsSummary: {
@@ -67,14 +67,20 @@ describe('ShippingView', () => {
     )
 
     expect(screen.getByText('운송장 엑셀 업로드')).toBeTruthy()
-    expect(screen.getByText('API 연동 준비가 필요합니다.')).toBeTruthy()
-    expect(screen.getByText(/스토어 연결에서 네이버와 쿠팡 API 키를 저장한 뒤 다시 업로드하세요/)).toBeTruthy()
+    expect(screen.getByText('연동 준비 상태')).toBeTruthy()
+    expect(
+      screen.getByText('연결 준비와 키 관리는 스토어 연결에서만 처리합니다. 여기서는 업로드와 발송만 진행합니다.')
+    ).toBeTruthy()
     expect(screen.getByText('엑셀 업로드')).toBeTruthy()
     expect(screen.getByLabelText('운송장 엑셀 업로드')).toBeTruthy()
-    expect(screen.getAllByRole('link', { name: '스토어 연결로 이동' }).length).toBeGreaterThan(0)
+    expect(screen.getByRole('link', { name: '스토어 연결로 이동' }).getAttribute('href')).toBe('/integrations')
+    expect(screen.queryByLabelText('네이버 Client ID')).toBeNull()
+    expect(screen.queryByLabelText('쿠팡 Access Key')).toBeNull()
+    expect(screen.queryByText('네이버 저장')).toBeNull()
+    expect(screen.queryByText('쿠팡 저장')).toBeNull()
   })
 
-  it('keeps the upload flow available for configured providers while surfacing partial setup gaps', () => {
+  it('keeps the upload flow execution-focused while surfacing partial setup gaps', () => {
     render(
       React.createElement(ShippingView, {
         settingsSummary: {
@@ -88,11 +94,13 @@ describe('ShippingView', () => {
       })
     )
 
-    expect(screen.getByText('일부 연동만 완료되었습니다.')).toBeTruthy()
-    expect(screen.getByText(/설정된 채널만 주문을 조회할 수 있습니다/)).toBeTruthy()
-    expect(screen.getByText('엑셀 업로드')).toBeTruthy()
-    expect(screen.getByText('쿠팡 API 키를 먼저 연결하세요.')).toBeTruthy()
-    expect(screen.getByRole('link', { name: '쿠팡 연결하기' })).toBeTruthy()
+    expect(screen.getByText('연동 준비 상태')).toBeTruthy()
+    expect(
+      screen.getByText('연결 준비와 키 관리는 스토어 연결에서만 처리합니다. 여기서는 업로드와 발송만 진행합니다.')
+    ).toBeTruthy()
+    expect(screen.getAllByText('네이버 연결됨').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('쿠팡 미연결').length).toBeGreaterThan(0)
+    expect(screen.getByRole('link', { name: '스토어 연결로 이동' }).getAttribute('href')).toBe('/integrations')
   })
 
   it('handles drag-and-drop upload and renders 엑셀뷰 table from uploaded sheet', async () => {

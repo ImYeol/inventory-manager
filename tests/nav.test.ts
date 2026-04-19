@@ -40,9 +40,12 @@ afterEach(() => {
 })
 
 describe('Nav', () => {
-  it('renders the requested primary navigation labels for the mixed sidebar', () => {
+  it('renders the simplified primary navigation without the old kicker copy', () => {
     render(React.createElement(Nav))
 
+    expect(screen.queryByText('Warehouse Console')).toBeNull()
+    expect(screen.queryByText('재고 운영 허브 중심의 운영 콘솔')).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Seleccase Inventory' })).toBeTruthy()
     expect(screen.getByRole('link', { name: '대시보드' }).getAttribute('href')).toBe('/')
     expect(screen.getByRole('link', { name: '재고 운영' }).getAttribute('href')).toBe('/inventory')
     expect(screen.getByRole('button', { name: '소싱' })).toBeTruthy()
@@ -69,8 +72,7 @@ describe('Nav', () => {
     render(React.createElement(Nav))
 
     const activeLink = screen.getAllByRole('link', { name: '분석' })[0]
-    expect(activeLink.className).toContain('bg-slate-50')
-    expect(activeLink.className).toContain('text-slate-950')
+    expect(activeLink.getAttribute('aria-current')).toBe('page')
   })
 
   it('marks sourcing as active on the sourcing child route', () => {

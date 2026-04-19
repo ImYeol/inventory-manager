@@ -28,13 +28,13 @@ afterEach(() => {
 })
 
 describe('SourcingFactoriesPage', () => {
-  it('loads factories data and passes it to the view', async () => {
+  it('keeps the sourcing factories route as a compact shell around the shared view', async () => {
     const factories = [{ id: 1, name: '광주 협력사' }]
     mocks.getFactoriesData.mockResolvedValue(factories)
 
     render(await SourcingFactoriesPage())
 
-    expect(mocks.factoriesView).toHaveBeenCalledWith(expect.objectContaining({ factories }))
     expect(screen.getByTestId('factories-view')).toBeTruthy()
+    expect(mocks.factoriesView).toHaveBeenCalledWith(expect.objectContaining({ factories }))
   })
 })

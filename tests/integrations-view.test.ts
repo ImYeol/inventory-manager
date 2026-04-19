@@ -24,7 +24,7 @@ afterEach(() => {
 })
 
 describe('IntegrationsView', () => {
-  it('renders masked summaries and keeps inputs empty', () => {
+  it('renders masked summaries and owns the credential inputs', () => {
     render(
       React.createElement(IntegrationsView, {
         summary: {
@@ -47,6 +47,8 @@ describe('IntegrationsView', () => {
     expect(screen.getByText('V-••••22')).toBeTruthy()
     expect((screen.getByLabelText('네이버 Client ID') as HTMLInputElement).value).toBe('')
     expect((screen.getByLabelText('쿠팡 Access Key') as HTMLInputElement).value).toBe('')
+    expect(screen.getByRole('button', { name: '네이버 저장' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '쿠팡 저장' })).toBeTruthy()
   })
 
   it('submits replacement values and refreshes the masked summary', async () => {

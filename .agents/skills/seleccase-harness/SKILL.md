@@ -140,6 +140,10 @@ Use this skill when the user wants structured planning or phased execution in th
 - Keep `기준 데이터` out of top-level IA unless the user explicitly wants it promoted again.
 - Prefer quick multi-item manual entry plus CSV, not single-item-only forms.
 - Extend shared UI primitives before adding page-local styling.
+- Converge reusable UI primitives under `src/components/ui/*`; treat `src/app/components/ui.tsx` as the class preset bridge, not the only place new components should live.
+- Prefer shared status badges and icon + text action buttons over page-local pills or all-text button rows.
+- If `/integrations`, `/shipping`, and `/settings` start showing the same provider form or summary again, stop and resolve ownership before polishing visuals.
+- Avoid repeated header copy, duplicate CTA clusters, and multi-layer card nesting when simplifying dense operations pages.
 - Prefer the smallest viable schema and UI change that satisfies the step.
 
 ## Acceptance Baseline

@@ -49,3 +49,8 @@ next-env.d.ts
 # misc dev files
 dbcheck.*
 AGENTS.md
+
+# phase
+
+/phases
+

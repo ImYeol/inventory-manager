@@ -27,7 +27,7 @@ beforeEach(() => {
 })
 
 describe('DashboardPage', () => {
-  it('renders the dashboard summary and recent activity from shared data sources', async () => {
+  it('renders a concise dashboard chrome with the shared metric surface', async () => {
     mocks.getAnalyticsData.mockResolvedValue({
       models: [
         { id: 1, name: 'LP01' },
@@ -88,16 +88,16 @@ describe('DashboardPage', () => {
     render(element as React.ReactElement)
 
     expect(screen.getByText('대시보드')).toBeTruthy()
+    expect(screen.getByText('재고 운영 상태와 최근 흐름을 한 화면에서 확인합니다.')).toBeTruthy()
     expect(screen.getByText('전체 재고')).toBeTruthy()
+    expect(screen.getByText('오늘 입고')).toBeTruthy()
+    expect(screen.getByText('오늘 출고')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '주의 품목' })).toBeTruthy()
     expect(screen.getByText('17')).toBeTruthy()
     expect(screen.getByText('최근 처리 이력')).toBeTruthy()
-    expect(screen.getByText('LP01')).toBeTruthy()
     expect(screen.getByRole('link', { name: /전체 재고/ }).getAttribute('href')).toBe('/inventory')
     expect(screen.getByRole('link', { name: /오늘 입고/ }).getAttribute('href')).toBe('/history')
-    expect(screen.getByRole('link', { name: '주의 품목 KPI' }).getAttribute('href')).toBe('/inventory')
     expect(screen.getByRole('link', { name: '운영 포인트: 재고현황' }).getAttribute('href')).toBe('/inventory')
-    expect(screen.getByRole('link', { name: /최근 처리 이력/ }).getAttribute('href')).toBe('/history')
-    expect(screen.getByRole('link', { name: '재고현황 보기' }).getAttribute('href')).toBe('/inventory')
-    expect(screen.getByRole('link', { name: '기준 데이터 관리' }).getAttribute('href')).toBe('/settings/master-data')
+    expect(screen.getByRole('link', { name: '기준 데이터' }).getAttribute('href')).toBe('/settings/master-data')
   })
 })

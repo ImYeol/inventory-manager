@@ -9,6 +9,26 @@
 3. 입력보다 검증이 먼저다. CSV, 일괄 반영, 원클릭 입고는 항상 미리보기와 상태 피드백을 동반해야 한다.
 4. 확장형 메뉴는 필요한 곳에만 쓴다.
 5. 분석, 운송장, 스토어 연결은 같은 운영 콘솔 안에서 일관된 토큰과 컴포넌트를 공유해야 한다.
+6. 페이지 chrome은 제목 우선, 짧은 copy 우선으로 유지한다.
+7. 재고 운영 workspace는 table-first다. 개요/입고/출고/CSV/이력의 기본 진입은 표와 작업 흐름이며, summary card는 기본 배치가 아니다.
+8. 상태 정보는 본문 badge와 table cell에서 우선 표현하고, 설명 문장을 늘려 대신하지 않는다.
+9. 반복 액션은 아이콘 + 텍스트 조합으로 빠르게 식별되게 하고, 한 surface 안의 버튼 위계는 primary 1개를 기본으로 한다.
+
+## 페이지 chrome 예산
+- 제목 위에 kicker, eyebrow, label, tag cluster를 두지 않는다.
+- 상단 chrome은 현재 workspace의 맥락을 다시 설명하지 않는다. `재고 운영`, `입고`, `출고` 같은 context label을 header copy에서 반복하지 말고 workspace 본문으로 넘긴다.
+- 페이지 헤더는 기본적으로 `title + 1문장 설명 + 1개 액션 영역`까지만 허용한다.
+- 설명 문구는 사용자가 지금 당장 알아야 하는 정보만 남기고, 반복 설명이나 배경 설명은 제거한다.
+- 상단에 badges/tags를 여러 개 쌓아 놓아 상태를 "설명"하려 하지 않는다. 필요한 상태는 표 본문이나 pill로 흡수한다.
+- tab은 라벨만으로 의미가 서도록 작성하고, 기본값으로 helper sentence를 아래에 붙이지 않는다.
+- tables는 기본적으로 live/actionable column만 노출하고, 정적 메타데이터는 detail drawer나 secondary view로 내린다.
+
+## 현재 UI 복잡성의 원인
+- `src/app/components/inventory/InventoryWorkspace.tsx`는 상단 탭, 상단 CTA, 탭 내부 CTA, overlay CTA가 함께 존재해 `개요/입고/출고`가 여러 위치에서 반복된다.
+- `src/app/(protected)/shipping/ShippingView.tsx`는 업로드 흐름 화면 안에 스토어 연결 상태 카드, 설정 유도 배너, 채널별 연결 CTA를 함께 넣어 화면 책임이 겹친다.
+- `src/app/(protected)/integrations/IntegrationsView.tsx`와 `src/app/(protected)/settings/SettingsView.tsx`는 거의 동일한 스토어 연결 요약/입력 UI를 중복 렌더링한다.
+- `src/components/ui/*`가 shared primitive의 주 소유권을 갖고, `src/app/components/ui.tsx`는 page helper 레이어로 좁혀졌다. 그 결과 badge, icon button, menu item, section header를 페이지마다 다시 구현하는 drift를 줄일 수 있었다.
+- 문제의 공통 원인은 "상태를 문장으로 더 설명하려는 습관", "요약 카드와 중첩 surface를 기본 레이아웃처럼 쓰는 습관", "한 도메인을 여러 route가 동시에 소유하는 구조"다.
 
 ## 정보 구조와 메뉴 원칙
 
@@ -53,6 +73,14 @@
   - 1번 레퍼런스의 넓은 테이블 + 필터 툴바
   - 2번 레퍼런스의 카테고리형 좌측 메뉴
 
+### 레퍼런스 스크린샷 분석
+- 테마: 밝은 neutral background 위에 얇은 border와 한 개의 강조색만 쓰는 운영형 콘솔이다. 브랜드색보다 상태색과 정보 밀도가 더 중요하다.
+- 색상: 기본 화면은 거의 white, light gray, muted gray로 구성되고, 강조는 CTA 1개와 상태 badge에서만 나타난다. 우리 구현은 이를 그대로 보라색으로 복제하지 않고 slate + amber accent + status palette로 재해석한다.
+- 폰트: 장식적인 타이포가 아니라 medium weight 중심의 UI 산세리프다. 제목과 표 숫자만 강하게 주고 설명문은 한 단계 낮은 대비로 눌러야 한다.
+- 여백: 헤더와 툴바는 16~24px 단위로 여유가 있지만, 버튼과 filter chip은 36~40px 높이의 compact control이다. 넓은 여백과 큰 카드가 아니라 compact control + 넓은 table area가 핵심이다.
+- 컴포넌트: 좌측 nav, 상단 유틸리티, 단일 페이지 헤더, 상태 filter, dense table, row-level status badge가 화면 대부분을 차지한다. summary card는 전면이 아니라 주변 역할이다.
+- 화면 구성: 상단에서 아래로 `title/primary action -> compact filter/action bar -> table`의 단선형 흐름이다. 상태 설명은 표 본문과 badge로 흡수되고, 같은 정보를 카드/설명/버튼에서 다시 반복하지 않는다.
+
 ### 색상 제안
 | 용도 | 토큰 | 제안 값 |
 |------|------|---------|
@@ -74,6 +102,15 @@
 | 주의 | 재고 부족/부분 입고 | `#D97706` |
 | 위험 | 품절/실패/오류 | `#DC2626` |
 | 정보 | 예정 입고/처리 대기 | `#2563EB` |
+
+## 배지, 아이콘, 버튼 규칙
+- 상태 badge는 `neutral`, `info`, `success`, `warning`, `danger` 다섯 계열을 기본으로 한다.
+- status 정보는 badge에서 먼저 전달하고, 같은 상태를 helper copy와 설명 카드로 다시 풀어 쓰지 않는다.
+- 테이블 row 상태, provider 연결 상태, CSV 검증 상태, 최근 처리 결과는 모두 shared badge primitive를 사용한다.
+- 메뉴, 주요 CTA, 반복 액션 버튼에는 lucide-react 아이콘을 붙인다. icon-only 버튼은 검색, 정렬, 더보기처럼 의미가 업계 표준으로 굳은 경우로 제한한다.
+- 버튼 위계는 `primary 1개 + secondary/ghost 보조`를 기본으로 한다. 같은 시야에서 동일 우선순위의 filled button이 여러 개 보이면 구조를 다시 나눈다.
+- filled primary는 저장, 업로드, 보내기 같은 실행 액션에만 사용한다. 이동, 열기, 돌아가기, 설정 진입은 기본적으로 secondary 또는 ghost다.
+- nav item은 아이콘 + 텍스트 조합을 기본으로 하고, badge는 count나 새로운 상태를 보완하는 용도에만 사용한다.
 
 ## 타이포그래피
 - 기본 UI 폰트: `SUIT Variable` 또는 `Pretendard Variable`
@@ -103,10 +140,12 @@
 - 공통 컨텍스트: warehouse selector
 - 워크스페이스 전환: `개요`, `입고`, `출고`, `CSV`, `이력`
 - 메인 패턴:
-  - `개요`: summary cards + filter toolbar + dense table
+  - `개요`: dense table + compact filter bar + primary actions
   - `입고/출고`: quick entry dialog/sheet + validation + result summary
   - `CSV`: upload block + preview table + error list
   - `이력`: audit table + detail drawer
+- `개요/입고/출고`를 top-level route로 다시 쪼개지 않는다. 복잡한 SKU 상세는 drawer 또는 secondary detail page로 내리고, 허브 헤더와 CTA를 반복하지 않는다.
+- 한 화면에 `상단 CTA + 본문 CTA + overlay CTA`가 모두 있지 않게 한다. 기본 CTA는 workspace context당 한 군데만 둔다.
 
 ### 1-1. 빠른 입고/출고 패턴
 - 기본 진입은 `빠른 등록` CTA다.
@@ -130,24 +169,45 @@
 - `창고로 입고` CTA는 row action 또는 bulk action 형태로 제공한다
 
 ### 4. 스토어 연결
-- 카드 또는 2열 panel 구조를 사용한다
 - provider별 연결 상태, 마스킹된 정보, 최근 갱신 시각을 노출한다
 - 목적은 주문 작업이 가능한 준비 상태를 보여주는 것이다
+- 자격증명 입력과 갱신은 이 화면만 소유한다.
+- provider 상태는 카드 2개와 compact alert 정도로 끝내고, 같은 상태를 설정 화면이나 운송장 본문에서 다시 중복 렌더링하지 않는다.
 
 ### 5. 운송장
 - 업로드 CTA와 provider 상태 summary를 상단에 둔다
 - `스토어 연결`과 역할이 겹치지 않게, 여기서는 실제 주문/발송 처리 중심으로 둔다
 - 별도 하위 메뉴 구조가 필요할 정도로 화면이 분화되기 전까지는 direct item으로 유지한다
+- 여기서 필요한 provider 정보는 `연결 여부`, `누락 채널`, `바로 이동 CTA` 정도의 compact strip면 충분하다.
+- 자격증명 폼, 마스킹된 키 상세, 중복 안내 문장은 `스토어 연결`로 이동한다.
 
 ### 6. 분석
 - 핵심 요약과 리포트 접근을 제공하는 direct item으로 유지한다
 - 세부 리포트가 실제로 2개 이상 의미 있는 목적지로 갈라지기 전까지는 하위 메뉴를 만들지 않는다
+
+### 7. 설정
+- `설정`은 기준 데이터와 운영 관리자 기능의 목적지다.
+- `스토어 연결`과 동일한 provider 입력 폼을 다시 두지 않는다.
+- 섹션은 역할 기준으로 묶고, 안내 문장보다 실제 관리 액션과 데이터 목록을 우선한다.
+
+## 반복 방지 규칙
+- 새로운 shared pattern은 `DESIGN_SYSTEM.md`에 먼저 기록한 뒤 reuse한다.
+- page-local one-off로 보이는 header, tab, table, menu 패턴은 기본적으로 금지한다.
+- 같은 정보를 title, helper text, badge, pill, table column에 중복 노출하지 않는다.
+- summary card를 먼저 쌓고 나서 표를 뒤로 미루는 구성은 operations page의 기본값이 아니다.
+- utility/filter bar는 compact해야 하며, 본문보다 시각적으로 커지면 우선순위가 잘못된 것이다.
+- workspace 내 tabs/buttons는 compact dimensions를 기본으로 두고, 큰 버튼은 예외적인 primary action에만 허용한다.
+- surface/card nesting이 2~3단으로 늘어나면 실패 신호로 본다. 정보를 새 카드에 계속 넣기보다 표, drawer, inline disclosure로 접는다.
+- 화면이 복잡해질수록 chrome을 늘리는 대신 details drawer, inline disclosure, secondary view로 정보를 내린다.
+- route 책임이 겹치기 시작하면 UI를 더 손보지 말고 ownership부터 다시 정리한다. 같은 form, 같은 provider summary, 같은 이동 CTA가 두 route 이상에 있으면 구조가 잘못된 것이다.
+- shared badge, icon button, menu item, section header 없이 page-local className로 상태를 새로 만들지 않는다.
 
 ## 테이블 원칙
 - sticky header 허용
 - 행 높이는 48~56px 범위를 유지
 - 이미지가 없으면 썸네일보다 옵션/상태 정보에 집중
 - 컬럼 수가 많아질 경우 기본/확장 컬럼 체계를 둔다
+- 기본 컬럼에는 현재 작업을 돕는 정보만 둔다. 과거값, 설명문, 내부 식별자는 기본적으로 숨긴다.
 - 상태 pill은 텍스트 + 색상으로 동시에 구분한다
 - 모바일에서는 dense table을 그대로 축소하지 말고 우선순위 컬럼만 남기거나 stacked card로 변환한다
 

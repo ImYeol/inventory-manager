@@ -10,9 +10,8 @@ export default async function AnalyticsPage() {
   return (
     <div className={ui.shell}>
       <PageHeader
-        kicker="Insights"
         title="재고 분석"
-        description="기간, 모델, 창고 단위로 재고 흐름과 비중을 정리합니다."
+        description="기간, 모델, 창고 단위로 재고 흐름을 정리합니다."
       />
       <AnalyticsView
         models={models}

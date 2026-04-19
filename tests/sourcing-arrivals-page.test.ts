@@ -31,7 +31,7 @@ afterEach(() => {
 })
 
 describe('SourcingArrivalsPage', () => {
-  it('loads catalog, factories, and arrivals and passes normalized props to the view', async () => {
+  it('keeps the sourcing arrivals route as a compact shell around the shared view', async () => {
     mocks.getCatalogData.mockResolvedValue({
       models: [
         {
@@ -47,12 +47,13 @@ describe('SourcingArrivalsPage', () => {
 
     render(await SourcingArrivalsPage())
 
+    expect(screen.getByTestId('arrivals-view')).toBeTruthy()
+
     expect(mocks.arrivalsView).toHaveBeenCalledWith(
       expect.objectContaining({
         factories: [{ id: 1, name: '광주 협력사', isActive: true }],
         arrivals: [{ id: 100, factoryName: '광주 협력사' }],
       }),
     )
-    expect(screen.getByTestId('arrivals-view')).toBeTruthy()
   })
 })

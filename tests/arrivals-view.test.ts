@@ -48,7 +48,7 @@ describe('ArrivalsView', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'CSV 등록' }))
-    fireEvent.change(screen.getByLabelText('CSV/표 붙여넣기'), {
+    fireEvent.change(screen.getByLabelText('CSV 붙여넣기'), {
       target: { value: '모델,사이즈,색상,수량\nLP01,S,네이비,12' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'CSV 행 가져오기' }))

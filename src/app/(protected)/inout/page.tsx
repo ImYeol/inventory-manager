@@ -19,9 +19,8 @@ export default async function InOutPage() {
   return (
     <div className={ui.shellNarrow}>
       <PageHeader
-        kicker="Entry"
         title="입출고 입력"
-        description="선택한 모델과 색상, 사이즈 기준으로 거래를 빠르게 등록합니다."
+        description="선택한 모델, 색상, 사이즈 기준으로 거래를 빠르게 등록합니다."
         actions={
           <Link href="/inventory" className={ui.buttonGhost + ' whitespace-nowrap'}>
             재고현황으로 돌아가기

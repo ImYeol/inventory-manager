@@ -73,9 +73,8 @@ export default async function Home() {
   return (
     <div className={ui.shell}>
       <PageHeader
-        kicker="Dashboard"
         title="대시보드"
-        description="재고 운영 상태와 최근 흐름을 한 화면에서 확인하고, 필요한 작업으로 바로 이동합니다."
+        description="재고 운영 상태와 최근 흐름을 한 화면에서 확인합니다."
       />
       <DashboardView
         metrics={metrics}

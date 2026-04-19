@@ -48,9 +48,8 @@ export default async function SettingsMasterDataPage() {
   return (
     <div className={ui.shell}>
       <PageHeader
-        kicker="Settings"
         title="기준 데이터"
-        description="창고 운영 단위와 상품 기준값을 설정에서 함께 관리합니다."
+        description="창고와 상품 기준값을 설정에서 관리합니다."
       />
       <MasterDataManager models={models} warehouses={warehouses} warehouseStats={warehouseStats} />
     </div>

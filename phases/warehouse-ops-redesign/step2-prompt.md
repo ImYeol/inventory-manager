@@ -16,7 +16,7 @@
 
 ## Completed Step Summaries
 
-- Step 0 (codex-hooks-and-doc-foundation): Codex hooks, CLAUDE contract, and redesign docs were aligned to the warehouse-ops, sourcing, and store-connections IA.
+- Step 0 (codex-hooks-and-doc-foundation): Codex hooks, AGENTS.md, and redesign docs were aligned to the warehouse-ops, sourcing, and store-connections IA.
 - Step 1 (navigation-and-route-simplification): Navigation was simplified to direct primary items plus a sourcing group, with protected routes aligned around /inventory and /integrations.
 ## Guardrails
 
@@ -193,7 +193,7 @@ Use CSS variables instead of raw colors for new work.
 ## Layout Patterns
 
 - Keep pages inside `ui.shell` or `ui.shellNarrow`.
-- Prefer a single page header, then summary cards, then filters, then primary table.
+- Operations pages should be table-first by default. Use the page header and filters to support the table, and add summary cards only when a page genuinely needs a glanceable KPI layer.
 - For heavy operations pages, keep action buttons within the same visual zone as the filter toolbar.
 - `재고 운영` should behave like one workspace with internal tab or segmented views, not several disconnected pages.
 - Creation and edit actions should prefer a shared overlay pattern: desktop dialog, mobile full-height sheet.
@@ -584,7 +584,7 @@ transactions (추가 필드 제안)
 → warehouse selector 설정
 → tab 선택(개요/입고/출고/CSV/이력)
 → 공통 warehouse context 기준으로 loader/action 실행
-→ summary + table + form + history 렌더링
+→ table를 중심으로 필요한 summary, form, history를 보조 렌더링
 ```
 
 ### B. 수동/CSV 입출고
@@ -986,7 +986,7 @@ Seleccase Inventory를 `재고 운영 허브 + 소싱 확장 + 스토어 연결 
 - 공통 컨텍스트: warehouse selector
 - 워크스페이스 전환: `개요`, `입고`, `출고`, `CSV`, `이력`
 - 메인 패턴:
-  - `개요`: summary cards + filter toolbar + dense table
+  - `개요`: table-first layout with optional summary cards + filter toolbar
   - `입고/출고`: quick entry dialog/sheet + validation + result summary
   - `CSV`: upload block + preview table + error list
   - `이력`: audit table + detail drawer
@@ -1151,4 +1151,3 @@ npm run test
 ## 금지사항
 - `입고`, `출고`, `이력`을 다시 1차 메뉴 수준으로 분리하지 마라. 이유: 이번 리디자인의 핵심 방향에 역행한다.
 - 모델/옵션 정보를 희생하고 창고명만 강조하지 마라. 이유: SKU 수준 운영 판단이 어려워진다.
-

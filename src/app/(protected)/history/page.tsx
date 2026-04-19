@@ -10,9 +10,8 @@ export default async function HistoryPage() {
   return (
     <div className={ui.shell}>
       <PageHeader
-        kicker="Activity"
         title="이력조회"
-        description="입고, 출고, 재고조정 기록을 기간과 창고, 모델 기준으로 빠르게 조회합니다."
+        description="입고, 출고, 재고조정 기록을 기간과 창고 기준으로 조회합니다."
       />
       <HistoryView
         transactions={transactions}

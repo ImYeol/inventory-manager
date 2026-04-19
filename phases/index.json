@@ -4,6 +4,11 @@
       "dir": "warehouse-ops-redesign",
       "status": "completed",
       "completed_at": "2026-04-19T04:26:00+0900"
+    },
+    {
+      "dir": "ops-ui-consistency-pass",
+      "status": "completed",
+      "completed_at": "2026-04-19T06:56:37+0900"
     }
   ]
 }
