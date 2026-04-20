@@ -76,6 +76,19 @@
 - 상태 문구가 action rail 높이를 밀어 올리지 않는가.
 - 좁아질 때 새 row 대신 무엇을 압축하거나 숨길지 정했는가.
 
+## Filter Budget Rules
+- 기본 필터는 `3~5개`를 기본 목표로 한다. visible column 전체를 필터로 복제하지 않는다.
+- 필터는 빈도와 업무 결정 가치로 고른다. low-frequency audit metadata는 row cell, tooltip, modal, advanced disclosure로 남긴다.
+- 기본 필터로 올리는 항목은 `이 값을 자주 바꾸며 결과 집합을 실제로 좁히는가`를 설명할 수 있어야 한다.
+- `count`, `reset`, active-state 요약은 toolbar meta cluster에 붙인다. 우측 끝 고립 텍스트나 별도 footer strip로 보내지 않는다.
+- toolbar search는 page-global search가 아니면 compact width가 기본이다. `flex-fill` 또는 남는 폭 전체 점유는 예외로 본다.
+- 같은 의미를 `filter + row cell + context pill`로 중복 노출하지 않는다.
+- embedded와 standalone은 같은 control vocabulary를 유지한다. 제거 가능한 것은 page chrome뿐이며, filterable field 자체를 read-only context로 치환하지 않는다.
+- multi-row toolbar가 필요하면 역할별 row를 명시한다.
+  - `select row`: single-select dropdown, status filter, mode filter
+  - `query row`: search, date range, text query
+  - `meta cluster`: reset, result count, compact status
+
 ## 디자인 토큰
 - `--background`
 - `--foreground`
@@ -244,6 +257,9 @@ src/components/ui/
 ### 이력 표
 - 목록과 같은 필터 감각을 유지하되, 변동 시각과 출처 메타를 더 먼저 보여준다.
 - 감사성 정보가 많아져도 summary card를 늘리는 방식으로 대응하지 않는다.
+- 기본 history filter는 `창고`, `구분`, `모델명`, `기간`을 canonical set으로 본다.
+- `등록 방식 / 참조`는 기본적으로 row metadata다. 표에서 이미 읽히는 감사 메타를 기본 필터에 중복 노출하지 않는다.
+- source filter가 필요해지면 dedicated audit page 또는 advanced disclosure로 승격하고, 기본 hub toolbar에는 바로 추가하지 않는다.
 
 ### 입고/출고 팝업
 - 버튼을 누른 타입에 맞는 고정 모드로 열린다.
