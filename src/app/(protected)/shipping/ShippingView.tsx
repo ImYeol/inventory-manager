@@ -1,30 +1,97 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import * as XLSX from 'xlsx'
 import { parseExcelRow, type CourierRow } from '@/lib/excel'
 import * as shippingActions from '@/lib/actions/shipping'
 import type { NaverOrder, CoupangOrder } from '@/lib/actions/shipping'
 import type { ShippingSettingsSummary } from '@/lib/shipping-credentials'
-import { ShippingClassificationBadge, type ShippingClassification } from '@/components/ui/shipping-classification-badge'
+import type { ShippingClassification } from '@/components/ui/shipping-classification-badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { StoreConnectionStatus } from '@/components/ui/store-connection-status'
 import { cx, ui } from '../../components/ui'
 
-type ShippingPreviewRow = {
+type ShippingProvider = 'naver' | 'coupang'
+
+type ProviderMatches = {
+  naver: { productOrderId: string } | null
+  coupang: { shipmentBoxId: number } | null
+}
+
+type ShippingPreviewRow = CourierRow & {
   key: string
-  recipientName: string
-  address: string
-  trackingNumber: string
   classification: ShippingClassification
-  productName: string
-  providerOrderLabel: string
-  matchedOrder:
-    | { provider: 'naver'; productOrderId: string }
-    | { provider: 'coupang'; shipmentBoxId: number }
-    | null
+  classificationSource: 'auto' | 'manual'
+  providerMatches: ProviderMatches
+}
+
+function ShippingProviderActionGroup({
+  label,
+  configured,
+  settingsHref,
+  refreshing,
+  canRefresh,
+  onRefresh,
+  applying,
+  canApply,
+  onApply,
+  message,
+}: {
+  label: string
+  configured: boolean
+  settingsHref: string
+  refreshing: boolean
+  canRefresh: boolean
+  onRefresh: () => void
+  applying: boolean
+  canApply: boolean
+  onApply: () => void
+  message: string
+}) {
+  if (!configured) {
+    return (
+      <Link
+        href={settingsHref}
+        aria-label={`${label} 연결`}
+        className={cx(ui.buttonSecondary, ui.buttonDense, 'gap-1.5 opacity-70')}
+      >
+        <StoreConnectionStatus configured={false} compact />
+        <span>{label} 연결</span>
+      </Link>
+    )
+  }
+
+  return (
+    <div className={ui.actionGroupDense}>
+      <span className={ui.statusPillDense}>
+        <StoreConnectionStatus configured compact />
+        <span>{label}</span>
+      </span>
+      <button
+        type="button"
+        aria-label={`${label} 갱신`}
+        onClick={onRefresh}
+        disabled={refreshing || applying || !canRefresh}
+        className={cx(ui.buttonSecondary, ui.buttonDense, (refreshing || applying || !canRefresh) && 'cursor-not-allowed opacity-50')}
+      >
+        {refreshing ? '갱신 중…' : '갱신'}
+      </button>
+      <button
+        type="button"
+        aria-label={`${label} 반영`}
+        onClick={onApply}
+        disabled={refreshing || applying || !canApply}
+        className={cx(ui.buttonSuccess, ui.buttonDense, (refreshing || applying || !canApply) && 'cursor-not-allowed opacity-50')}
+      >
+        {applying ? '반영 중…' : '반영'}
+      </button>
+      <span aria-live="polite" className="sr-only">
+        {message ? `${label} ${message}` : ''}
+      </span>
+    </div>
+  )
 }
 
 type ExcelRow = Record<string, unknown>
@@ -35,6 +102,68 @@ function normalizeAddress(addr: string) {
 
 function normalizeName(value: string | undefined) {
   return (value ?? '').trim()
+}
+
+function findNaverMatch(row: Pick<CourierRow, 'recipientName' | 'address'>, orders: NaverOrder[]) {
+  const normalizedName = normalizeName(row.recipientName)
+  const normalizedRowAddress = normalizeAddress(row.address)
+
+  const matchedOrder = orders.find((order) => {
+    const orderName = normalizeName(order.recipientName)
+    const orderAddress = normalizeAddress(order.recipientAddress)
+    return (
+      normalizedName.length > 0 &&
+      orderName === normalizedName &&
+      (orderAddress.includes(normalizedRowAddress) || normalizedRowAddress.includes(orderAddress))
+    )
+  })
+
+  return matchedOrder ? { productOrderId: matchedOrder.productOrderId } : null
+}
+
+function findCoupangMatch(row: Pick<CourierRow, 'recipientName' | 'address'>, orders: CoupangOrder[]) {
+  const normalizedName = normalizeName(row.recipientName)
+  const normalizedRowAddress = normalizeAddress(row.address)
+
+  const matchedOrder = orders.find((order) => {
+    const orderName = normalizeName(order.receiverName)
+    const orderAddress = normalizeAddress(order.receiverAddr)
+    return (
+      normalizedName.length > 0 &&
+      orderName === normalizedName &&
+      (orderAddress.includes(normalizedRowAddress) || normalizedRowAddress.includes(orderAddress))
+    )
+  })
+
+  return matchedOrder ? { shipmentBoxId: matchedOrder.shipmentBoxId } : null
+}
+
+function resolveClassification(providerMatches: ProviderMatches): ShippingClassification {
+  if (providerMatches.naver && providerMatches.coupang) {
+    return 'ambiguous'
+  }
+
+  if (providerMatches.naver) {
+    return 'naver'
+  }
+
+  if (providerMatches.coupang) {
+    return 'coupang'
+  }
+
+  return 'unclassified'
+}
+
+function getActiveMatchedOrder(row: ShippingPreviewRow) {
+  if (row.classification === 'naver' && row.providerMatches.naver) {
+    return { provider: 'naver' as const, productOrderId: row.providerMatches.naver.productOrderId }
+  }
+
+  if (row.classification === 'coupang' && row.providerMatches.coupang) {
+    return { provider: 'coupang' as const, shipmentBoxId: row.providerMatches.coupang.shipmentBoxId }
+  }
+
+  return null
 }
 
 function isSupportedExcelFile(file: File) {
@@ -50,77 +179,39 @@ function isSupportedExcelFile(file: File) {
 
 function classifyRows(courierRows: CourierRow[], naverOrders: NaverOrder[], coupangOrders: CoupangOrder[]) {
   return courierRows.map<ShippingPreviewRow>((row, index) => {
-    const normalizedName = normalizeName(row.recipientName)
-    const normalizedRowAddress = normalizeAddress(row.address)
-
-    const matchedNaver = naverOrders.find((order) => {
-      const orderName = normalizeName(order.recipientName)
-      const orderAddress = normalizeAddress(order.recipientAddress)
-      return (
-        normalizedName.length > 0 &&
-        orderName === normalizedName &&
-        (orderAddress.includes(normalizedRowAddress) || normalizedRowAddress.includes(orderAddress))
-      )
-    })
-
-    const matchedCoupang = coupangOrders.find((order) => {
-      const orderName = normalizeName(order.receiverName)
-      const orderAddress = normalizeAddress(order.receiverAddr)
-      return (
-        normalizedName.length > 0 &&
-        orderName === normalizedName &&
-        (orderAddress.includes(normalizedRowAddress) || normalizedRowAddress.includes(orderAddress))
-      )
-    })
-
-    if (matchedNaver && matchedCoupang) {
-      return {
-        key: `${index}-${row.trackingNumber}`,
-        recipientName: row.recipientName,
-        address: row.address,
-        trackingNumber: row.trackingNumber,
-        classification: 'ambiguous',
-        productName: [matchedNaver.productName, matchedCoupang.productName].filter(Boolean).join(' / '),
-        providerOrderLabel: `${matchedNaver.productOrderId} / ${matchedCoupang.shipmentBoxId}`,
-        matchedOrder: null,
-      }
+    const providerMatches = {
+      naver: findNaverMatch(row, naverOrders),
+      coupang: findCoupangMatch(row, coupangOrders),
     }
 
-    if (matchedNaver) {
-      return {
-        key: `${index}-${row.trackingNumber}`,
-        recipientName: row.recipientName,
-        address: row.address,
-        trackingNumber: row.trackingNumber,
-        classification: 'naver',
-        productName: matchedNaver.productName,
-        providerOrderLabel: matchedNaver.productOrderId,
-        matchedOrder: { provider: 'naver', productOrderId: matchedNaver.productOrderId },
-      }
+    return {
+      ...row,
+      key: `${index}-${row.trackingNumber}`,
+      classification: resolveClassification(providerMatches),
+      classificationSource: 'auto',
+      providerMatches,
     }
+  })
+}
 
-    if (matchedCoupang) {
+function refreshRowsForProvider(rows: ShippingPreviewRow[], provider: ShippingProvider, orders: NaverOrder[] | CoupangOrder[]) {
+  return rows.map((row) => {
+    const providerMatches =
+      provider === 'naver'
+        ? { ...row.providerMatches, naver: findNaverMatch(row, orders as NaverOrder[]) }
+        : { ...row.providerMatches, coupang: findCoupangMatch(row, orders as CoupangOrder[]) }
+
+    if (row.classificationSource === 'manual') {
       return {
-        key: `${index}-${row.trackingNumber}`,
-        recipientName: row.recipientName,
-        address: row.address,
-        trackingNumber: row.trackingNumber,
-        classification: 'coupang',
-        productName: matchedCoupang.productName,
-        providerOrderLabel: String(matchedCoupang.shipmentBoxId),
-        matchedOrder: { provider: 'coupang', shipmentBoxId: matchedCoupang.shipmentBoxId },
+        ...row,
+        providerMatches,
       }
     }
 
     return {
-      key: `${index}-${row.trackingNumber}`,
-      recipientName: row.recipientName,
-      address: row.address,
-      trackingNumber: row.trackingNumber,
-      classification: 'unclassified',
-      productName: '',
-      providerOrderLabel: '',
-      matchedOrder: null,
+      ...row,
+      classification: resolveClassification(providerMatches),
+      providerMatches,
     }
   })
 }
@@ -130,12 +221,16 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
   const [isDragOver, setIsDragOver] = useState(false)
   const [fileName, setFileName] = useState('')
   const [previewRows, setPreviewRows] = useState<ShippingPreviewRow[]>([])
-  const [classificationFilter, setClassificationFilter] = useState<'all' | ShippingClassification>('all')
+  const [classificationFilter, setClassificationFilter] = useState<'all' | 'naver' | 'coupang' | 'unclassified'>('all')
+  const [previewPage, setPreviewPage] = useState(1)
   const [naverMessage, setNaverMessage] = useState('')
   const [coupangMessage, setCoupangMessage] = useState('')
-  const [loading, startLoadingTransition] = useTransition()
-  const [naverSending, startNaverSendTransition] = useTransition()
-  const [coupangSending, startCoupangSendTransition] = useTransition()
+  const [classifying, setClassifying] = useState(false)
+  const [naverRefreshing, startNaverRefreshTransition] = useTransition()
+  const [coupangRefreshing, startCoupangRefreshTransition] = useTransition()
+  const [naverApplying, startNaverApplyTransition] = useTransition()
+  const [coupangApplying, startCoupangApplyTransition] = useTransition()
+  const rowsPerPage = 50
 
   const hasNaverConfig = settingsSummary.naver.configured
   const hasCoupangConfig = settingsSummary.coupang.configured
@@ -148,6 +243,8 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
     if (!isSupportedExcelFile(file)) {
       setUploadError('엑셀 파일(.xlsx, .xls)만 업로드할 수 있습니다.')
       setPreviewRows([])
+      setPreviewPage(1)
+      setClassifying(false)
       return
     }
 
@@ -159,6 +256,8 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
       if (!data) {
         setUploadError('엑셀 파일을 읽을 수 없습니다.')
         setPreviewRows([])
+        setPreviewPage(1)
+        setClassifying(false)
         return
       }
 
@@ -168,6 +267,8 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
         if (!sheetName) {
           setUploadError('엑셀 파일에 시트가 없습니다.')
           setPreviewRows([])
+          setPreviewPage(1)
+          setClassifying(false)
           return
         }
 
@@ -178,29 +279,43 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
           .map(parseExcelRow)
           .filter((row) => row.trackingNumber)
 
-        startLoadingTransition(async () => {
-          const [naverResult, coupangResult] = await Promise.all([
-            hasNaverConfig ? shippingActions.fetchNaverOrders() : Promise.resolve({ success: true, orders: [] as NaverOrder[] }),
-            hasCoupangConfig ? shippingActions.fetchCoupangOrders() : Promise.resolve({ success: true, orders: [] as CoupangOrder[] }),
-          ])
+        setClassifying(true)
+        void (async () => {
+          try {
+            const [naverResult, coupangResult] = await Promise.all([
+              hasNaverConfig ? shippingActions.fetchNaverOrders() : Promise.resolve({ success: true, orders: [] as NaverOrder[] }),
+              hasCoupangConfig ? shippingActions.fetchCoupangOrders() : Promise.resolve({ success: true, orders: [] as CoupangOrder[] }),
+            ])
 
-          setPreviewRows(
-            classifyRows(
-              courierRows,
-              naverResult.success ? naverResult.orders : [],
-              coupangResult.success ? coupangResult.orders : [],
-            ),
-          )
-        })
+            setPreviewRows(
+              classifyRows(
+                courierRows,
+                naverResult.success ? naverResult.orders : [],
+                coupangResult.success ? coupangResult.orders : [],
+              ),
+            )
+            setPreviewPage(1)
+          } catch {
+            setUploadError('엑셀 파일을 처리하지 못했습니다.')
+            setPreviewRows([])
+            setPreviewPage(1)
+          } finally {
+            setClassifying(false)
+          }
+        })()
       } catch {
         setUploadError('엑셀 파일을 처리하지 못했습니다.')
         setPreviewRows([])
+        setPreviewPage(1)
+        setClassifying(false)
       }
     }
 
     reader.onerror = () => {
       setUploadError('엑셀 파일을 읽는 중 오류가 발생했습니다.')
       setPreviewRows([])
+      setPreviewPage(1)
+      setClassifying(false)
     }
 
     reader.readAsArrayBuffer(file)
@@ -210,6 +325,14 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
     () => previewRows.filter((row) => classificationFilter === 'all' || row.classification === classificationFilter),
     [classificationFilter, previewRows],
   )
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / rowsPerPage))
+  const pagedRows = useMemo(
+    () => filteredRows.slice((previewPage - 1) * rowsPerPage, previewPage * rowsPerPage),
+    [filteredRows, previewPage],
+  )
+  useEffect(() => {
+    setPreviewPage((currentPage) => Math.min(Math.max(currentPage, 1), totalPages))
+  }, [totalPages])
   const classificationSummary = useMemo(
     () => ({
       total: previewRows.length,
@@ -221,71 +344,133 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
     [previewRows],
   )
 
-  const naverMatches = previewRows.filter((row) => row.classification === 'naver' && row.matchedOrder?.provider === 'naver')
-  const coupangMatches = previewRows.filter((row) => row.classification === 'coupang' && row.matchedOrder?.provider === 'coupang')
-  const providerActions = [
-    {
-      provider: 'naver' as const,
-      label: '네이버',
-      configured: hasNaverConfig,
-    },
-    {
-      provider: 'coupang' as const,
-      label: '쿠팡',
-      configured: hasCoupangConfig,
-    },
-  ]
+  const naverMatches = useMemo(
+    () =>
+      previewRows.filter((row) => {
+        const matchedOrder = getActiveMatchedOrder(row)
+        return matchedOrder?.provider === 'naver'
+      }),
+    [previewRows],
+  )
+  const coupangMatches = useMemo(
+    () =>
+      previewRows.filter((row) => {
+        const matchedOrder = getActiveMatchedOrder(row)
+        return matchedOrder?.provider === 'coupang'
+      }),
+    [previewRows],
+  )
+
+  const handleClassificationFilterChange = (value: 'all' | 'naver' | 'coupang' | 'unclassified') => {
+    setClassificationFilter(value)
+    setPreviewPage(1)
+  }
+
+  const handleManualClassification = (rowKey: string, nextClassification: ShippingClassification) => {
+    setPreviewRows((rows) =>
+      rows.map((row) =>
+        row.key === rowKey ? { ...row, classification: nextClassification, classificationSource: 'manual' } : row,
+      ),
+    )
+  }
+
+  const goPrevPage = () => {
+    setPreviewPage((current) => Math.max(1, current - 1))
+  }
+
+  const goNextPage = () => {
+    setPreviewPage((current) => Math.min(totalPages, current + 1))
+  }
+
+  const handleNaverRefresh = () => {
+    if (!hasNaverConfig || previewRows.length === 0) return
+
+    startNaverRefreshTransition(async () => {
+      const result = await shippingActions.fetchNaverOrders()
+      if (!result.success) {
+        setNaverMessage(result.error ?? '오류')
+        return
+      }
+
+      setPreviewRows((rows) => refreshRowsForProvider(rows, 'naver', result.orders))
+      setNaverMessage('갱신됨')
+    })
+  }
+
+  const handleCoupangRefresh = () => {
+    if (!hasCoupangConfig || previewRows.length === 0) return
+
+    startCoupangRefreshTransition(async () => {
+      const result = await shippingActions.fetchCoupangOrders()
+      if (!result.success) {
+        setCoupangMessage(result.error ?? '오류')
+        return
+      }
+
+      setPreviewRows((rows) => refreshRowsForProvider(rows, 'coupang', result.orders))
+      setCoupangMessage('갱신됨')
+    })
+  }
 
   const handleNaverSend = () => {
     const targets = naverMatches.flatMap((row) =>
-      row.matchedOrder?.provider === 'naver'
-        ? [{ productOrderId: row.matchedOrder.productOrderId, trackingNumber: row.trackingNumber }]
+      getActiveMatchedOrder(row)?.provider === 'naver'
+        ? [{ productOrderId: getActiveMatchedOrder(row).productOrderId, trackingNumber: row.trackingNumber }]
         : [],
     )
     if (targets.length === 0) return
 
-    startNaverSendTransition(async () => {
+    startNaverApplyTransition(async () => {
       const result = await shippingActions.sendNaverTrackingNumbers(targets)
-      setNaverMessage(result.success ? `${targets.length}건 발송 완료` : (result.error ?? `${result.failedOrders.length}건 실패`))
+      setNaverMessage(result.success ? `${targets.length}건 반영됨` : (result.error ?? `${result.failedOrders.length}건 실패`))
     })
   }
 
   const handleCoupangSend = () => {
     const targets = coupangMatches.flatMap((row) =>
-      row.matchedOrder?.provider === 'coupang'
-        ? [{ shipmentBoxId: row.matchedOrder.shipmentBoxId, trackingNumber: row.trackingNumber }]
+      getActiveMatchedOrder(row)?.provider === 'coupang'
+        ? [{ shipmentBoxId: getActiveMatchedOrder(row).shipmentBoxId, trackingNumber: row.trackingNumber }]
         : [],
     )
     if (targets.length === 0) return
 
-    startCoupangSendTransition(async () => {
+    startCoupangApplyTransition(async () => {
       const result = await shippingActions.sendCoupangTrackingNumbers(targets)
-      setCoupangMessage(result.success ? `${targets.length}건 발송 완료` : (result.error ?? `${result.failedBoxes.length}건 실패`))
+      setCoupangMessage(result.success ? `${targets.length}건 반영됨` : (result.error ?? `${result.failedBoxes.length}건 실패`))
     })
   }
+
+  const renderClassificationControl = (row: ShippingPreviewRow) => {
+    return (
+      <Select
+        value={row.classification}
+        onValueChange={(value) => handleManualClassification(row.key, value as ShippingClassification)}
+      >
+        <SelectTrigger aria-label={`${row.recipientName} 분류 변경`} className={cx(ui.controlSm, 'h-8 w-[6.75rem] min-w-[6.75rem]')}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="ambiguous">중복 후보</SelectItem>
+          <SelectItem value="unclassified">미분류</SelectItem>
+          <SelectItem value="naver">네이버</SelectItem>
+          <SelectItem value="coupang">쿠팡</SelectItem>
+        </SelectContent>
+      </Select>
+    )
+  }
+
+  const statusMessages = [
+    naverMessage ? `네이버 ${naverMessage}` : null,
+    coupangMessage ? `쿠팡 ${coupangMessage}` : null,
+  ].filter(Boolean) as string[]
 
   return (
     <div className="space-y-4">
       <Card variant="strong" className="overflow-hidden">
-        <CardHeader className="flex flex-col gap-4 border-b border-[color:var(--border)] px-4 py-3 md:flex-row md:items-center md:justify-between">
+        <CardHeader className="border-b border-[color:var(--border)] px-4 py-3">
           <div className="space-y-1">
             <CardTitle className="text-base">운송장 업로드</CardTitle>
             <p className="text-sm leading-6 text-slate-500">엑셀을 넣고, 연결 상태를 확인한 뒤, 바로 분류 결과를 확인합니다.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {providerActions.map((provider) => (
-              <Link
-                key={provider.provider}
-                href={`/settings?section=store-connections&provider=${provider.provider}`}
-                aria-label={`${provider.label} ${provider.configured ? '변경' : '연결'}`}
-                className={cx(ui.buttonSecondary, 'h-10 gap-2 px-3')}
-              >
-                <StoreConnectionStatus configured={provider.configured} compact />
-                <span>
-                  {provider.label} {provider.configured ? '변경' : '연결'}
-                </span>
-              </Link>
-            ))}
           </div>
         </CardHeader>
         <CardContent className="px-4 py-4">
@@ -347,75 +532,122 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
       </Card>
 
       <Card variant="strong" className="overflow-hidden">
-        <CardHeader className="flex flex-col gap-3 border-b border-[color:var(--border)] px-4 py-3 md:flex-row md:items-center md:justify-between">
-          <CardTitle className="text-sm">분류 미리보기</CardTitle>
-          <div className="flex flex-wrap items-center gap-2">
-            <Select value={classificationFilter} onValueChange={(value) => setClassificationFilter(value as typeof classificationFilter)}>
-              <SelectTrigger aria-label="분류 필터" className={cx(ui.controlSm, 'min-w-[10rem]')}>
-                <SelectValue placeholder="전체" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">전체</SelectItem>
-                <SelectItem value="naver">네이버</SelectItem>
-                <SelectItem value="coupang">쿠팡</SelectItem>
-                <SelectItem value="unclassified">미분류</SelectItem>
-                <SelectItem value="ambiguous">중복 후보</SelectItem>
-              </SelectContent>
-            </Select>
-            {loading ? <span className="text-sm text-slate-500">주문 정보를 확인하는 중…</span> : null}
+        <CardHeader className="border-b border-[color:var(--border)] px-0 py-0">
+          <div className="px-4 py-2.5">
+            <CardTitle className="text-sm">분류 미리보기</CardTitle>
+          </div>
+          <div className="border-t border-[color:var(--border)] px-4 py-2">
+            <div className={cx(ui.toolbarDense, 'md:overflow-visible')}>
+              <Select
+                value={classificationFilter}
+                onValueChange={(value) =>
+                  handleClassificationFilterChange(value as 'all' | 'naver' | 'coupang' | 'unclassified')
+                }
+              >
+                <SelectTrigger aria-label="분류 필터" className={cx(ui.controlSm, 'h-8 w-[7.5rem] min-w-[7.5rem] rounded-xl px-2.5 text-xs')}>
+                  <SelectValue placeholder="전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  <SelectItem value="naver">네이버</SelectItem>
+                  <SelectItem value="coupang">쿠팡</SelectItem>
+                  <SelectItem value="unclassified">미분류</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className={cx(ui.actionGroupDense, 'gap-1.5 md:ml-auto')}>
+                <ShippingProviderActionGroup
+                  label="네이버"
+                  configured={hasNaverConfig}
+                  settingsHref="/settings?section=store-connections&provider=naver"
+                  refreshing={classifying || naverRefreshing}
+                  canRefresh={previewRows.length > 0 && !classifying}
+                  onRefresh={handleNaverRefresh}
+                  applying={naverApplying}
+                  canApply={naverMatches.length > 0 && !classifying && !naverRefreshing}
+                  onApply={handleNaverSend}
+                  message={naverMessage}
+                />
+                <ShippingProviderActionGroup
+                  label="쿠팡"
+                  configured={hasCoupangConfig}
+                  settingsHref="/settings?section=store-connections&provider=coupang"
+                  refreshing={classifying || coupangRefreshing}
+                  canRefresh={previewRows.length > 0 && !classifying}
+                  onRefresh={handleCoupangRefresh}
+                  applying={coupangApplying}
+                  canApply={coupangMatches.length > 0 && !classifying && !coupangRefreshing}
+                  onApply={handleCoupangSend}
+                  message={coupangMessage}
+                />
+              </div>
+            </div>
           </div>
         </CardHeader>
 
         <CardContent className="space-y-0 p-0">
-          <div className="flex flex-wrap items-center gap-2 border-b border-[color:var(--border)] px-4 py-3 text-xs text-slate-500">
-            <span className={ui.pill}>전체 {classificationSummary.total}건</span>
-            <span className={ui.pill}>네이버 {classificationSummary.naver}건</span>
-            <span className={ui.pill}>쿠팡 {classificationSummary.coupang}건</span>
-            <span className={ui.pillMuted}>미분류 {classificationSummary.unclassified}건</span>
-            {classificationSummary.ambiguous > 0 ? <span className={ui.pillMuted}>중복 후보 {classificationSummary.ambiguous}건</span> : null}
+          <div className="border-b border-[color:var(--border)] px-4 py-2">
+            <div className={cx(ui.toolbarDense, 'gap-1.5 text-[11px] text-slate-500 md:overflow-visible')}>
+              <span className={cx(ui.pill, 'px-2 py-0.5 text-[11px]')}>전체 {classificationSummary.total}건</span>
+              <span className={cx(ui.pill, 'px-2 py-0.5 text-[11px]')}>네이버 {classificationSummary.naver}건</span>
+              <span className={cx(ui.pill, 'px-2 py-0.5 text-[11px]')}>쿠팡 {classificationSummary.coupang}건</span>
+              <span className={cx(ui.pillMuted, 'px-2 py-0.5 text-[11px]')}>미분류 {classificationSummary.unclassified}건</span>
+              {classificationSummary.ambiguous > 0 ? (
+                <span className={cx(ui.pillMuted, 'px-2 py-0.5 text-[11px]')}>중복 후보 {classificationSummary.ambiguous}건</span>
+              ) : null}
+              {statusMessages.map((message) => (
+                <span key={message} className={cx(ui.statusPillDense, 'text-[11px] md:ml-auto first:md:ml-auto')}>
+                  {message}
+                </span>
+              ))}
+            </div>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
+            <table className="min-w-max border-collapse text-sm">
               <thead>
                 <tr className="ui-table-head text-left">
-                  <th className="px-4 py-3">받는분</th>
-                  <th className="px-4 py-3">주소</th>
-                  <th className="px-4 py-3">운송장번호</th>
-                  <th className="px-4 py-3">주문 정보</th>
-                  <th className="px-4 py-3">분류</th>
+                  <th className="px-4 py-3 whitespace-nowrap">분류</th>
+                  <th className="px-4 py-3 whitespace-nowrap">No</th>
+                  <th className="px-4 py-3 whitespace-nowrap">집화예정장소</th>
+                  <th className="px-4 py-3 whitespace-nowrap">접수일자</th>
+                  <th className="px-4 py-3 whitespace-nowrap">집화예정일자</th>
+                  <th className="px-4 py-3 whitespace-nowrap">집화일자</th>
+                  <th className="px-4 py-3 whitespace-nowrap">예약구분</th>
+                  <th className="px-4 py-3 whitespace-nowrap">예약번호</th>
+                  <th className="px-4 py-3 whitespace-nowrap">운송장번호</th>
+                  <th className="px-4 py-3 whitespace-nowrap">받는분</th>
+                  <th className="px-4 py-3 whitespace-nowrap">전화번호</th>
+                  <th className="px-4 py-3 whitespace-nowrap">주소</th>
+                  <th className="px-4 py-3 whitespace-nowrap">예약매체</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.length === 0 ? (
+                {pagedRows.length === 0 ? (
                   <tr className="border-t border-[color:var(--border)]">
-                    <td colSpan={5} className="px-4 py-12 text-center text-slate-400">
+                    <td colSpan={13} className="px-4 py-12 text-center text-slate-400">
                       분류할 업로드 행이 없습니다.
                     </td>
                   </tr>
                 ) : (
-                  filteredRows.map((row) => (
+                  pagedRows.map((row) => (
                     <tr key={row.key} className="border-t border-[color:var(--border)]">
-                      <td className="px-4 py-3 font-medium text-slate-900">{row.recipientName}</td>
-                      <td className="px-4 py-3 text-slate-600">{row.address}</td>
-                      <td className="px-4 py-3">
-            <span className={cx(ui.pillMuted, 'px-2 py-0.5 font-mono text-xs font-semibold text-slate-800')}>
+                      <td className="px-4 py-3 whitespace-nowrap">{renderClassificationControl(row)}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.no || '-'}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.pickupLocation || '-'}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.receiptDate || '-'}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.pickupScheduleDate || '-'}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.pickupDate || '-'}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.reservationType || '-'}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.reservationNumber || '-'}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={cx(ui.pillMuted, 'px-2 py-0.5 font-mono text-xs font-semibold text-slate-800')}>
                           {row.trackingNumber}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-slate-500">
-                        {row.productName ? (
-                          <div className="space-y-1">
-                            <p className="text-sm text-slate-800">{row.productName}</p>
-                            <p className="text-xs text-slate-500">{row.providerOrderLabel}</p>
-                          </div>
-                        ) : (
-                          '-'
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <ShippingClassificationBadge classification={row.classification} />
-                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap font-medium text-slate-900">{row.recipientName}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.phone || '-'}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.address || '-'}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.reservationMedia || '-'}</td>
                     </tr>
                   ))
                 )}
@@ -424,31 +656,26 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
           </div>
 
           <div className="border-t border-[color:var(--border)] px-4 py-3">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
-                <span>네이버 {naverMatches.length}건 발송 가능</span>
-                {naverMessage ? <span className={cx(ui.pillMuted, 'px-2.5 py-1 text-xs text-slate-700')}>{naverMessage}</span> : null}
-                <span>쿠팡 {coupangMatches.length}건 발송 가능</span>
-                {coupangMessage ? <span className={cx(ui.pillMuted, 'px-2.5 py-1 text-xs text-slate-700')}>{coupangMessage}</span> : null}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleNaverSend}
-                  disabled={naverSending || naverMatches.length === 0}
-                  className={ui.buttonPrimary}
-                >
-                  {naverSending ? '네이버 발송 중…' : '네이버 발송'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCoupangSend}
-                  disabled={coupangSending || coupangMatches.length === 0}
-                  className={ui.buttonSecondary}
-                >
-                  {coupangSending ? '쿠팡 발송 중…' : '쿠팡 발송'}
-                </button>
-              </div>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={goPrevPage}
+                disabled={previewPage === 1 || totalPages === 1}
+                className={cx(ui.buttonSecondary, (previewPage === 1 || totalPages === 1) && 'cursor-not-allowed opacity-50')}
+              >
+                이전
+              </button>
+              <span className="min-w-[5rem] text-center text-sm text-slate-500">
+                {filteredRows.length > 0 ? `${previewPage} / ${totalPages}` : '0 / 0'}
+              </span>
+              <button
+                type="button"
+                onClick={goNextPage}
+                disabled={previewPage === totalPages || totalPages === 1}
+                className={cx(ui.buttonSecondary, (previewPage === totalPages || totalPages === 1) && 'cursor-not-allowed opacity-50')}
+              >
+                다음
+              </button>
             </div>
           </div>
         </CardContent>

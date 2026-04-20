@@ -104,3 +104,13 @@
 **결정**: header/body를 함께 담는 strong card는 하나의 clipped surface로 읽혀야 하며, corner gap이나 segmented seam을 page-local border patch로 땜질하지 않는다. 대신 shared card/surface primitive의 variant, padding, token을 고친다.  
 **이유**: settings-card처럼 카드가 두 개로 쪼개져 보이면 동일 surface가 아니라 임시 조립물처럼 읽힌다. 이런 문제를 페이지별 border 수정으로 막으면 재발한다.  
 **트레이드오프**: 카드가 어색하면 개별 화면에서 고치는 대신 shared primitive까지 올라가야 하므로 수정 범위가 커질 수 있다.
+
+## ADR-022: 운영 콘솔은 Simple Surface First와 component budget을 기본 원칙으로 삼는다
+**결정**: 모든 운영 화면은 `compact toolbar + primary surface`를 기본 구조로 하고, 새 기능은 새 카드/새 섹션을 추가하기 전에 기존 toolbar, table, header, action rail 안에서 먼저 흡수한다. 전역 액션은 영향을 주는 surface 가까이에 두고, 관련 액션은 compact group으로 묶는다.  
+**이유**: 운영 콘솔에서 실제 가치가 생기는 지점은 설명 카드가 아니라 표, 필터, 액션이다. component 수와 action 수가 늘어날수록 사용자는 어디를 눌러야 하는지 다시 해석해야 한다.  
+**트레이드오프**: 화면별로 즉흥적인 wrapper나 상태 카드를 추가하는 대신, shared primitive와 existing surface를 더 엄격하게 재사용해야 한다.
+
+**외부 근거**
+- Carbon: table에 영향을 주는 액션은 table toolbar에 둔다.
+- PatternFly: action은 영향을 주는 surface 가까이에 둔다.
+- Oracle: 자동 반영 가능한 흐름에는 불필요한 refresh UI를 늘리지 않는다.

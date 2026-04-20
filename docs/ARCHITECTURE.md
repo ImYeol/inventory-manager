@@ -42,6 +42,16 @@ src/
 
 이번 패스의 본질은 원장 재작성보다 `route ownership`, `product management ownership`, `inventory table UX`, `settings/store-connection consolidation`, `shipping preview classification`을 다시 정리하는 것이다.
 
+## Global Action Ownership
+- 운영 화면의 canonical 구조는 `compact toolbar + primary surface`다.
+- 새 기능은 새 카드나 새 설명 섹션으로 풀기 전에, 기존 toolbar나 action rail 안에 흡수 가능한지 먼저 검토한다.
+- action ownership은 화면 ownership과 별도로 본다. 데이터에 직접 영향을 주는 액션은 그 데이터를 보여 주는 surface의 toolbar가 canonical owner다.
+- navigation은 route owner가 맡고, 데이터 변경 action은 surface owner가 맡는다.
+- 설계/구현 단계에서는 component budget을 함께 본다.
+  - 전역 액션 수를 최소화했는가
+  - provider/tool/action을 compact group으로 묶을 수 있는가
+  - 같은 상태를 카드, 배지, 문장, 버튼으로 반복하지 않는가
+
 ## 코드 증거 기준 문제 정리
 
 ### 1. 상품 관리와 재고 운영의 ownership이 분리되지 않았다
@@ -214,8 +224,9 @@ shipping_preview_rows
 - address
 - tracking_number
 - channel_badge        # naver | coupang | unclassified | ambiguous
-- matched_provider
-- matched_order_ref
+- classification_source # auto | manual
+- naver_order_ref
+- coupang_order_ref
 - match_reason
 ```
 
@@ -230,6 +241,11 @@ shipping_preview_rows
 - 업로드 직후 표 아래 첫 surface가 분류 미리보기가 되어야 한다.
 - 미연결 provider는 비활성 안내가 아니라 활성 `연결` 버튼으로 노출한다.
 - 버튼은 canonical settings section으로 이동해야 한다.
+- `/shipping`에서 provider action의 canonical owner는 preview toolbar다.
+- preview toolbar는 `분류 필터 + provider action group` 구조를 기본으로 한다.
+- provider action group은 `상태 chip + 갱신 + 반영`을 한 묶음으로 둔다.
+- `중복 후보`는 row badge와 summary count에는 남길 수 있지만, 기본 filter set의 canonical 대상은 아니다.
+- 자동 분류 후 사용자가 바꾼 row는 `classification_source=manual`로 보호하고, provider 갱신 시 분류값을 덮어쓰지 않는다.
 
 ## Shared Component Strategy
 

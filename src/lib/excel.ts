@@ -16,6 +16,7 @@ export type CourierRow = {
 const COLUMN_MAP: Record<string, keyof CourierRow> = {
   'No': 'no',
   '집화예정장소': 'pickupLocation',
+  '집화예정점소': 'pickupLocation',
   '접수일자': 'receiptDate',
   '집화예정일자': 'pickupScheduleDate',
   '집화일자': 'pickupDate',
@@ -30,11 +31,19 @@ const COLUMN_MAP: Record<string, keyof CourierRow> = {
   '예약매체': 'reservationMedia',
 };
 
+function normalizeHeader(header: string) {
+  return header
+    .normalize('NFC')
+    .replace(/\uFEFF/g, '')
+    .replace(/\s+/g, '')
+    .trim()
+}
+
 export function parseExcelRow(row: Record<string, unknown>): CourierRow {
   const result: Partial<CourierRow> = {};
   for (const [header, value] of Object.entries(row)) {
-    const trimmed = header.trim();
-    const key = COLUMN_MAP[trimmed];
+    const normalized = normalizeHeader(header.trim());
+    const key = COLUMN_MAP[normalized];
     if (key) {
       result[key] = String(value ?? '').trim();
     }

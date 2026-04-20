@@ -43,9 +43,9 @@ afterEach(() => {
 function makeExcelFile() {
   const workbook = XLSX.utils.book_new()
   const worksheet = XLSX.utils.aoa_to_sheet([
-    ['운송장번호', '받는분', '주소'],
-    ['123456789', '홍길동', '서울특별시'],
-    ['987654321', '김철수', '부산'],
+    ['No', '집화예정장소', '접수일자', '집화예정일자', '집화일자', '예약구분', '예약번호', '운송장번호', '받는분', '전화번호', '주소', '예약매체'],
+    ['1', '서울집화장', '2026-04-12', '2026-04-13', '2026-04-14', '일반', 'AB-123', '123456789', '홍길동', '010-1234-5678', '서울특별시', '웹'],
+    ['2', '부산집화장', '2026-04-15', '2026-04-16', '2026-04-17', '일반', 'CD-456', '987654321', '김철수', '010-2222-3333', '부산', '파일'],
   ])
   XLSX.utils.book_append_sheet(workbook, worksheet, '시트1')
   const arrayBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
@@ -76,7 +76,7 @@ describe('ShippingView', () => {
     expect(screen.getByRole('combobox', { name: '분류 필터' }).className).not.toContain('bg-white')
   })
 
-  it('shows provider change links for configured stores and keeps the compact status rail visible', () => {
+  it('shows provider action groups for configured stores and keeps links for unconfigured stores', () => {
     render(
       React.createElement(ShippingView, {
         settingsSummary: {
@@ -91,9 +91,11 @@ describe('ShippingView', () => {
     )
 
     expect(screen.queryByText('연동 준비 상태')).toBeNull()
-    expect(screen.getByRole('link', { name: /네이버 변경/ }).getAttribute('href')).toBe('/settings?section=store-connections&provider=naver')
+    expect((screen.getByRole('button', { name: '네이버 갱신' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: '네이버 반영' }) as HTMLButtonElement).disabled).toBe(true)
     expect(screen.getByRole('link', { name: /쿠팡 연결/ }).getAttribute('href')).toBe('/settings?section=store-connections&provider=coupang')
     expect(screen.getAllByLabelText('연결됨')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: '네이버 갱신' }).parentElement?.className).toContain('whitespace-nowrap')
   })
 
   it('classifies uploaded rows and filters the preview by badge state', async () => {
@@ -135,17 +137,144 @@ describe('ShippingView', () => {
     })
 
     await waitFor(() => {
-      expect(screen.getByRole('cell', { name: '네이버' })).toBeTruthy()
+      expect(screen.getByRole('cell', { name: '홍길동' })).toBeTruthy()
     })
 
     expect(screen.getByText('분류 미리보기')).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: '분류' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: 'No' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: '집화예정장소' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: '예약번호' })).toBeTruthy()
     expect(screen.getByRole('cell', { name: '홍길동' })).toBeTruthy()
-    expect(screen.getByRole('cell', { name: '미분류' })).toBeTruthy()
+    expect(screen.getByRole('cell', { name: 'AB-123' })).toBeTruthy()
+    expect(screen.getByRole('cell', { name: '010-1234-5678' })).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: '홍길동 분류 변경' }).textContent).toContain('네이버')
+    expect(screen.getByRole('combobox', { name: '김철수 분류 변경' }).textContent).toContain('미분류')
+    await waitFor(() => {
+      expect((screen.getByRole('button', { name: '네이버 갱신' }) as HTMLButtonElement).disabled).toBe(false)
+      expect((screen.getByRole('button', { name: '네이버 반영' }) as HTMLButtonElement).disabled).toBe(false)
+      expect((screen.getByRole('button', { name: '쿠팡 반영' }) as HTMLButtonElement).disabled).toBe(true)
+    })
+    expect(screen.queryByRole('button', { name: '네이버 발송' })).toBeNull()
 
     fireEvent.click(screen.getByRole('combobox', { name: '분류 필터' }))
     fireEvent.click(await screen.findByRole('option', { name: '미분류' }))
 
     expect(screen.queryByRole('cell', { name: '홍길동' })).toBeNull()
     expect(screen.getByRole('cell', { name: '김철수' })).toBeTruthy()
+  })
+
+  it('keeps manual classification when provider data is refreshed', async () => {
+    shippingActions.fetchNaverOrders.mockResolvedValue({
+      success: true,
+      orders: [
+        {
+          productOrderId: 'PO-1',
+          orderId: 'ORDER-1',
+          productName: '테스트 상품',
+          recipientName: '홍길동',
+          recipientAddress: '서울특별시 송파구 오금동',
+          quantity: 1,
+          orderDate: '2026-04-12T09:00:00.000Z',
+          productOrderStatus: 'PAYED',
+        },
+      ],
+    })
+    shippingActions.fetchCoupangOrders.mockResolvedValue({
+      success: true,
+      orders: [],
+    })
+
+    render(
+      React.createElement(ShippingView, {
+        settingsSummary: {
+          naver: { configured: true, masked: { clientId: 'naver-••••' }, updatedAt: '2026-04-12T09:00:00.000Z' },
+          coupang: { configured: false, masked: {}, updatedAt: null },
+        },
+      })
+    )
+
+    const dropZone = screen.getByLabelText('운송장 엑셀 업로드 영역')
+    const file = makeExcelFile()
+    const dataTransfer = { files: [file] } as unknown as DataTransfer
+
+    fireEvent.drop(dropZone, {
+      dataTransfer,
+    })
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: '홍길동 분류 변경' }).textContent).toContain('네이버')
+    })
+
+    fireEvent.click(screen.getByRole('combobox', { name: '홍길동 분류 변경' }))
+    fireEvent.click(await screen.findByRole('option', { name: '미분류' }))
+
+    expect(screen.getByRole('combobox', { name: '홍길동 분류 변경' }).textContent).toContain('미분류')
+
+    fireEvent.click(screen.getByRole('button', { name: '네이버 갱신' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: '홍길동 분류 변경' }).textContent).toContain('미분류')
+    })
+  })
+
+  it('allows resolving ambiguous rows through the classification dropdown', async () => {
+    shippingActions.fetchNaverOrders.mockResolvedValue({
+      success: true,
+      orders: [
+        {
+          productOrderId: 'PO-1',
+          orderId: 'ORDER-1',
+          productName: '테스트 상품',
+          recipientName: '홍길동',
+          recipientAddress: '서울특별시 송파구 오금동',
+          quantity: 1,
+          orderDate: '2026-04-12T09:00:00.000Z',
+          productOrderStatus: 'PAYED',
+        },
+      ],
+    })
+    shippingActions.fetchCoupangOrders.mockResolvedValue({
+      success: true,
+      orders: [
+        {
+          shipmentBoxId: 1001,
+          orderId: 2001,
+          productName: '쿠팡 상품',
+          receiverName: '홍길동',
+          receiverAddr: '서울특별시 송파구 오금동',
+          vendorItemName: '옵션',
+          quantity: 1,
+          ordererName: '주문자',
+          orderDate: '2026-04-12T09:00:00.000Z',
+        },
+      ],
+    })
+
+    render(
+      React.createElement(ShippingView, {
+        settingsSummary: {
+          naver: { configured: true, masked: { clientId: 'naver-••••' }, updatedAt: '2026-04-12T09:00:00.000Z' },
+          coupang: { configured: true, masked: { accessKey: 'cp-••••', vendorId: 'v-••' }, updatedAt: '2026-04-12T10:00:00.000Z' },
+        },
+      })
+    )
+
+    const dropZone = screen.getByLabelText('운송장 엑셀 업로드 영역')
+    const file = makeExcelFile()
+    const dataTransfer = { files: [file] } as unknown as DataTransfer
+
+    fireEvent.drop(dropZone, {
+      dataTransfer,
+    })
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: '홍길동 분류 변경' }).textContent).toContain('중복 후보')
+    })
+
+    fireEvent.click(screen.getByRole('combobox', { name: '홍길동 분류 변경' }))
+    fireEvent.click(await screen.findByRole('option', { name: '네이버' }))
+
+    expect(screen.getByRole('combobox', { name: '홍길동 분류 변경' }).textContent).toContain('네이버')
   })
 })

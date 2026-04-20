@@ -41,6 +41,40 @@
 20. 검토 대상은 `src/app`, `src/components/ui`, `docs/UI_GUIDE.md`, `docs/ARCHITECTURE.md`, `docs/ADR.md`, 그리고 이를 검사하는 hooks/scripts까지 포함한다.
 21. 개별 화면에서 `style={{ ... }}`로 색상, border, 배경을 직접 입히는 self-themed UI는 금지한다. semantic variant나 design token을 shared primitive에 추가해 해결한다. 데이터 기반 색상 chip, 진행률 width 같은 표현만 예외로 둔다.
 22. 페이지별 검색창, 툴바, table shell, empty state는 ad-hoc wrapper를 새로 만들지 말고 shared primitive를 재사용한다.
+23. Simple Surface First. 새 요구사항은 새 카드/섹션/설명 박스를 추가하기 전에 기존 toolbar, table, header, action rail 안에서 먼저 해결한다.
+24. 화면마다 component budget을 둔다. 목적을 설명하는 surface보다 실제 작업 surface가 먼저 보여야 하며, 새 기능은 가능한 한 기존 primitive 조합으로 흡수한다.
+25. 전역 액션은 영향을 주는 surface의 toolbar에 둔다. navigation은 link, 데이터 변경은 button으로 분리한다.
+26. action naming은 짧은 동사를 우선한다. provider명, 상태명, 행동명을 같은 줄에서 반복하지 않는다.
+27. 상태 표현은 큰 filled card보다 dot, badge, disabled, loading text 같은 저노이즈 표현을 우선한다.
+28. 설계와 구현 전에 `이 화면에 정말 필요한 컴포넌트가 몇 개인가`를 먼저 점검한다.
+
+## Compact Action Doctrine
+- 운영 화면의 기본 순서는 `header -> compact toolbar -> primary surface`다.
+- 새 문제를 새 wrapper card로 풀지 않고, 기존 action rail에 흡수할 수 있는지 먼저 본다.
+- action은 적을수록 좋다. 관련 액션은 compact group으로 묶고, 한 group 안에서 상태와 행동을 같이 해결한다.
+- action group은 같은 뜻을 반복하지 않는다. 예: provider 이름은 한 번만 보여주고, 버튼은 `갱신`, `반영`처럼 짧은 동사로 둔다.
+- 설명용 메시지보다 버튼 state, disabled state, inline status로 의미를 전달한다.
+- toolbar와 action rail은 desktop에서 한 줄 안정성을 우선한다. 내부 action group은 기본적으로 wrap하지 않는다.
+- 새 액션이 들어오면 새 줄을 만들기 전에 폭, padding, 라벨 길이, 비핵심 텍스트를 먼저 압축한다.
+- 성공/실패/상태 메시지는 toolbar 높이를 밀어 올리면 안 된다. toolbar 폭 계산에 참여하지 않게 하거나, 별도 dense strip으로 보낸다.
+- 운영 화면에서는 multi-row 정렬보다 action row 높이 안정성을 우선한다.
+- 외부 패턴의 기준은 다음을 따른다.
+  - Carbon: table에 영향을 주는 액션은 table toolbar에 둔다.
+  - PatternFly: action은 영향을 주는 surface 가까이에 둔다.
+  - Oracle: 자동 반영 가능한 흐름에는 불필요한 refresh UI를 늘리지 않는다.
+
+## Component Budget Checklist
+- 이 화면의 primary surface는 무엇인가.
+- 이 작업에 필요한 전역 액션은 몇 개인가.
+- 기존 toolbar 안에 흡수 가능한가.
+- 새 카드나 새 섹션 없이 해결 가능한가.
+- 버튼 라벨을 한 단어 또는 짧은 동사로 줄일 수 있는가.
+- 같은 상태를 두 번 이상 말하고 있지 않은가.
+- provider, tool, action을 compact group으로 묶을 수 있는가.
+- 이 toolbar는 한 줄 유지가 가능한가.
+- 내부 group이 별도로 wrap하지 않는가.
+- 상태 문구가 action rail 높이를 밀어 올리지 않는가.
+- 좁아질 때 새 row 대신 무엇을 압축하거나 숨길지 정했는가.
 
 ## 디자인 토큰
 - `--background`
@@ -251,8 +285,11 @@ src/components/ui/
   - `미분류`
   - 필요 시 `중복 후보`
 - 필터는 최소 `전체 / 네이버 / 쿠팡 / 미분류`를 제공한다.
+- `중복 후보`는 row badge와 count strip에는 남길 수 있지만, 기본 filter set에는 포함하지 않는다.
 - 이름과 주소가 비교 기준임을 row detail 또는 tooltip 수준으로만 보여 주고, 긴 설명 문장은 줄인다.
-- 채널별 발송 버튼은 preview surface 주변의 compact action rail로 붙이고, provider별 중복 카드 분리는 피한다.
+- preview toolbar는 `분류 필터 + provider action group`을 기본으로 한다.
+- provider action group은 `[상태 chip] [갱신] [반영]` 구조를 기본으로 하고, provider 이름은 group 안에서 한 번만 보여 준다.
+- 채널별 발송 버튼은 summary rail에 따로 두지 않고 provider action group의 `반영`으로 흡수한다.
 
 ### 미연결 상태
 - `네이버 미연결`, `쿠팡 미연결` 상태는 버튼이 살아 있어야 한다.

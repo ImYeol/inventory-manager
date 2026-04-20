@@ -40,7 +40,12 @@ export const ui = {
   buttonDanger: 'ui-button ui-button-danger',
   buttonLink: 'ui-button ui-button-link',
   toolbar: 'flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1',
+  toolbarDense: 'flex min-w-0 items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-0.5',
   toolbarAction: 'ui-button ui-button-secondary ui-button-sm whitespace-nowrap',
+  actionGroupDense: 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap',
+  statusPillDense:
+    'inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-0.5 text-[11px] font-semibold text-slate-700',
+  buttonDense: 'h-8 rounded-xl px-2.5 text-xs',
   iconButton: 'ui-button ui-button-secondary ui-button-icon shrink-0',
   badge: 'ui-badge',
   tab: 'ui-tab',
