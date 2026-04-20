@@ -66,6 +66,11 @@ type SelectOption<Value extends string | number> = {
   label: string
 }
 
+type SourcingSchemaState = {
+  status: 'ready' | 'missing'
+  message: string | null
+}
+
 function createRow(): ArrivalRow {
   return {
     key: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -139,11 +144,13 @@ function SelectField<Value extends string | number>({
 }
 
 export default function ArrivalsView({
+  schemaState,
   factories,
   warehouses,
   models,
   arrivals,
 }: {
+  schemaState: SourcingSchemaState
   factories: FactoryLookup[]
   warehouses: WarehouseLookup[]
   models: ModelLookup[]
@@ -244,6 +251,11 @@ export default function ArrivalsView({
       return
     }
 
+    if (schemaState.status === 'missing') {
+      setMessage(schemaState.message)
+      return
+    }
+
     startTransition(async () => {
       try {
         await createFactoryArrivalBatch({
@@ -303,6 +315,11 @@ export default function ArrivalsView({
       return
     }
 
+    if (schemaState.status === 'missing') {
+      setMessage(schemaState.message)
+      return
+    }
+
     startTransition(async () => {
       try {
         await receiveFactoryArrival({
@@ -324,6 +341,12 @@ export default function ArrivalsView({
         title="입고 예정"
         description="공장 예정 입고를 수동 또는 CSV로 등록하고 잔여 수량만 반영합니다."
       />
+
+      {schemaState.status === 'missing' && schemaState.message ? (
+        <Card variant="muted" className="mb-4 overflow-hidden">
+          <CardContent className="px-4 py-3 text-sm font-medium text-slate-700">{schemaState.message}</CardContent>
+        </Card>
+      ) : null}
 
       {message ? (
         <Card variant="muted" className="mb-4 overflow-hidden">
@@ -494,13 +517,13 @@ export default function ArrivalsView({
               <div className="text-sm text-slate-600">
                 유효 항목 <span className="font-semibold text-slate-950">{normalizedRows.filter((row) => row.valid).length}</span>건
               </div>
-              <button
-                type="button"
-                onClick={submitRows}
-                disabled={isPending || normalizedRows.filter((row) => row.valid).length === 0}
-                className={ui.buttonPrimary}
-              >
-                예정 입고 등록
+                <button
+                  type="button"
+                  onClick={submitRows}
+                  disabled={schemaState.status === 'missing' || isPending || normalizedRows.filter((row) => row.valid).length === 0}
+                  className={ui.buttonPrimary}
+                >
+                  예정 입고 등록
               </button>
             </CardContent>
           </Card>
@@ -644,7 +667,7 @@ export default function ArrivalsView({
                         <button
                           type="button"
                           onClick={() => submitReceive(arrival)}
-                          disabled={isPending || warehouses.length === 0 || arrival.remainingQuantity === 0}
+                          disabled={schemaState.status === 'missing' || isPending || warehouses.length === 0 || arrival.remainingQuantity === 0}
                           className={ui.buttonPrimary}
                         >
                           입고 반영

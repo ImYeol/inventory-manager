@@ -9,6 +9,7 @@ vi.mock('../src/lib/db', () => ({
 }))
 
 import {
+  SOURCING_SCHEMA_MISSING_MESSAGE,
   getAnalyticsData,
   getCatalogData,
   getCurrentStockRow,
@@ -19,6 +20,7 @@ import {
   getTransactionsWithRelations,
   runBulkTransaction,
   runInventoryAdjustment,
+  runRevertTransaction,
 } from '@/lib/data'
 
 type QueryResult = { data: unknown; error: null | { message: string } }
@@ -140,8 +142,8 @@ describe('Supabase data mappers', () => {
             source_channel: 'factory-arrival',
             reference_type: 'factory_arrival',
             reference_id: 10,
-            memo: '공장 예정 입고 반영',
-            created_at: '2026-04-12T03:00:00.000Z',
+          memo: '공장 예정 입고 반영',
+          created_at: '2026-04-12T03:00:00.000Z',
           },
         ],
         error: null,
@@ -172,6 +174,9 @@ describe('Supabase data mappers', () => {
           sizeName: 'S',
           colorName: '네이비',
           colorRgb: '#0f172a',
+          canRevert: false,
+          revertDisabledReason: '예정입고 반영',
+          revertSummary: null,
         },
       ],
       models: [{ id: 1, name: 'LP01' }],
@@ -260,11 +265,151 @@ describe('Supabase data mappers', () => {
           sizeName: 'S',
           colorName: '네이비',
           colorRgb: '#0f172a',
+          canRevert: true,
+          revertDisabledReason: null,
+          revertSummary: '같은 수량의 출고 보정 이력이 추가됩니다.',
         },
       ],
       models: [{ id: 1, name: 'LP01' }],
       warehouses: [{ id: 1, name: '오금동' }],
     })
+  })
+
+  it('marks only the latest manual history rows as revertable and explains blocked reasons', async () => {
+    const supabase = createSupabaseMock({
+      transactions: {
+        data: [
+          {
+            id: 31,
+            date: '2026-04-15',
+            model_id: 1,
+            size_id: 10,
+            color_id: 20,
+            type: 'ADJUSTMENT',
+            quantity: 4,
+            warehouse_id: 1,
+            source_channel: 'manual',
+            reference_type: null,
+            reference_id: null,
+            memo: null,
+            created_at: '2026-04-15T09:00:00.000Z',
+          },
+          {
+            id: 30,
+            date: '2026-04-14',
+            model_id: 1,
+            size_id: 10,
+            color_id: 20,
+            type: 'INBOUND',
+            quantity: 2,
+            warehouse_id: 1,
+            source_channel: 'manual',
+            reference_type: null,
+            reference_id: null,
+            memo: null,
+            created_at: '2026-04-14T09:00:00.000Z',
+          },
+          {
+            id: 21,
+            date: '2026-04-13',
+            model_id: 2,
+            size_id: 11,
+            color_id: 21,
+            type: 'INBOUND',
+            quantity: 5,
+            warehouse_id: 1,
+            source_channel: 'csv',
+            reference_type: null,
+            reference_id: null,
+            memo: null,
+            created_at: '2026-04-13T09:00:00.000Z',
+          },
+          {
+            id: 11,
+            date: '2026-04-12',
+            model_id: 3,
+            size_id: 12,
+            color_id: 22,
+            type: 'OUTBOUND',
+            quantity: 1,
+            warehouse_id: 2,
+            source_channel: null,
+            reference_type: 'shipment',
+            reference_id: 99,
+            memo: null,
+            created_at: '2026-04-12T09:00:00.000Z',
+          },
+        ],
+        error: null,
+      },
+      models: {
+        data: [
+          { id: 1, name: 'LP01' },
+          { id: 2, name: 'LP02' },
+          { id: 3, name: 'LP03' },
+        ],
+        error: null,
+      },
+      sizes: {
+        data: [
+          { id: 10, name: 'S' },
+          { id: 11, name: 'M' },
+          { id: 12, name: 'L' },
+        ],
+        error: null,
+      },
+      colors: {
+        data: [
+          { id: 20, name: '네이비', rgb_code: '#0f172a' },
+          { id: 21, name: '블랙', rgb_code: '#111111' },
+          { id: 22, name: '화이트', rgb_code: '#ffffff' },
+        ],
+        error: null,
+      },
+      warehouses: {
+        data: [
+          { id: 1, name: '오금동' },
+          { id: 2, name: '대자동' },
+        ],
+        error: null,
+      },
+    })
+
+    mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
+
+    const result = await getTransactionsWithRelations()
+
+    expect(result.transactions.map((item) => ({
+      id: item.id,
+      canRevert: item.canRevert,
+      revertDisabledReason: item.revertDisabledReason,
+      revertSummary: item.revertSummary,
+    }))).toEqual([
+      {
+        id: 31,
+        canRevert: true,
+        revertDisabledReason: null,
+        revertSummary: '직전 재고값으로 재고조정 이력이 추가됩니다.',
+      },
+      {
+        id: 30,
+        canRevert: false,
+        revertDisabledReason: '후속 이력 있음',
+        revertSummary: null,
+      },
+      {
+        id: 21,
+        canRevert: false,
+        revertDisabledReason: 'CSV 반영',
+        revertSummary: null,
+      },
+      {
+        id: 11,
+        canRevert: false,
+        revertDisabledReason: '이미 시스템 참조가 있는 행',
+        revertSummary: null,
+      },
+    ])
   })
 
   it('returns the current stock quantity for a warehouse id', async () => {
@@ -340,54 +485,74 @@ describe('Supabase data mappers', () => {
 
     mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
 
-    await expect(getFactoriesData()).resolves.toEqual([
-      {
-        id: 1,
-        name: '광주 협력사',
-        contactName: '홍길동',
-        phone: '010-1111-2222',
-        email: 'factory@example.com',
-        notes: '메인 협력 공장',
-        isActive: true,
-        createdAt: '2026-04-19T00:00:00.000Z',
-        updatedAt: '2026-04-19T00:00:00.000Z',
-        arrivalCount: 1,
-        pendingQuantity: 12,
-      },
-    ])
-
-    await expect(getFactoryArrivalsData()).resolves.toEqual([
-      {
-        id: 10,
-        factoryId: 1,
-        factoryName: '광주 협력사',
-        referenceCode: null,
-        expectedDate: '2026-04-21',
-        status: '예정',
-        sourceChannel: 'manual',
-        memo: '1차 납품',
-        createdAt: '2026-04-19T00:00:00.000Z',
-        updatedAt: '2026-04-19T00:00:00.000Z',
-        totalOrderedQuantity: 12,
-        totalReceivedQuantity: 0,
-        remainingQuantity: 12,
-        items: [
+    await expect(getFactoriesData()).resolves.toEqual({
+      schemaState: { status: 'ready', message: null },
+      factories: [
+        {
+          id: 1,
+          name: '광주 협력사',
+          contactName: '홍길동',
+          phone: '010-1111-2222',
+          email: 'factory@example.com',
+          notes: '메인 협력 공장',
+          isActive: true,
+          createdAt: '2026-04-19T00:00:00.000Z',
+          updatedAt: '2026-04-19T00:00:00.000Z',
+          arrivalCount: 1,
+          pendingQuantity: 12,
+        },
+      ],
+      factorySourcingItems: {
+        1: [
           {
-            id: 100,
-            modelId: 1,
+            expectedDate: '2026-04-21',
+            status: '예정',
             modelName: 'LP01',
-            sizeId: 10,
             sizeName: 'S',
-            colorId: 20,
             colorName: '네이비',
-            colorRgb: '#0f172a',
             orderedQuantity: 12,
             receivedQuantity: 0,
             remainingQuantity: 12,
           },
         ],
       },
-    ])
+    })
+
+    await expect(getFactoryArrivalsData()).resolves.toEqual({
+      schemaState: { status: 'ready', message: null },
+      arrivals: [
+        {
+          id: 10,
+          factoryId: 1,
+          factoryName: '광주 협력사',
+          referenceCode: null,
+          expectedDate: '2026-04-21',
+          status: '예정',
+          sourceChannel: 'manual',
+          memo: '1차 납품',
+          createdAt: '2026-04-19T00:00:00.000Z',
+          updatedAt: '2026-04-19T00:00:00.000Z',
+          totalOrderedQuantity: 12,
+          totalReceivedQuantity: 0,
+          remainingQuantity: 12,
+          items: [
+            {
+              id: 100,
+              modelId: 1,
+              modelName: 'LP01',
+              sizeId: 10,
+              sizeName: 'S',
+              colorId: 20,
+              colorName: '네이비',
+              colorRgb: '#0f172a',
+              orderedQuantity: 12,
+              receivedQuantity: 0,
+              remainingQuantity: 12,
+            },
+          ],
+        },
+      ],
+    })
   })
 
   it('returns empty sourcing data when factory tables are not deployed yet', async () => {
@@ -403,8 +568,15 @@ describe('Supabase data mappers', () => {
 
     mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
 
-    await expect(getFactoriesData()).resolves.toEqual([])
-    await expect(getFactoryArrivalsData()).resolves.toEqual([])
+    await expect(getFactoriesData()).resolves.toEqual({
+      schemaState: { status: 'missing', message: SOURCING_SCHEMA_MISSING_MESSAGE },
+      factories: [],
+      factorySourcingItems: {},
+    })
+    await expect(getFactoryArrivalsData()).resolves.toEqual({
+      schemaState: { status: 'missing', message: SOURCING_SCHEMA_MISSING_MESSAGE },
+      arrivals: [],
+    })
   })
 
   it('maps bulk transaction payloads into Supabase RPC enums', async () => {
@@ -449,6 +621,19 @@ describe('Supabase data mappers', () => {
     expect(rpc).toHaveBeenCalledWith('apply_inventory_adjustment', {
       p_inventory_id: 99,
       p_new_quantity: 12,
+    })
+  })
+
+  it('delegates transaction revert requests to the stored procedure', async () => {
+    const rpc = vi.fn(async () => ({ error: null }))
+    const supabase = { from: vi.fn(), rpc, auth: { getUser: vi.fn() } }
+    mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
+
+    await runRevertTransaction(88, '잘못 입력')
+
+    expect(rpc).toHaveBeenCalledWith('revert_inventory_transaction', {
+      p_transaction_id: 88,
+      p_memo: '잘못 입력',
     })
   })
 

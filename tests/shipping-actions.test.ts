@@ -82,6 +82,7 @@ describe('shipping server actions', () => {
       accessKey: 'coupang-access',
       secretKey: 'coupang-secret',
       vendorId: 'A00012345',
+      defaultDeliveryCompanyCode: 'CJGLS',
     }
 
     mocks.getRequiredShippingCredentials.mockResolvedValue(credentials)
@@ -89,33 +90,52 @@ describe('shipping server actions', () => {
       {
         shipmentBoxId: 101,
         orderId: 202,
-        receiverName: '홍길동',
-        receiverAddr: '서울시 송파구',
-        productName: '테스트 상품',
-        quantity: 1,
-        orderDate: '2026-04-12T00:00:00.000Z',
+        orderedAt: '2026-04-12T00:00:00.000Z',
         status: 'ACCEPT',
+        receiver: {
+          name: '홍길동',
+          addr1: '서울시',
+          addr2: '송파구',
+        },
+        orderItems: [
+          {
+            vendorItemId: 303,
+            vendorItemName: '테스트 상품',
+            shippingCount: 1,
+          },
+        ],
       },
     ])
 
-    await expect(fetchCoupangOrders()).resolves.toEqual({
+    await expect(fetchCoupangOrders({ fromDate: '2026-04-10', toDate: '2026-04-12' })).resolves.toEqual({
       success: true,
       orders: [
         {
           shipmentBoxId: 101,
           orderId: 202,
-          receiverName: '홍길동',
-          receiverAddr: '서울시 송파구',
-          productName: '테스트 상품',
-          quantity: 1,
-          orderDate: '2026-04-12T00:00:00.000Z',
+          orderedAt: '2026-04-12T00:00:00.000Z',
           status: 'ACCEPT',
+          receiver: {
+            name: '홍길동',
+            addr1: '서울시',
+            addr2: '송파구',
+          },
+          orderItems: [
+            {
+              vendorItemId: 303,
+              vendorItemName: '테스트 상품',
+              shippingCount: 1,
+            },
+          ],
         },
       ],
     })
 
     expect(mocks.getRequiredShippingCredentials).toHaveBeenCalledWith('coupang')
-    expect(mocks.fetchCoupangPendingOrders).toHaveBeenCalledWith(credentials)
+    expect(mocks.fetchCoupangPendingOrders).toHaveBeenCalledWith(credentials, {
+      fromDate: '2026-04-10',
+      toDate: '2026-04-12',
+    })
   })
 
   it('returns a clear user-facing error when naver send is attempted without credentials', async () => {
@@ -141,8 +161,9 @@ describe('shipping server actions', () => {
       accessKey: 'coupang-access',
       secretKey: 'coupang-secret',
       vendorId: 'A00012345',
+      defaultDeliveryCompanyCode: 'CJGLS',
     }
-    const matches = [{ shipmentBoxId: 11, trackingNumber: 'TRACK-11' }]
+    const matches = [{ shipmentBoxId: 11, orderId: 22, vendorItemIds: [301, 302], trackingNumber: 'TRACK-11' }]
 
     mocks.getRequiredShippingCredentials.mockResolvedValue(credentials)
     mocks.confirmCoupangShipments.mockResolvedValue({

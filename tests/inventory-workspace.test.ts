@@ -31,8 +31,52 @@ vi.mock('@/app/(protected)/inout/InOutForm', () => ({
 }))
 
 vi.mock('@/app/(protected)/history/HistoryView', () => ({
-  default: ({ controlledWarehouseId }: { controlledWarehouseId?: number | '' }) =>
-    React.createElement('div', {}, `HistoryView:${controlledWarehouseId || 'all'}`),
+  default: ({
+    filters,
+    onFiltersChange,
+    embedded,
+  }: {
+    filters?: { warehouseId: number | ''; search: string }
+    onFiltersChange?: (next: { warehouseId: number | ''; type: string; search: string; dateFrom: string; dateTo: string }) => void
+    embedded?: boolean
+  }) =>
+    React.createElement(
+      'div',
+      {},
+      React.createElement('div', {}, `HistoryWarehouse:${filters?.warehouseId || 'all'}`),
+      React.createElement('div', {}, `HistorySearch:${filters?.search || '-'}`),
+      React.createElement('div', {}, `HistoryEmbedded:${embedded ? 'yes' : 'no'}`),
+      React.createElement(
+        'button',
+        {
+          type: 'button',
+          onClick: () =>
+            onFiltersChange?.({
+              warehouseId: 1,
+              type: '',
+              search: filters?.search ?? '',
+              dateFrom: '',
+              dateTo: '',
+            }),
+        },
+        'SetHistoryWarehouse1',
+      ),
+      React.createElement(
+        'button',
+        {
+          type: 'button',
+          onClick: () =>
+            onFiltersChange?.({
+              warehouseId: filters?.warehouseId ?? '',
+              type: '',
+              search: 'LP',
+              dateFrom: '',
+              dateTo: '',
+            }),
+        },
+        'SetHistorySearchLP',
+      ),
+    ),
 }))
 
 import InventoryWorkspace from '@/app/components/inventory/InventoryWorkspace'
@@ -132,22 +176,43 @@ describe('InventoryWorkspace', () => {
     expect(screen.queryByText('주의 항목')).toBeNull()
   })
 
-  it('switches to the embedded history view through tabs without duplicating top-level filters', () => {
+  it('switches to the embedded history view through tabs without duplicating top-level filters and keeps history filters independent', async () => {
     render(
       React.createElement(InventoryWorkspace, {
-        warehouses: [{ id: 1, name: '오금동' }],
+        warehouses: [
+          { id: 1, name: '오금동' },
+          { id: 2, name: '대자동' },
+        ],
         models: [],
         transactions: [],
       }),
     )
 
+    await openComboboxAndPick('창고 선택', '대자동')
+
     const historyTab = screen.getByRole('tab', { name: '이력' })
     fireEvent.mouseDown(historyTab)
     fireEvent.click(historyTab)
-    expect(screen.getByText('HistoryView:all')).toBeTruthy()
+    expect(screen.getByText('HistoryWarehouse:all')).toBeTruthy()
+    expect(screen.getByText('HistorySearch:-')).toBeTruthy()
+    expect(screen.getByText('HistoryEmbedded:yes')).toBeTruthy()
     expect(screen.queryByRole('heading', { name: '이력 필터' })).toBeNull()
-    expect(screen.queryByRole('combobox', { name: '창고' })).toBeNull()
     expect(screen.queryByRole('button', { name: '입고' })).toBeNull()
     expect(screen.queryByRole('button', { name: '출고' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'SetHistoryWarehouse1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'SetHistorySearchLP' }))
+
+    const listTab = screen.getByRole('tab', { name: '목록' })
+    fireEvent.mouseDown(listTab)
+    fireEvent.click(listTab)
+
+    expect(screen.getByRole('combobox', { name: '창고 선택' }).textContent).toContain('대자동')
+
+    fireEvent.mouseDown(historyTab)
+    fireEvent.click(historyTab)
+
+    expect(screen.getByText('HistoryWarehouse:1')).toBeTruthy()
+    expect(screen.getByText('HistorySearch:LP')).toBeTruthy()
   })
 })

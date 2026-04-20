@@ -10,8 +10,8 @@ export default async function HistoryPage() {
   return (
     <div className={ui.shell}>
       <PageHeader
-        title="이력조회"
-        description="입고, 출고, 재고조정 기록을 기간과 창고 기준으로 조회합니다."
+        title="이력 조회"
+        description="재고 변동을 조회하고 필요한 항목은 되돌립니다."
       />
       <HistoryView
         transactions={transactions}

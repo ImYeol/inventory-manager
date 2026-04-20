@@ -32,7 +32,11 @@ describe('SettingsView', () => {
           },
           coupang: {
             configured: true,
-            masked: { accessKey: 'cp-••••1111', vendorId: 'V-••••22' },
+            masked: {
+              accessKey: 'cp-••••1111',
+              vendorId: 'V-••••22',
+              defaultDeliveryCompanyCode: 'CJGLS',
+            },
             updatedAt: '2026-04-11T08:30:00.000Z',
           },
         },
@@ -58,6 +62,8 @@ describe('SettingsView', () => {
     expect(screen.queryByRole('link', { name: '변경' })).toBeNull()
     expect(screen.getByLabelText('네이버 Client ID')).toBeTruthy()
     expect(screen.getByLabelText('쿠팡 Access Key')).toBeTruthy()
+    expect(screen.getByLabelText('쿠팡 기본 택배사 코드')).toBeTruthy()
+    expect(screen.getByText('CJGLS')).toBeTruthy()
     expect(screen.queryByText('네이버와 쿠팡 연결 정보를 이 화면에서 관리합니다.')).toBeNull()
   })
 

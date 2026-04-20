@@ -160,6 +160,23 @@ describe('shared action and status primitives', () => {
     expect(screen.getByText('미연결')).toBeTruthy()
   })
 
+  it('supports a muted disconnected tone for compact status chips', () => {
+    render(
+      React.createElement(
+        'div',
+        { 'data-testid': 'muted-status' },
+        React.createElement(StoreConnectionStatus, {
+          configured: false,
+          compact: true,
+          disconnectedTone: 'muted',
+        }),
+      ),
+    )
+
+    expect(screen.getByLabelText('미연결')).toBeTruthy()
+    expect(screen.getByTestId('muted-status').querySelector('[aria-hidden="true"]')?.className).toContain('bg-slate-400')
+  })
+
   it('supports row interaction on the basic data table without breaking cell rendering', () => {
     const onRowClick = vi.fn()
 

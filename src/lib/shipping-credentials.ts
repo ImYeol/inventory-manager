@@ -13,6 +13,7 @@ export type CoupangCredentials = {
   accessKey: string
   secretKey: string
   vendorId: string
+  defaultDeliveryCompanyCode: string
 }
 
 export type ShippingSettingsSummaryItem = {
@@ -70,7 +71,9 @@ function hasConfiguredMaskedValue(
     typeof summary.accessKey === 'string' &&
     summary.accessKey.length > 0 &&
     typeof summary.vendorId === 'string' &&
-    summary.vendorId.length > 0
+    summary.vendorId.length > 0 &&
+    typeof summary.defaultDeliveryCompanyCode === 'string' &&
+    summary.defaultDeliveryCompanyCode.length > 0
   )
 }
 
@@ -158,6 +161,7 @@ export function buildCoupangMaskedSummary(credentials: CoupangCredentials) {
   return {
     accessKey: maskValue(credentials.accessKey),
     vendorId: maskValue(credentials.vendorId),
+    defaultDeliveryCompanyCode: credentials.defaultDeliveryCompanyCode,
   }
 }
 

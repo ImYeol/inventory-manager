@@ -1,10 +1,19 @@
 'use server'
 
-import { fetchNaverPendingOrders, dispatchNaverOrders, type NaverOrder } from '../api/naver'
-import { fetchCoupangPendingOrders, confirmCoupangShipments, type CoupangOrder } from '../api/coupang'
+import {
+  fetchNaverPendingOrders,
+  dispatchNaverOrders,
+  type NaverOrder,
+} from '../api/naver'
+import {
+  fetchCoupangPendingOrders,
+  confirmCoupangShipments,
+  type CoupangOrderItem,
+  type CoupangOrderSheet,
+} from '../api/coupang'
 import { getRequiredShippingCredentials } from '../shipping-credentials'
 
-export type { NaverOrder, CoupangOrder }
+export type { NaverOrder, CoupangOrderItem, CoupangOrderSheet }
 
 export async function fetchNaverOrders(): Promise<{
   success: boolean;
@@ -44,14 +53,17 @@ export async function sendNaverTrackingNumbers(
   }
 }
 
-export async function fetchCoupangOrders(): Promise<{
+export async function fetchCoupangOrders(input?: {
+  fromDate?: string
+  toDate?: string
+}): Promise<{
   success: boolean;
-  orders: CoupangOrder[];
+  orders: CoupangOrderSheet[];
   error?: string;
 }> {
   try {
     const credentials = await getRequiredShippingCredentials('coupang')
-    const orders = await fetchCoupangPendingOrders(credentials)
+    const orders = await fetchCoupangPendingOrders(credentials, input)
     return { success: true, orders }
   } catch (e) {
     return {
@@ -63,7 +75,7 @@ export async function fetchCoupangOrders(): Promise<{
 }
 
 export async function sendCoupangTrackingNumbers(
-  matches: { shipmentBoxId: number; trackingNumber: string }[]
+  matches: { shipmentBoxId: number; orderId: number; vendorItemIds: number[]; trackingNumber: string }[]
 ): Promise<{
   success: boolean;
   failedBoxes: number[];

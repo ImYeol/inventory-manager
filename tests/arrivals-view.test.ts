@@ -39,6 +39,7 @@ describe('ArrivalsView', () => {
 
     render(
       React.createElement(ArrivalsView, {
+        schemaState: { status: 'ready', message: null },
         factories: [{ id: 1, name: '광주 협력사', isActive: true }],
         warehouses: [
           { id: 11, name: '오금동' },
@@ -88,6 +89,7 @@ describe('ArrivalsView', () => {
 
     render(
       React.createElement(ArrivalsView, {
+        schemaState: { status: 'ready', message: null },
         factories: [{ id: 1, name: '광주 협력사', isActive: true }],
         warehouses: [
           { id: 11, name: '오금동' },
@@ -142,5 +144,54 @@ describe('ArrivalsView', () => {
       }),
     )
     expect(mocks.refresh).toHaveBeenCalled()
+  })
+
+  it('shows the setup banner and blocks register/receive actions when sourcing schema is missing', async () => {
+    render(
+      React.createElement(ArrivalsView, {
+        schemaState: {
+          status: 'missing',
+          message: '소싱 스키마가 아직 배포되지 않았습니다. supabase/schema.sql 적용 후 다시 시도하세요.',
+        },
+        factories: [{ id: 1, name: '광주 협력사', isActive: true }],
+        warehouses: [{ id: 11, name: '오금동' }],
+        models: [
+          {
+            id: 1,
+            name: 'LP01',
+            sizes: [{ id: 10, name: 'S' }],
+            colors: [{ id: 20, name: '네이비', rgbCode: '#111111' }],
+          },
+        ],
+        arrivals: [
+          {
+            id: 101,
+            factoryName: '광주 협력사',
+            expectedDate: '2026-04-21',
+            status: '예정',
+            sourceChannel: 'manual',
+            memo: null,
+            totalOrderedQuantity: 5,
+            remainingQuantity: 5,
+            items: [
+              {
+                id: 201,
+                modelName: 'LP01',
+                sizeName: 'S',
+                colorName: '네이비',
+                colorRgb: '#111111',
+                orderedQuantity: 5,
+                receivedQuantity: 0,
+                remainingQuantity: 5,
+              },
+            ],
+          },
+        ],
+      }),
+    )
+
+    expect(screen.getByText('소싱 스키마가 아직 배포되지 않았습니다. supabase/schema.sql 적용 후 다시 시도하세요.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '예정 입고 등록' }).getAttribute('disabled')).not.toBeNull()
+    expect(screen.getByRole('button', { name: '입고 반영' }).getAttribute('disabled')).not.toBeNull()
   })
 })

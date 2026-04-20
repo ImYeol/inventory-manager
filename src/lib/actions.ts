@@ -6,9 +6,11 @@ import {
   getCatalogData,
   getCurrentStockRow,
   getModelLookups,
+  normalizeSourcingErrorMessage,
   getTransactionsWithRelations,
   runBulkTransaction,
   runInventoryAdjustment,
+  runRevertTransaction,
   runReceiveFactoryArrival,
 } from './data'
 import { getSupabaseWithUser } from './db'
@@ -155,6 +157,16 @@ export async function getTransactions(filters?: {
 
 export async function adjustInventory(inventoryId: number, newQuantity: number) {
   await runInventoryAdjustment(inventoryId, newQuantity)
+  revalidateInventoryPaths()
+  return { success: true }
+}
+
+export async function revertTransaction(transactionId: number, memo?: string | null) {
+  if (!transactionId) {
+    throw new Error('되돌릴 이력을 찾을 수 없습니다.')
+  }
+
+  await runRevertTransaction(transactionId, memo)
   revalidateInventoryPaths()
   return { success: true }
 }
@@ -452,7 +464,7 @@ export async function createFactory(input: {
   })
 
   if (error) {
-    throw new Error(error.message)
+    throw new Error(normalizeSourcingErrorMessage(error, '공장 등록에 실패했습니다.'))
   }
 
   revalidatePath('/sourcing/factories')
@@ -469,7 +481,7 @@ export async function setFactoryActive(factoryId: number, isActive: boolean) {
   const { error } = await supabase.from('factories').update({ is_active: isActive }).eq('id', factoryId)
 
   if (error) {
-    throw new Error(error.message)
+    throw new Error(normalizeSourcingErrorMessage(error, '공장 상태 변경에 실패했습니다.'))
   }
 
   revalidatePath('/sourcing/factories')
@@ -528,7 +540,7 @@ export async function createFactoryArrivalBatch(input: {
     .single()
 
   if (arrivalError || !arrival?.id) {
-    throw new Error(arrivalError?.message ?? '예정 입고 등록에 실패했습니다.')
+    throw new Error(normalizeSourcingErrorMessage(arrivalError, '예정 입고 등록에 실패했습니다.'))
   }
 
   const { error: itemsError } = await supabase.from('factory_arrival_items').insert(
@@ -540,7 +552,7 @@ export async function createFactoryArrivalBatch(input: {
 
   if (itemsError) {
     await supabase.from('factory_arrivals').delete().eq('id', arrival.id)
-    throw new Error(itemsError.message)
+    throw new Error(normalizeSourcingErrorMessage(itemsError, '예정 입고 등록에 실패했습니다.'))
   }
 
   revalidatePath('/sourcing/arrivals')
@@ -557,7 +569,15 @@ export async function receiveFactoryArrival(input: {
     throw new Error('입고 반영 정보가 올바르지 않습니다.')
   }
 
-  await runReceiveFactoryArrival(input.arrivalId, input.warehouseId, input.items)
+  try {
+    await runReceiveFactoryArrival(input.arrivalId, input.warehouseId, input.items)
+  } catch (error) {
+    const source =
+      error instanceof Error
+        ? { message: error.message }
+        : { message: '입고 반영에 실패했습니다.' }
+    throw new Error(normalizeSourcingErrorMessage(source, '입고 반영에 실패했습니다.'))
+  }
 
   revalidateInventoryPaths()
   revalidatePath('/sourcing/arrivals')

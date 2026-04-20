@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { SOURCING_SCHEMA_MISSING_MESSAGE } from '@/lib/data'
 
 const mocks = vi.hoisted(() => ({
   getSupabaseWithUser: vi.fn(),
@@ -10,9 +11,13 @@ vi.mock('@/lib/db', () => ({
   getSupabaseWithUser: mocks.getSupabaseWithUser,
 }))
 
-vi.mock('@/lib/data', () => ({
-  runReceiveFactoryArrival: mocks.runReceiveFactoryArrival,
-}))
+vi.mock('@/lib/data', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/data')>()
+  return {
+    ...actual,
+    runReceiveFactoryArrival: mocks.runReceiveFactoryArrival,
+  }
+})
 
 vi.mock('next/cache', () => ({
   revalidatePath: mocks.revalidatePath,
@@ -124,5 +129,46 @@ describe('sourcing actions', () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/history')
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sourcing/arrivals')
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sourcing/factories')
+  })
+
+  it('normalizes missing-schema errors across sourcing actions', async () => {
+    const missingSchemaError = { message: "relation 'public.factory_arrivals' does not exist" }
+    const insert = vi.fn(() => Promise.resolve({ error: missingSchemaError }))
+    const update = vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: missingSchemaError })) }))
+    const arrivalInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(() => Promise.resolve({ data: null, error: missingSchemaError })),
+      })),
+    }))
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === 'factories') return { insert, update }
+        if (table === 'factory_arrivals') return { insert: arrivalInsert, delete: vi.fn(() => ({ eq: vi.fn() })) }
+        if (table === 'factory_arrival_items') return { insert: vi.fn(() => Promise.resolve({ error: missingSchemaError })) }
+        throw new Error(`unexpected table ${table}`)
+      }),
+    }
+
+    mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
+    mocks.runReceiveFactoryArrival.mockRejectedValue(new Error("Could not find the table 'factory_arrivals' in the schema cache"))
+
+    await expect(createFactory({ name: '광주 협력사' })).rejects.toThrow(SOURCING_SCHEMA_MISSING_MESSAGE)
+    await expect(setFactoryActive(1, false)).rejects.toThrow(SOURCING_SCHEMA_MISSING_MESSAGE)
+    await expect(
+      createFactoryArrivalBatch({
+        factoryId: 1,
+        expectedDate: '2026-04-21',
+        sourceChannel: 'manual',
+        items: [{ modelId: 1, sizeId: 10, colorId: 20, orderedQuantity: 4 }],
+      }),
+    ).rejects.toThrow(SOURCING_SCHEMA_MISSING_MESSAGE)
+    await expect(
+      receiveFactoryArrival({
+        arrivalId: 55,
+        warehouseId: 2,
+        items: [{ arrivalItemId: 100, quantity: 4 }],
+      }),
+    ).rejects.toThrow(SOURCING_SCHEMA_MISSING_MESSAGE)
   })
 })

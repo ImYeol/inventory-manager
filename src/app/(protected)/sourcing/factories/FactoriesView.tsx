@@ -25,6 +25,22 @@ type FactoryData = {
   pendingQuantity: number
 }
 
+type FactorySourcingItem = {
+  expectedDate: string
+  status: string
+  modelName: string
+  sizeName: string
+  colorName: string
+  orderedQuantity: number
+  receivedQuantity: number
+  remainingQuantity: number
+}
+
+type SourcingSchemaState = {
+  status: 'ready' | 'missing'
+  message: string | null
+}
+
 type FactoryStatusFilter = 'all' | 'active' | 'inactive'
 
 type SelectOption<Value extends string | number> = {
@@ -74,7 +90,22 @@ function SelectField<Value extends string | number>({
   )
 }
 
-export default function FactoriesView({ factories }: { factories: FactoryData[] }) {
+function getArrivalStatusTone(status: string) {
+  if (status === '예정') return 'info'
+  if (status === '부분입고') return 'warning'
+  if (status === '입고완료') return 'success'
+  return 'neutral'
+}
+
+export default function FactoriesView({
+  factories,
+  schemaState,
+  factorySourcingItems,
+}: {
+  factories: FactoryData[]
+  schemaState: SourcingSchemaState
+  factorySourcingItems: Record<number, FactorySourcingItem[]>
+}) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState<string | null>(null)
@@ -117,6 +148,7 @@ export default function FactoriesView({ factories }: { factories: FactoryData[] 
     () => (selectedFactoryId === null ? null : factories.find((factory) => factory.id === selectedFactoryId) ?? null),
     [factories, selectedFactoryId],
   )
+  const selectedFactorySourcingItems = selectedFactory ? factorySourcingItems[selectedFactory.id] ?? [] : []
 
   const openDetail = (factoryId: number) => {
     setSelectedFactoryId(factoryId)
@@ -154,11 +186,27 @@ export default function FactoriesView({ factories }: { factories: FactoryData[] 
         title="외부 공장"
         description="공장 목록을 검색하고 상태를 걸러서 상세 정보와 등록 작업을 빠르게 처리합니다."
         actions={
-          <Button type="button" onClick={() => setIsRegisterOpen(true)} size="sm" className="h-10 px-3">
+          <Button
+            type="button"
+            onClick={() => {
+              if (schemaState.status === 'ready') {
+                setIsRegisterOpen(true)
+              }
+            }}
+            size="sm"
+            className="h-10 px-3"
+            disabled={schemaState.status === 'missing'}
+          >
             공장 등록
           </Button>
         }
       />
+
+      {schemaState.status === 'missing' && schemaState.message ? (
+        <Card variant="muted" className="mb-4 overflow-hidden">
+          <CardContent className="px-4 py-3 text-sm font-medium text-slate-700">{schemaState.message}</CardContent>
+        </Card>
+      ) : null}
 
       {message ? (
         <Card variant="muted" className="mb-4 overflow-hidden">
@@ -206,12 +254,12 @@ export default function FactoriesView({ factories }: { factories: FactoryData[] 
             <Table aria-label="공장 목록">
               <TableHeader>
                 <TableRow>
-                  <TableHead>공장</TableHead>
-                  <TableHead>연락처</TableHead>
-                  <TableHead className="text-right">예정 입고</TableHead>
-                  <TableHead className="text-right">잔여</TableHead>
-                  <TableHead>상태</TableHead>
-                  <TableHead className="text-right">작업</TableHead>
+                  <TableHead className="w-[18rem]">공장</TableHead>
+                  <TableHead className="w-[18rem]">연락처</TableHead>
+                  <TableHead className="w-[7rem] text-right">예정 입고</TableHead>
+                  <TableHead className="w-[7rem] text-right">잔여</TableHead>
+                  <TableHead className="w-[7rem]">상태</TableHead>
+                  <TableHead className="w-[6rem] text-right">작업</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -224,27 +272,31 @@ export default function FactoriesView({ factories }: { factories: FactoryData[] 
                 ) : (
                   filteredFactories.map((factory) => (
                     <TableRow key={factory.id} data-state={factory.id === selectedFactory?.id ? 'selected' : undefined}>
-                      <TableCell className="font-medium text-slate-950">
+                      <TableCell className="max-w-[18rem] font-medium text-slate-950">
                         <button
                           type="button"
                           onClick={() => openDetail(factory.id)}
-                          className="text-left font-medium text-slate-950 hover:underline"
+                          className="w-full truncate text-left font-medium text-slate-950 hover:underline"
                         >
                           {factory.name}
                         </button>
-                        {factory.notes ? <p className="mt-1 text-xs text-slate-500">{factory.notes}</p> : null}
+                        {factory.notes ? <p className="mt-1 line-clamp-2 text-xs text-slate-500">{factory.notes}</p> : null}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="max-w-[18rem] break-words">
                         {[factory.contactName, factory.phone, factory.email].filter(Boolean).join(' · ') || '연락처 정보 없음'}
                       </TableCell>
-                      <TableCell className="text-right font-semibold text-slate-950">{factory.arrivalCount}건</TableCell>
-                      <TableCell className="text-right font-semibold text-slate-950">{factory.pendingQuantity}개</TableCell>
-                      <TableCell>
+                      <TableCell className="w-[7rem] text-right font-semibold tabular-nums text-slate-950">
+                        {factory.arrivalCount}건
+                      </TableCell>
+                      <TableCell className="w-[7rem] text-right font-semibold tabular-nums text-slate-950">
+                        {factory.pendingQuantity}개
+                      </TableCell>
+                      <TableCell className="w-[7rem] align-middle">
                         <StatusBadge tone={factory.isActive ? 'success' : 'neutral'} className="px-2.5 py-1">
                           {factory.isActive ? '활성' : '비활성'}
                         </StatusBadge>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="w-[6rem] text-right">
                         <Button type="button" variant="secondary" size="sm" onClick={() => openDetail(factory.id)}>
                           상세
                         </Button>
@@ -261,7 +313,7 @@ export default function FactoriesView({ factories }: { factories: FactoryData[] 
       <Modal
         open={selectedFactory !== null}
         title={selectedFactory?.name ?? '공장 상세'}
-        description={selectedFactory ? '공장 정보와 상태를 확인합니다.' : undefined}
+        description={selectedFactory ? '공장 정보와 열려 있는 상품 소싱 내역을 확인합니다.' : undefined}
         onOpenChange={(open) => {
           if (!open) {
             setSelectedFactoryId(null)
@@ -279,6 +331,12 @@ export default function FactoriesView({ factories }: { factories: FactoryData[] 
       >
         {selectedFactory ? (
           <div className="space-y-4">
+            {schemaState.status === 'missing' && schemaState.message ? (
+              <Card variant="muted" className="overflow-hidden">
+                <CardContent className="px-4 py-3 text-sm font-medium text-slate-700">{schemaState.message}</CardContent>
+              </Card>
+            ) : null}
+
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge tone={selectedFactory.isActive ? 'success' : 'neutral'} className="px-2.5 py-1">
                 {selectedFactory.isActive ? '활성' : '비활성'}
@@ -321,6 +379,56 @@ export default function FactoriesView({ factories }: { factories: FactoryData[] 
                 </CardContent>
               </Card>
             </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-slate-950">상품 소싱 내역</h3>
+                <span className={cx(ui.pillMuted, 'tabular-nums')}>열림 {selectedFactorySourcingItems.length}건</span>
+              </div>
+
+              <div className={ui.tableShell}>
+                <div className="overflow-x-auto">
+                  <Table aria-label="상품 소싱 내역">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[8rem]">예정일</TableHead>
+                        <TableHead>상품</TableHead>
+                        <TableHead className="w-[10rem]">옵션</TableHead>
+                        <TableHead className="w-[7rem]">상태</TableHead>
+                        <TableHead className="w-[6rem] text-right">주문</TableHead>
+                        <TableHead className="w-[6rem] text-right">받은</TableHead>
+                        <TableHead className="w-[6rem] text-right">잔여</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedFactorySourcingItems.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="py-8 text-center text-sm text-slate-500">
+                            열려 있는 소싱 내역이 없습니다.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        selectedFactorySourcingItems.map((item, index) => (
+                          <TableRow key={`${item.expectedDate}-${item.modelName}-${item.sizeName}-${item.colorName}-${index}`}>
+                            <TableCell className="font-medium text-slate-950">{item.expectedDate}</TableCell>
+                            <TableCell className="font-medium text-slate-950">{item.modelName}</TableCell>
+                            <TableCell>{item.colorName} / {item.sizeName}</TableCell>
+                            <TableCell>
+                              <StatusBadge tone={getArrivalStatusTone(item.status)} className="px-2.5 py-1">
+                                {item.status}
+                              </StatusBadge>
+                            </TableCell>
+                            <TableCell className="text-right font-medium tabular-nums text-slate-950">{item.orderedQuantity}</TableCell>
+                            <TableCell className="text-right font-medium tabular-nums text-slate-950">{item.receivedQuantity}</TableCell>
+                            <TableCell className="text-right font-semibold tabular-nums text-slate-950">{item.remainingQuantity}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </div>
           </div>
         ) : null}
       </Modal>
@@ -335,13 +443,24 @@ export default function FactoriesView({ factories }: { factories: FactoryData[] 
             <Button type="button" variant="secondary" onClick={() => setIsRegisterOpen(false)}>
               취소
             </Button>
-            <Button type="button" onClick={submitFactory} disabled={isPending || draft.name.trim().length === 0}>
+            <Button
+              type="button"
+              onClick={submitFactory}
+              disabled={schemaState.status === 'missing' || isPending || draft.name.trim().length === 0}
+            >
               등록
             </Button>
           </div>
         }
       >
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="space-y-3">
+          {schemaState.status === 'missing' && schemaState.message ? (
+            <Card variant="muted" className="overflow-hidden">
+              <CardContent className="px-4 py-3 text-sm font-medium text-slate-700">{schemaState.message}</CardContent>
+            </Card>
+          ) : null}
+
+          <div className="grid gap-3 md:grid-cols-2">
           <div className="md:col-span-2">
             <label className={ui.label}>공장 이름</label>
             <Input
@@ -383,6 +502,7 @@ export default function FactoriesView({ factories }: { factories: FactoryData[] 
               className={cx(ui.control, 'min-h-28 resize-y')}
             />
           </div>
+        </div>
         </div>
       </Modal>
     </div>

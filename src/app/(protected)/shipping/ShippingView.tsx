@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import * as XLSX from 'xlsx'
 import { parseExcelRow, type CourierRow } from '@/lib/excel'
 import * as shippingActions from '@/lib/actions/shipping'
-import type { NaverOrder, CoupangOrder } from '@/lib/actions/shipping'
+import type { CoupangOrderSheet, NaverOrder } from '@/lib/actions/shipping'
 import type { ShippingSettingsSummary } from '@/lib/shipping-credentials'
 import type { ShippingClassification } from '@/components/ui/shipping-classification-badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,9 +15,18 @@ import { cx, ui } from '../../components/ui'
 
 type ShippingProvider = 'naver' | 'coupang'
 
+type CoupangShipmentMatch = {
+  shipmentBoxId: number
+  orderId: number
+  vendorItemIds: number[]
+}
+
 type ProviderMatches = {
   naver: { productOrderId: string } | null
-  coupang: { shipmentBoxId: number } | null
+  coupang: {
+    primary: CoupangShipmentMatch | null
+    candidates: CoupangShipmentMatch[]
+  }
 }
 
 type ShippingPreviewRow = CourierRow & {
@@ -25,6 +34,11 @@ type ShippingPreviewRow = CourierRow & {
   classification: ShippingClassification
   classificationSource: 'auto' | 'manual'
   providerMatches: ProviderMatches
+}
+
+type CoupangDateRange = {
+  fromDate?: string
+  toDate?: string
 }
 
 function ShippingProviderActionGroup({
@@ -54,11 +68,11 @@ function ShippingProviderActionGroup({
     return (
       <Link
         href={settingsHref}
-        aria-label={`${label} 연결`}
-        className={cx(ui.buttonSecondary, ui.buttonDense, 'gap-1.5 opacity-70')}
+        aria-label={`${label} 미연결`}
+        className={cx(ui.buttonSecondary, ui.buttonDense, 'gap-1.5')}
       >
-        <StoreConnectionStatus configured={false} compact />
-        <span>{label} 연결</span>
+        <StoreConnectionStatus configured={false} compact disconnectedTone="muted" />
+        <span>{label} 미연결</span>
       </Link>
     )
   }
@@ -104,6 +118,39 @@ function normalizeName(value: string | undefined) {
   return (value ?? '').trim()
 }
 
+function normalizeDateValue(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null
+}
+
+function hasPreviewContent(row: CourierRow) {
+  return [row.no, row.reservationNumber, row.recipientName, row.address, row.trackingNumber].some(
+    (value) => value.trim().length > 0,
+  )
+}
+
+function hasTrackingNumber(row: Pick<CourierRow, 'trackingNumber'>) {
+  return row.trackingNumber.trim().length > 0
+}
+
+function collectCoupangDateRange(rows: CourierRow[]): CoupangDateRange {
+  const dates = rows.flatMap((row) =>
+    [row.receiptDate, row.pickupScheduleDate, row.pickupDate]
+      .map(normalizeDateValue)
+      .filter((value): value is string => value !== null),
+  )
+
+  if (dates.length === 0) {
+    return {}
+  }
+
+  const sortedDates = [...dates].sort()
+
+  return {
+    fromDate: sortedDates[0],
+    toDate: sortedDates[sortedDates.length - 1],
+  }
+}
+
 function findNaverMatch(row: Pick<CourierRow, 'recipientName' | 'address'>, orders: NaverOrder[]) {
   const normalizedName = normalizeName(row.recipientName)
   const normalizedRowAddress = normalizeAddress(row.address)
@@ -121,25 +168,40 @@ function findNaverMatch(row: Pick<CourierRow, 'recipientName' | 'address'>, orde
   return matchedOrder ? { productOrderId: matchedOrder.productOrderId } : null
 }
 
-function findCoupangMatch(row: Pick<CourierRow, 'recipientName' | 'address'>, orders: CoupangOrder[]) {
+function findCoupangMatch(row: Pick<CourierRow, 'recipientName' | 'address'>, orders: CoupangOrderSheet[]) {
   const normalizedName = normalizeName(row.recipientName)
   const normalizedRowAddress = normalizeAddress(row.address)
 
-  const matchedOrder = orders.find((order) => {
-    const orderName = normalizeName(order.receiverName)
-    const orderAddress = normalizeAddress(order.receiverAddr)
-    return (
-      normalizedName.length > 0 &&
-      orderName === normalizedName &&
-      (orderAddress.includes(normalizedRowAddress) || normalizedRowAddress.includes(orderAddress))
-    )
-  })
+  const candidates = orders
+    .filter((order) => {
+      const orderName = normalizeName(order.receiver.name)
+      const orderAddress = normalizeAddress(`${order.receiver.addr1} ${order.receiver.addr2}`.trim())
+      return (
+        normalizedName.length > 0 &&
+        orderName === normalizedName &&
+        (orderAddress.includes(normalizedRowAddress) || normalizedRowAddress.includes(orderAddress))
+      )
+    })
+    .map<CoupangShipmentMatch>((order) => ({
+      shipmentBoxId: order.shipmentBoxId,
+      orderId: order.orderId,
+      vendorItemIds: order.orderItems
+        .map((item) => item.vendorItemId)
+        .filter((vendorItemId) => Number.isFinite(vendorItemId) && vendorItemId > 0),
+    }))
 
-  return matchedOrder ? { shipmentBoxId: matchedOrder.shipmentBoxId } : null
+  return {
+    primary: candidates.length === 1 ? candidates[0] : null,
+    candidates,
+  }
 }
 
 function resolveClassification(providerMatches: ProviderMatches): ShippingClassification {
-  if (providerMatches.naver && providerMatches.coupang) {
+  if (providerMatches.naver && providerMatches.coupang.candidates.length > 0) {
+    return 'ambiguous'
+  }
+
+  if (providerMatches.coupang.candidates.length > 1) {
     return 'ambiguous'
   }
 
@@ -147,7 +209,7 @@ function resolveClassification(providerMatches: ProviderMatches): ShippingClassi
     return 'naver'
   }
 
-  if (providerMatches.coupang) {
+  if (providerMatches.coupang.primary) {
     return 'coupang'
   }
 
@@ -159,8 +221,13 @@ function getActiveMatchedOrder(row: ShippingPreviewRow) {
     return { provider: 'naver' as const, productOrderId: row.providerMatches.naver.productOrderId }
   }
 
-  if (row.classification === 'coupang' && row.providerMatches.coupang) {
-    return { provider: 'coupang' as const, shipmentBoxId: row.providerMatches.coupang.shipmentBoxId }
+  if (row.classification === 'coupang' && row.providerMatches.coupang.primary) {
+    return {
+      provider: 'coupang' as const,
+      shipmentBoxId: row.providerMatches.coupang.primary.shipmentBoxId,
+      orderId: row.providerMatches.coupang.primary.orderId,
+      vendorItemIds: row.providerMatches.coupang.primary.vendorItemIds,
+    }
   }
 
   return null
@@ -177,7 +244,7 @@ function isSupportedExcelFile(file: File) {
   return (extension && allowedExtensions.includes(extension)) || allowedMimeTypes.has(file.type)
 }
 
-function classifyRows(courierRows: CourierRow[], naverOrders: NaverOrder[], coupangOrders: CoupangOrder[]) {
+function classifyRows(courierRows: CourierRow[], naverOrders: NaverOrder[], coupangOrders: CoupangOrderSheet[]) {
   return courierRows.map<ShippingPreviewRow>((row, index) => {
     const providerMatches = {
       naver: findNaverMatch(row, naverOrders),
@@ -186,7 +253,7 @@ function classifyRows(courierRows: CourierRow[], naverOrders: NaverOrder[], coup
 
     return {
       ...row,
-      key: `${index}-${row.trackingNumber}`,
+      key: `${index}-${row.trackingNumber || row.reservationNumber || row.recipientName}`,
       classification: resolveClassification(providerMatches),
       classificationSource: 'auto',
       providerMatches,
@@ -194,12 +261,16 @@ function classifyRows(courierRows: CourierRow[], naverOrders: NaverOrder[], coup
   })
 }
 
-function refreshRowsForProvider(rows: ShippingPreviewRow[], provider: ShippingProvider, orders: NaverOrder[] | CoupangOrder[]) {
+function refreshRowsForProvider(
+  rows: ShippingPreviewRow[],
+  provider: ShippingProvider,
+  orders: NaverOrder[] | CoupangOrderSheet[],
+) {
   return rows.map((row) => {
     const providerMatches =
       provider === 'naver'
         ? { ...row.providerMatches, naver: findNaverMatch(row, orders as NaverOrder[]) }
-        : { ...row.providerMatches, coupang: findCoupangMatch(row, orders as CoupangOrder[]) }
+        : { ...row.providerMatches, coupang: findCoupangMatch(row, orders as CoupangOrderSheet[]) }
 
     if (row.classificationSource === 'manual') {
       return {
@@ -221,6 +292,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
   const [isDragOver, setIsDragOver] = useState(false)
   const [fileName, setFileName] = useState('')
   const [previewRows, setPreviewRows] = useState<ShippingPreviewRow[]>([])
+  const [coupangDateRange, setCoupangDateRange] = useState<CoupangDateRange>({})
   const [classificationFilter, setClassificationFilter] = useState<'all' | 'naver' | 'coupang' | 'unclassified'>('all')
   const [previewPage, setPreviewPage] = useState(1)
   const [naverMessage, setNaverMessage] = useState('')
@@ -243,6 +315,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
     if (!isSupportedExcelFile(file)) {
       setUploadError('엑셀 파일(.xlsx, .xls)만 업로드할 수 있습니다.')
       setPreviewRows([])
+      setCoupangDateRange({})
       setPreviewPage(1)
       setClassifying(false)
       return
@@ -256,6 +329,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
       if (!data) {
         setUploadError('엑셀 파일을 읽을 수 없습니다.')
         setPreviewRows([])
+        setCoupangDateRange({})
         setPreviewPage(1)
         setClassifying(false)
         return
@@ -267,6 +341,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
         if (!sheetName) {
           setUploadError('엑셀 파일에 시트가 없습니다.')
           setPreviewRows([])
+          setCoupangDateRange({})
           setPreviewPage(1)
           setClassifying(false)
           return
@@ -277,14 +352,18 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
         const courierRows = jsonRows
           .filter((row) => Object.keys(row).length > 0)
           .map(parseExcelRow)
-          .filter((row) => row.trackingNumber)
+          .filter(hasPreviewContent)
+        const nextCoupangDateRange = collectCoupangDateRange(courierRows)
+        setCoupangDateRange(nextCoupangDateRange)
 
         setClassifying(true)
         void (async () => {
           try {
             const [naverResult, coupangResult] = await Promise.all([
               hasNaverConfig ? shippingActions.fetchNaverOrders() : Promise.resolve({ success: true, orders: [] as NaverOrder[] }),
-              hasCoupangConfig ? shippingActions.fetchCoupangOrders() : Promise.resolve({ success: true, orders: [] as CoupangOrder[] }),
+              hasCoupangConfig
+                ? shippingActions.fetchCoupangOrders(nextCoupangDateRange)
+                : Promise.resolve({ success: true, orders: [] as CoupangOrderSheet[] }),
             ])
 
             setPreviewRows(
@@ -298,6 +377,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
           } catch {
             setUploadError('엑셀 파일을 처리하지 못했습니다.')
             setPreviewRows([])
+            setCoupangDateRange({})
             setPreviewPage(1)
           } finally {
             setClassifying(false)
@@ -306,6 +386,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
       } catch {
         setUploadError('엑셀 파일을 처리하지 못했습니다.')
         setPreviewRows([])
+        setCoupangDateRange({})
         setPreviewPage(1)
         setClassifying(false)
       }
@@ -314,6 +395,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
     reader.onerror = () => {
       setUploadError('엑셀 파일을 읽는 중 오류가 발생했습니다.')
       setPreviewRows([])
+      setCoupangDateRange({})
       setPreviewPage(1)
       setClassifying(false)
     }
@@ -348,7 +430,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
     () =>
       previewRows.filter((row) => {
         const matchedOrder = getActiveMatchedOrder(row)
-        return matchedOrder?.provider === 'naver'
+        return matchedOrder?.provider === 'naver' && hasTrackingNumber(row)
       }),
     [previewRows],
   )
@@ -356,7 +438,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
     () =>
       previewRows.filter((row) => {
         const matchedOrder = getActiveMatchedOrder(row)
-        return matchedOrder?.provider === 'coupang'
+        return matchedOrder?.provider === 'coupang' && hasTrackingNumber(row)
       }),
     [previewRows],
   )
@@ -401,7 +483,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
     if (!hasCoupangConfig || previewRows.length === 0) return
 
     startCoupangRefreshTransition(async () => {
-      const result = await shippingActions.fetchCoupangOrders()
+      const result = await shippingActions.fetchCoupangOrders(coupangDateRange)
       if (!result.success) {
         setCoupangMessage(result.error ?? '오류')
         return
@@ -429,7 +511,14 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
   const handleCoupangSend = () => {
     const targets = coupangMatches.flatMap((row) =>
       getActiveMatchedOrder(row)?.provider === 'coupang'
-        ? [{ shipmentBoxId: getActiveMatchedOrder(row).shipmentBoxId, trackingNumber: row.trackingNumber }]
+        ? [
+            {
+              shipmentBoxId: getActiveMatchedOrder(row).shipmentBoxId,
+              orderId: getActiveMatchedOrder(row).orderId,
+              vendorItemIds: getActiveMatchedOrder(row).vendorItemIds,
+              trackingNumber: row.trackingNumber,
+            },
+          ]
         : [],
     )
     if (targets.length === 0) return
@@ -641,7 +730,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
                       <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.reservationNumber || '-'}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className={cx(ui.pillMuted, 'px-2 py-0.5 font-mono text-xs font-semibold text-slate-800')}>
-                          {row.trackingNumber}
+                          {row.trackingNumber || '-'}
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap font-medium text-slate-900">{row.recipientName}</td>

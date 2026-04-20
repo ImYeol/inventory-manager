@@ -17,7 +17,9 @@ export async function GET(request: Request) {
 
     if (!error) {
       const forwardedHost = request.headers.get('x-forwarded-host')
-      const baseUrl = forwardedHost ? `https://${forwardedHost}` : origin
+      const forwardedProto = request.headers.get('x-forwarded-proto')
+      const baseUrl =
+        forwardedHost && forwardedProto ? `${forwardedProto}://${forwardedHost}` : origin
 
       return NextResponse.redirect(`${baseUrl}${next}`)
     }

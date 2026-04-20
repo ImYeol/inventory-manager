@@ -40,12 +40,14 @@ afterEach(() => {
   shippingActions.sendCoupangTrackingNumbers.mockReset()
 })
 
-function makeExcelFile() {
+function makeExcelFile(rows?: string[][]) {
   const workbook = XLSX.utils.book_new()
   const worksheet = XLSX.utils.aoa_to_sheet([
     ['No', '집화예정장소', '접수일자', '집화예정일자', '집화일자', '예약구분', '예약번호', '운송장번호', '받는분', '전화번호', '주소', '예약매체'],
-    ['1', '서울집화장', '2026-04-12', '2026-04-13', '2026-04-14', '일반', 'AB-123', '123456789', '홍길동', '010-1234-5678', '서울특별시', '웹'],
-    ['2', '부산집화장', '2026-04-15', '2026-04-16', '2026-04-17', '일반', 'CD-456', '987654321', '김철수', '010-2222-3333', '부산', '파일'],
+    ...(rows ?? [
+      ['1', '서울집화장', '2026-04-12', '2026-04-13', '2026-04-14', '일반', 'AB-123', '123456789', '홍길동', '010-1234-5678', '서울특별시', '웹'],
+      ['2', '부산집화장', '2026-04-15', '2026-04-16', '2026-04-17', '일반', 'CD-456', '987654321', '김철수', '010-2222-3333', '부산', '파일'],
+    ]),
   ])
   XLSX.utils.book_append_sheet(workbook, worksheet, '시트1')
   const arrayBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
@@ -53,6 +55,28 @@ function makeExcelFile() {
   return new File([arrayBuffer], '운송장.xlsx', {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   })
+}
+
+function makeCoupangOrderSheet(overrides?: Record<string, unknown>) {
+  return {
+    shipmentBoxId: 1001,
+    orderId: 2001,
+    orderedAt: '2026-04-12T09:00:00.000Z',
+    status: 'INSTRUCT',
+    receiver: {
+      name: '홍길동',
+      addr1: '서울특별시',
+      addr2: '송파구 오금동',
+    },
+    orderItems: [
+      {
+        vendorItemId: 3001,
+        vendorItemName: '옵션 1',
+        shippingCount: 1,
+      },
+    ],
+    ...overrides,
+  }
 }
 
 describe('ShippingView', () => {
@@ -70,8 +94,8 @@ describe('ShippingView', () => {
     expect(screen.getByText('운송장 업로드').closest('section')?.className).toContain('ui-card')
     expect(screen.getByText('분류 미리보기').closest('section')?.className).toContain('ui-card')
     expect(screen.getByLabelText('운송장 엑셀 업로드')).toBeTruthy()
-    expect(screen.getByRole('link', { name: /네이버 연결/ }).getAttribute('href')).toBe('/settings?section=store-connections&provider=naver')
-    expect(screen.getByRole('link', { name: /쿠팡 연결/ }).getAttribute('href')).toBe('/settings?section=store-connections&provider=coupang')
+    expect(screen.getByRole('link', { name: /네이버 미연결/ }).getAttribute('href')).toBe('/settings?section=store-connections&provider=naver')
+    expect(screen.getByRole('link', { name: /쿠팡 미연결/ }).getAttribute('href')).toBe('/settings?section=store-connections&provider=coupang')
     expect(screen.getAllByLabelText('미연결')).toHaveLength(2)
     expect(screen.getByRole('combobox', { name: '분류 필터' }).className).not.toContain('bg-white')
   })
@@ -93,7 +117,7 @@ describe('ShippingView', () => {
     expect(screen.queryByText('연동 준비 상태')).toBeNull()
     expect((screen.getByRole('button', { name: '네이버 갱신' }) as HTMLButtonElement).disabled).toBe(true)
     expect((screen.getByRole('button', { name: '네이버 반영' }) as HTMLButtonElement).disabled).toBe(true)
-    expect(screen.getByRole('link', { name: /쿠팡 연결/ }).getAttribute('href')).toBe('/settings?section=store-connections&provider=coupang')
+    expect(screen.getByRole('link', { name: /쿠팡 미연결/ }).getAttribute('href')).toBe('/settings?section=store-connections&provider=coupang')
     expect(screen.getAllByLabelText('연결됨')).toHaveLength(1)
     expect(screen.getByRole('button', { name: '네이버 갱신' }).parentElement?.className).toContain('whitespace-nowrap')
   })
@@ -123,7 +147,11 @@ describe('ShippingView', () => {
       React.createElement(ShippingView, {
         settingsSummary: {
           naver: { configured: true, masked: { clientId: 'naver-••••' }, updatedAt: '2026-04-12T09:00:00.000Z' },
-          coupang: { configured: true, masked: { accessKey: 'cp-••••', vendorId: 'v-••' }, updatedAt: '2026-04-12T10:00:00.000Z' },
+          coupang: {
+            configured: true,
+            masked: { accessKey: 'cp-••••', vendorId: 'v-••', defaultDeliveryCompanyCode: 'CJGLS' },
+            updatedAt: '2026-04-12T10:00:00.000Z',
+          },
         },
       })
     )
@@ -138,6 +166,11 @@ describe('ShippingView', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('cell', { name: '홍길동' })).toBeTruthy()
+    })
+
+    expect(shippingActions.fetchCoupangOrders).toHaveBeenCalledWith({
+      fromDate: '2026-04-12',
+      toDate: '2026-04-17',
     })
 
     expect(screen.getByText('분류 미리보기')).toBeTruthy()
@@ -236,26 +269,18 @@ describe('ShippingView', () => {
     })
     shippingActions.fetchCoupangOrders.mockResolvedValue({
       success: true,
-      orders: [
-        {
-          shipmentBoxId: 1001,
-          orderId: 2001,
-          productName: '쿠팡 상품',
-          receiverName: '홍길동',
-          receiverAddr: '서울특별시 송파구 오금동',
-          vendorItemName: '옵션',
-          quantity: 1,
-          ordererName: '주문자',
-          orderDate: '2026-04-12T09:00:00.000Z',
-        },
-      ],
+      orders: [makeCoupangOrderSheet()],
     })
 
     render(
       React.createElement(ShippingView, {
         settingsSummary: {
           naver: { configured: true, masked: { clientId: 'naver-••••' }, updatedAt: '2026-04-12T09:00:00.000Z' },
-          coupang: { configured: true, masked: { accessKey: 'cp-••••', vendorId: 'v-••' }, updatedAt: '2026-04-12T10:00:00.000Z' },
+          coupang: {
+            configured: true,
+            masked: { accessKey: 'cp-••••', vendorId: 'v-••', defaultDeliveryCompanyCode: 'CJGLS' },
+            updatedAt: '2026-04-12T10:00:00.000Z',
+          },
         },
       })
     )
@@ -276,5 +301,136 @@ describe('ShippingView', () => {
     fireEvent.click(await screen.findByRole('option', { name: '네이버' }))
 
     expect(screen.getByRole('combobox', { name: '홍길동 분류 변경' }).textContent).toContain('네이버')
+  })
+
+  it('keeps rows without tracking numbers in preview and excludes them from coupang apply targets', async () => {
+    shippingActions.fetchNaverOrders.mockResolvedValue({
+      success: true,
+      orders: [],
+    })
+    shippingActions.fetchCoupangOrders.mockResolvedValue({
+      success: true,
+      orders: [makeCoupangOrderSheet()],
+    })
+
+    render(
+      React.createElement(ShippingView, {
+        settingsSummary: {
+          naver: { configured: false, masked: {}, updatedAt: null },
+          coupang: {
+            configured: true,
+            masked: { accessKey: 'cp-••••', vendorId: 'v-••', defaultDeliveryCompanyCode: 'CJGLS' },
+            updatedAt: '2026-04-12T10:00:00.000Z',
+          },
+        },
+      }),
+    )
+
+    fireEvent.drop(screen.getByLabelText('운송장 엑셀 업로드 영역'), {
+      dataTransfer: {
+        files: [
+          makeExcelFile([
+            ['1', '서울집화장', '2026-04-12', '2026-04-13', '2026-04-14', '일반', 'AB-123', '', '홍길동', '010-1234-5678', '서울특별시', '웹'],
+          ]),
+        ],
+      } as unknown as DataTransfer,
+    })
+
+    await waitFor(() => {
+      expect(screen.getByRole('cell', { name: '홍길동' })).toBeTruthy()
+    })
+
+    expect(screen.getByRole('combobox', { name: '홍길동 분류 변경' }).textContent).toContain('쿠팡')
+    expect(screen.getByRole('cell', { name: '-' })).toBeTruthy()
+    await waitFor(() => {
+      expect((screen.getByRole('button', { name: '쿠팡 반영' }) as HTMLButtonElement).disabled).toBe(true)
+    })
+  })
+
+  it('refreshes coupang matches with the uploaded date range and sends shipment payloads with vendor item ids', async () => {
+    shippingActions.fetchNaverOrders.mockResolvedValue({
+      success: true,
+      orders: [],
+    })
+    shippingActions.fetchCoupangOrders
+      .mockResolvedValueOnce({
+        success: true,
+        orders: [
+          makeCoupangOrderSheet({
+            orderItems: [
+              { vendorItemId: 301, vendorItemName: '옵션 1', shippingCount: 1 },
+              { vendorItemId: 302, vendorItemName: '옵션 2', shippingCount: 1 },
+            ],
+          }),
+        ],
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        orders: [
+          makeCoupangOrderSheet({
+            orderItems: [
+              { vendorItemId: 301, vendorItemName: '옵션 1', shippingCount: 1 },
+              { vendorItemId: 302, vendorItemName: '옵션 2', shippingCount: 1 },
+            ],
+          }),
+        ],
+      })
+    shippingActions.sendCoupangTrackingNumbers.mockResolvedValue({
+      success: true,
+      failedBoxes: [],
+    })
+
+    render(
+      React.createElement(ShippingView, {
+        settingsSummary: {
+          naver: { configured: false, masked: {}, updatedAt: null },
+          coupang: {
+            configured: true,
+            masked: { accessKey: 'cp-••••', vendorId: 'v-••', defaultDeliveryCompanyCode: 'CJGLS' },
+            updatedAt: '2026-04-12T10:00:00.000Z',
+          },
+        },
+      }),
+    )
+
+    fireEvent.drop(screen.getByLabelText('운송장 엑셀 업로드 영역'), {
+      dataTransfer: {
+        files: [
+          makeExcelFile([
+            ['1', '서울집화장', '2026-04-12', '2026-04-13', '2026-04-14', '일반', 'AB-123', '123456789', '홍길동', '010-1234-5678', '서울특별시', '웹'],
+          ]),
+        ],
+      } as unknown as DataTransfer,
+    })
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: '홍길동 분류 변경' }).textContent).toContain('쿠팡')
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: '쿠팡 갱신' }))
+
+    await waitFor(() => {
+      expect(shippingActions.fetchCoupangOrders).toHaveBeenLastCalledWith({
+        fromDate: '2026-04-12',
+        toDate: '2026-04-14',
+      })
+    })
+
+    await waitFor(() => {
+      expect((screen.getByRole('button', { name: '쿠팡 반영' }) as HTMLButtonElement).disabled).toBe(false)
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: '쿠팡 반영' }))
+
+    await waitFor(() => {
+      expect(shippingActions.sendCoupangTrackingNumbers).toHaveBeenCalledWith([
+        {
+          shipmentBoxId: 1001,
+          orderId: 2001,
+          vendorItemIds: [301, 302],
+          trackingNumber: '123456789',
+        },
+      ])
+    })
   })
 })

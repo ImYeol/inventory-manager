@@ -155,6 +155,7 @@ describe('shipping settings server actions', () => {
     formData.set('accessKey', 'coupang-access-1234')
     formData.set('secretKey', 'coupang-secret')
     formData.set('vendorId', 'A12345678')
+    formData.set('defaultDeliveryCompanyCode', 'CJGLS')
 
     mocks.getSupabaseWithUser.mockResolvedValue({
       supabase: { from: supabase.from },
@@ -168,6 +169,7 @@ describe('shipping settings server actions', () => {
         masked: {
           accessKey: 'co***************34',
           vendorId: 'A1*****78',
+          defaultDeliveryCompanyCode: 'CJGLS',
         },
         updatedAt: '2026-04-12T09:00:00.000Z',
       },
@@ -182,6 +184,7 @@ describe('shipping settings server actions', () => {
       masked_summary: {
         accessKey: 'co***************34',
         vendorId: 'A1*****78',
+        defaultDeliveryCompanyCode: 'CJGLS',
       },
     })
   })
@@ -199,6 +202,7 @@ describe('shipping settings server actions', () => {
         accessKey: 'access-only',
         secretKey: '',
         vendorId: '',
+        defaultDeliveryCompanyCode: '',
       })
     ).resolves.toEqual({
       success: false,

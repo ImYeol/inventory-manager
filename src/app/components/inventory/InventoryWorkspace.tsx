@@ -1,8 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import HistoryView, { type HistoryFilterState } from '@/app/(protected)/history/HistoryView'
 import InOutForm from '@/app/(protected)/inout/InOutForm'
-import HistoryView from '@/app/(protected)/history/HistoryView'
 import { PageHeader, ui } from '@/app/components/ui'
 import { FixedSheet } from '@/components/ui/fixed-sheet'
 import { InventoryDataTable, type InventoryColumnKey, type InventoryDataRow } from '@/components/ui/inventory-data-table'
@@ -99,6 +99,13 @@ export default function InventoryWorkspace({
   const [statusFilter, setStatusFilter] = useState<'all' | 'normal' | 'warning' | 'danger'>('all')
   const [activeView, setActiveView] = useState<ViewMode>('list')
   const [overlayMode, setOverlayMode] = useState<'입고' | '출고' | null>(null)
+  const [historyFilters, setHistoryFilters] = useState<HistoryFilterState>({
+    warehouseId: '',
+    type: '',
+    search: '',
+    dateFrom: '',
+    dateTo: '',
+  })
   const [visibleColumns, setVisibleColumns] = useState<Set<InventoryColumnKey>>(
     () => new Set(ALL_COLUMNS.map((column) => column.key)),
   )
@@ -223,7 +230,8 @@ export default function InventoryWorkspace({
             transactions={transactions.map((tx) => ({ ...tx, warehouse: tx.warehouseName }))}
             models={models.map((model) => ({ id: model.id, name: model.name }))}
             warehouses={warehouses}
-            controlledWarehouseId={selectedWarehouseId === 'all' ? '' : selectedWarehouseId}
+            filters={historyFilters}
+            onFiltersChange={setHistoryFilters}
             embedded
           />
         </TabsContent>

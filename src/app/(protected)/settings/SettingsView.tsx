@@ -16,7 +16,12 @@ type SettingsViewProps = {
 export default function SettingsView({ summary, focusProvider }: SettingsViewProps) {
   const [currentSummary, setCurrentSummary] = useState(summary)
   const [naverValues, setNaverValues] = useState({ clientId: '', clientSecret: '' })
-  const [coupangValues, setCoupangValues] = useState({ accessKey: '', secretKey: '', vendorId: '' })
+  const [coupangValues, setCoupangValues] = useState({
+    accessKey: '',
+    secretKey: '',
+    vendorId: '',
+    defaultDeliveryCompanyCode: '',
+  })
   const [naverMessage, setNaverMessage] = useState('')
   const [coupangMessage, setCoupangMessage] = useState('')
   const [naverError, setNaverError] = useState('')
@@ -28,6 +33,7 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
   const coupangAccessKeyRef = useRef<HTMLInputElement>(null)
   const coupangSecretKeyRef = useRef<HTMLInputElement>(null)
   const coupangVendorIdRef = useRef<HTMLInputElement>(null)
+  const coupangDeliveryCompanyCodeRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!focusProvider) {
@@ -103,11 +109,18 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
       return
     }
 
+    if (!coupangValues.defaultDeliveryCompanyCode.trim()) {
+      setCoupangError('쿠팡 기본 택배사 코드를 입력하세요.')
+      coupangDeliveryCompanyCodeRef.current?.focus()
+      return
+    }
+
     startCoupangTransition(async () => {
       const result = await saveCoupangSettings({
         accessKey: coupangValues.accessKey.trim(),
         secretKey: coupangValues.secretKey.trim(),
         vendorId: coupangValues.vendorId.trim(),
+        defaultDeliveryCompanyCode: coupangValues.defaultDeliveryCompanyCode.trim(),
       })
 
       if (result.success === false) {
@@ -116,7 +129,7 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
       }
 
       await refreshSummary()
-      setCoupangValues({ accessKey: '', secretKey: '', vendorId: '' })
+      setCoupangValues({ accessKey: '', secretKey: '', vendorId: '', defaultDeliveryCompanyCode: '' })
       setCoupangMessage('쿠팡 API 정보를 저장했습니다.')
     })
   }
@@ -180,6 +193,7 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
         summary={[
           { label: 'Access Key', value: currentSummary.coupang.masked.accessKey },
           { label: 'Vendor ID', value: currentSummary.coupang.masked.vendorId },
+          { label: '기본 택배사 코드', value: currentSummary.coupang.masked.defaultDeliveryCompanyCode },
         ]}
         updatedAt={currentSummary.coupang.updatedAt}
         action={
@@ -190,7 +204,7 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
       >
         <div className="space-y-1">
           <p className="text-sm font-medium text-slate-950">쿠팡 API</p>
-          <p className="text-sm text-slate-500">Access Key, Secret Key, Vendor ID를 관리합니다.</p>
+          <p className="text-sm text-slate-500">Access Key, Secret Key, Vendor ID와 기본 택배사 코드를 관리합니다.</p>
         </div>
         <form id="coupang-settings" className="space-y-4" onSubmit={handleCoupangSave}>
           <div className="grid gap-4">
@@ -234,6 +248,25 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
                 spellCheck={false}
                 value={coupangValues.vendorId}
                 onChange={(event) => setCoupangValues((prev) => ({ ...prev, vendorId: event.target.value }))}
+              />
+            </div>
+            <div>
+              <label htmlFor="coupang-delivery-company-code" className={ui.label}>
+                쿠팡 기본 택배사 코드
+              </label>
+              <Input
+                ref={coupangDeliveryCompanyCodeRef}
+                id="coupang-delivery-company-code"
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                value={coupangValues.defaultDeliveryCompanyCode}
+                onChange={(event) =>
+                  setCoupangValues((prev) => ({
+                    ...prev,
+                    defaultDeliveryCompanyCode: event.target.value,
+                  }))
+                }
               />
             </div>
           </div>

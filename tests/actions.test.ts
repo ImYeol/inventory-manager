@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getTransactionsWithRelations: vi.fn(),
   runBulkTransaction: vi.fn(),
   runInventoryAdjustment: vi.fn(),
+  runRevertTransaction: vi.fn(),
   revalidatePath: vi.fn(),
 }))
 
@@ -17,6 +18,7 @@ vi.mock('@/lib/data', () => ({
   getTransactionsWithRelations: mocks.getTransactionsWithRelations,
   runBulkTransaction: mocks.runBulkTransaction,
   runInventoryAdjustment: mocks.runInventoryAdjustment,
+  runRevertTransaction: mocks.runRevertTransaction,
 }))
 
 vi.mock('next/cache', () => ({
@@ -33,6 +35,7 @@ import {
   getModelDetails,
   getModels,
   getTransactions,
+  revertTransaction,
 } from '@/lib/actions'
 
 beforeEach(() => {
@@ -164,5 +167,16 @@ describe('server action wrappers', () => {
     await expect(createTransactions([])).resolves.toEqual({ success: true })
     await expect(getModelDetails(1)).resolves.toBeUndefined()
     await expect(getCurrentStock(1, 10, 20, 1)).resolves.toBeUndefined()
+  })
+
+  it('reverts a transaction through the stored procedure helper and revalidates inventory paths', async () => {
+    mocks.runRevertTransaction.mockResolvedValue(undefined)
+
+    await expect(revertTransaction(77, '입력 실수')).resolves.toEqual({ success: true })
+
+    expect(mocks.runRevertTransaction).toHaveBeenCalledWith(77, '입력 실수')
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/')
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/inventory')
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/history')
   })
 })

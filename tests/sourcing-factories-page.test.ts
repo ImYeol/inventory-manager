@@ -13,7 +13,7 @@ vi.mock('@/lib/data', () => ({
 }))
 
 vi.mock('@/app/(protected)/sourcing/factories/FactoriesView', () => ({
-  default: (props: { factories: unknown }) => {
+  default: (props: { factories: unknown; schemaState: unknown; factorySourcingItems: unknown }) => {
     mocks.factoriesView(props)
     return React.createElement('div', { 'data-testid': 'factories-view' })
   },
@@ -30,11 +30,13 @@ afterEach(() => {
 describe('SourcingFactoriesPage', () => {
   it('keeps the sourcing factories route as a compact shell around the shared view', async () => {
     const factories = [{ id: 1, name: '광주 협력사' }]
-    mocks.getFactoriesData.mockResolvedValue(factories)
+    const schemaState = { status: 'ready', message: null }
+    const factorySourcingItems = { 1: [] }
+    mocks.getFactoriesData.mockResolvedValue({ factories, schemaState, factorySourcingItems })
 
     render(await SourcingFactoriesPage())
 
     expect(screen.getByTestId('factories-view')).toBeTruthy()
-    expect(mocks.factoriesView).toHaveBeenCalledWith(expect.objectContaining({ factories }))
+    expect(mocks.factoriesView).toHaveBeenCalledWith(expect.objectContaining({ factories, schemaState, factorySourcingItems }))
   })
 })

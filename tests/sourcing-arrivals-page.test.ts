@@ -17,7 +17,7 @@ vi.mock('@/lib/data', () => ({
 }))
 
 vi.mock('@/app/(protected)/sourcing/arrivals/ArrivalsView', () => ({
-  default: (props: { factories: unknown; models: unknown; arrivals: unknown }) => {
+  default: (props: { factories: unknown; models: unknown; arrivals: unknown; schemaState: unknown }) => {
     mocks.arrivalsView(props)
     return React.createElement('div', { 'data-testid': 'arrivals-view' })
   },
@@ -42,8 +42,15 @@ describe('SourcingArrivalsPage', () => {
         },
       ],
     })
-    mocks.getFactoriesData.mockResolvedValue([{ id: 1, name: '광주 협력사', isActive: true }])
-    mocks.getFactoryArrivalsData.mockResolvedValue([{ id: 100, factoryName: '광주 협력사' }])
+    mocks.getFactoriesData.mockResolvedValue({
+      schemaState: { status: 'ready', message: null },
+      factories: [{ id: 1, name: '광주 협력사', isActive: true }],
+      factorySourcingItems: { 1: [] },
+    })
+    mocks.getFactoryArrivalsData.mockResolvedValue({
+      schemaState: { status: 'ready', message: null },
+      arrivals: [{ id: 100, factoryName: '광주 협력사' }],
+    })
 
     render(await SourcingArrivalsPage())
 
@@ -51,6 +58,7 @@ describe('SourcingArrivalsPage', () => {
 
     expect(mocks.arrivalsView).toHaveBeenCalledWith(
       expect.objectContaining({
+        schemaState: { status: 'ready', message: null },
         factories: [{ id: 1, name: '광주 협력사', isActive: true }],
         arrivals: [{ id: 100, factoryName: '광주 협력사' }],
       }),

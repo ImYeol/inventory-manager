@@ -59,6 +59,12 @@ type TransactionRow = {
   created_at: string
 }
 
+type HistoryRevertState = {
+  canRevert: boolean
+  revertDisabledReason: string | null
+  revertSummary: string | null
+}
+
 type FactoryRow = {
   id: number
   name: string
@@ -124,6 +130,28 @@ export type WarehouseLookup = {
   name: string
 }
 
+export type HistoryTransaction = {
+  id: number
+  date: string
+  type: string
+  quantity: number
+  warehouseId: number
+  warehouse: string
+  warehouseName: string
+  sourceChannel: string | null
+  referenceType: string | null
+  referenceId: number | null
+  memo: string | null
+  createdAt: string
+  modelName: string
+  sizeName: string
+  colorName: string
+  colorRgb: string
+  canRevert: boolean
+  revertDisabledReason: string | null
+  revertSummary: string | null
+}
+
 export type CatalogData = {
   models: CatalogModel[]
   warehouses: WarehouseLookup[]
@@ -151,6 +179,19 @@ export type FactoryData = {
   arrivalCount: number
   pendingQuantity: number
 }
+
+export type FactorySourcingItem = {
+  expectedDate: string
+  status: string
+  modelName: string
+  sizeName: string
+  colorName: string
+  orderedQuantity: number
+  receivedQuantity: number
+  remainingQuantity: number
+}
+
+export type FactorySourcingItemsByFactory = Record<number, FactorySourcingItem[]>
 
 export type FactoryArrivalData = {
   id: number
@@ -181,10 +222,87 @@ export type FactoryArrivalData = {
   }>
 }
 
+export type SourcingSchemaState = {
+  status: 'ready' | 'missing'
+  message: string | null
+}
+
+export type FactoriesDataResult = {
+  schemaState: SourcingSchemaState
+  factories: FactoryData[]
+  factorySourcingItems: FactorySourcingItemsByFactory
+}
+
+export type FactoryArrivalsDataResult = {
+  schemaState: SourcingSchemaState
+  arrivals: FactoryArrivalData[]
+}
+
+export const SOURCING_SCHEMA_MISSING_MESSAGE =
+  '소싱 스키마가 아직 배포되지 않았습니다. supabase/schema.sql 적용 후 다시 시도하세요.'
+
 function ensure<T>(data: T | null, error: { message: string } | null): T {
   if (error) throw new Error(error.message)
   if (!data) throw new Error('No data returned from Supabase.')
   return data
+}
+
+function makeTransactionLedgerKey(row: Pick<TransactionRow, 'model_id' | 'size_id' | 'color_id' | 'warehouse_id'>) {
+  return `${row.model_id}:${row.size_id}:${row.color_id}:${row.warehouse_id}`
+}
+
+function getRevertSummary(type: TransactionTypeValue) {
+  if (type === 'INBOUND') return '같은 수량의 출고 보정 이력이 추가됩니다.'
+  if (type === 'OUTBOUND') return '같은 수량의 입고 보정 이력이 추가됩니다.'
+  return '직전 재고값으로 재고조정 이력이 추가됩니다.'
+}
+
+function getHistoryRevertState(row: TransactionRow, isLatestForKey: boolean): HistoryRevertState {
+  if (!isLatestForKey) {
+    return {
+      canRevert: false,
+      revertDisabledReason: '후속 이력 있음',
+      revertSummary: null,
+    }
+  }
+
+  if (row.source_channel === 'csv') {
+    return {
+      canRevert: false,
+      revertDisabledReason: 'CSV 반영',
+      revertSummary: null,
+    }
+  }
+
+  if (row.source_channel === 'factory-arrival') {
+    return {
+      canRevert: false,
+      revertDisabledReason: '예정입고 반영',
+      revertSummary: null,
+    }
+  }
+
+  if (row.reference_type !== null || row.reference_id !== null) {
+    return {
+      canRevert: false,
+      revertDisabledReason: '이미 시스템 참조가 있는 행',
+      revertSummary: null,
+    }
+  }
+
+  if (row.source_channel !== null && row.source_channel !== 'manual') {
+    return {
+      canRevert: false,
+      revertDisabledReason: '이미 시스템 참조가 있는 행',
+      revertSummary: null,
+    }
+  }
+
+  return {
+    canRevert: true,
+    revertDisabledReason: null,
+    revertSummary: getRevertSummary(row.type),
+  }
 }
 
 function isMissingSchemaError(error: { message: string } | null | undefined) {
@@ -196,6 +314,37 @@ function isMissingSchemaError(error: { message: string } | null | undefined) {
     message.includes('could not find the column') ||
     message.includes('schema cache')
   )
+}
+
+export function isMissingSourcingSchemaError(error: { message: string } | null | undefined) {
+  return isMissingSchemaError(error)
+}
+
+function getReadySourcingSchemaState(): SourcingSchemaState {
+  return { status: 'ready', message: null }
+}
+
+function getMissingSourcingSchemaState(): SourcingSchemaState {
+  return { status: 'missing', message: SOURCING_SCHEMA_MISSING_MESSAGE }
+}
+
+export function getSourcingSchemaState(errors: Array<{ message: string } | null | undefined>): SourcingSchemaState {
+  return errors.some((error) => isMissingSourcingSchemaError(error)) ? getMissingSourcingSchemaState() : getReadySourcingSchemaState()
+}
+
+export function normalizeSourcingErrorMessage(
+  error: { message: string } | null | undefined,
+  fallback: string,
+) {
+  if (isMissingSourcingSchemaError(error)) {
+    return SOURCING_SCHEMA_MISSING_MESSAGE
+  }
+
+  return error?.message ?? fallback
+}
+
+function isOpenSourcingArrival(status: string) {
+  return status === '예정' || status === '부분입고'
 }
 
 export async function getWarehouses(): Promise<WarehouseLookup[]> {
@@ -326,68 +475,139 @@ export async function getTransactionsWithRelations() {
   const sizeMap = new Map(sizes.map((size) => [size.id, size.name]))
   const colorMap = new Map(colors.map((color) => [color.id, color]))
   const warehouseMap = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse.name]))
+  const latestLedgerKeys = new Set<string>()
 
   return {
-    transactions: transactions.map((item) => ({
-      id: item.id,
-      date: formatDateLabel(item.date),
-      type: transactionTypeLabels[item.type],
-      quantity: item.quantity,
-      warehouseId: item.warehouse_id,
-      warehouse: warehouseMap.get(item.warehouse_id) ?? `창고 #${item.warehouse_id}`,
-      warehouseName: warehouseMap.get(item.warehouse_id) ?? `창고 #${item.warehouse_id}`,
-      sourceChannel: item.source_channel,
-      referenceType: item.reference_type,
-      referenceId: item.reference_id,
-      memo: item.memo,
-      createdAt: item.created_at,
-      modelName: modelMap.get(item.model_id) ?? '',
-      sizeName: sizeMap.get(item.size_id) ?? '',
-      colorName: colorMap.get(item.color_id)?.name ?? '',
-      colorRgb: colorMap.get(item.color_id)?.rgb_code ?? '#888888',
-    })),
+    transactions: transactions.map((item): HistoryTransaction => {
+      const ledgerKey = makeTransactionLedgerKey(item)
+      const isLatestForKey = !latestLedgerKeys.has(ledgerKey)
+
+      if (isLatestForKey) {
+        latestLedgerKeys.add(ledgerKey)
+      }
+
+      const revertState = getHistoryRevertState(item, isLatestForKey)
+
+      return {
+        id: item.id,
+        date: formatDateLabel(item.date),
+        type: transactionTypeLabels[item.type],
+        quantity: item.quantity,
+        warehouseId: item.warehouse_id,
+        warehouse: warehouseMap.get(item.warehouse_id) ?? `창고 #${item.warehouse_id}`,
+        warehouseName: warehouseMap.get(item.warehouse_id) ?? `창고 #${item.warehouse_id}`,
+        sourceChannel: item.source_channel,
+        referenceType: item.reference_type,
+        referenceId: item.reference_id,
+        memo: item.memo,
+        createdAt: item.created_at,
+        modelName: modelMap.get(item.model_id) ?? '',
+        sizeName: sizeMap.get(item.size_id) ?? '',
+        colorName: colorMap.get(item.color_id)?.name ?? '',
+        colorRgb: colorMap.get(item.color_id)?.rgb_code ?? '#888888',
+        canRevert: revertState.canRevert,
+        revertDisabledReason: revertState.revertDisabledReason,
+        revertSummary: revertState.revertSummary,
+      }
+    }),
     models: models.map((model) => ({ id: model.id, name: model.name })),
     warehouses: warehouses.map((warehouse) => ({ id: warehouse.id, name: warehouse.name })),
   }
 }
 
-export async function getFactoriesData(): Promise<FactoryData[]> {
+export async function getFactoriesData(): Promise<FactoriesDataResult> {
   const { supabase } = await getSupabaseWithUser()
-  const [factoriesRes, arrivalsRes, arrivalItemsRes] = await Promise.all([
+  const [factoriesRes, arrivalsRes, arrivalItemsRes, modelsRes, sizesRes, colorsRes] = await Promise.all([
     supabase
       .from('factories')
       .select('id, name, contact_name, phone, email, notes, is_active, created_at, updated_at')
       .order('is_active', { ascending: false })
       .order('name'),
-    supabase.from('factory_arrivals').select('id, factory_id'),
-    supabase.from('factory_arrival_items').select('factory_arrival_id, ordered_quantity, received_quantity'),
+    supabase
+      .from('factory_arrivals')
+      .select('id, factory_id, expected_date, status')
+      .order('expected_date', { ascending: true })
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('factory_arrival_items')
+      .select('factory_arrival_id, model_id, size_id, color_id, ordered_quantity, received_quantity'),
+    supabase.from('models').select('id, name'),
+    supabase.from('sizes').select('id, name'),
+    supabase.from('colors').select('id, name'),
   ])
 
-  if (
-    isMissingSchemaError(factoriesRes.error) ||
-    isMissingSchemaError(arrivalsRes.error) ||
-    isMissingSchemaError(arrivalItemsRes.error)
-  ) {
-    return []
+  const schemaState = getSourcingSchemaState([factoriesRes.error, arrivalsRes.error, arrivalItemsRes.error])
+
+  if (schemaState.status === 'missing') {
+    return {
+      schemaState,
+      factories: [],
+      factorySourcingItems: {},
+    }
   }
 
   const factories = ensure(factoriesRes.data as FactoryRow[] | null, factoriesRes.error)
-  const arrivals = ensure(arrivalsRes.data as Array<{ id: number; factory_id: number }> | null, arrivalsRes.error)
+  const arrivals = ensure(
+    arrivalsRes.data as Array<{ id: number; factory_id: number; expected_date: string; status: string }> | null,
+    arrivalsRes.error,
+  )
   const arrivalItems = ensure(
-    arrivalItemsRes.data as Array<{ factory_arrival_id: number; ordered_quantity: number; received_quantity: number }> | null,
+    arrivalItemsRes.data as Array<{
+      factory_arrival_id: number
+      model_id?: number
+      size_id?: number
+      color_id?: number
+      ordered_quantity: number
+      received_quantity: number
+    }> | null,
     arrivalItemsRes.error,
   )
+  const models = ensure(modelsRes.data as Array<{ id: number; name: string }> | null, modelsRes.error)
+  const sizes = ensure(sizesRes.data as Array<{ id: number; name: string }> | null, sizesRes.error)
+  const colors = ensure(colorsRes.data as Array<{ id: number; name: string }> | null, colorsRes.error)
 
-  const arrivalByFactory = new Map<number, number[]>()
+  const arrivalByFactory = new Map<number, Array<{ id: number; expectedDate: string; status: string }>>()
   for (const arrival of arrivals) {
     const list = arrivalByFactory.get(arrival.factory_id) ?? []
-    list.push(arrival.id)
+    list.push({
+      id: arrival.id,
+      expectedDate: arrival.expected_date,
+      status: arrival.status,
+    })
     arrivalByFactory.set(arrival.factory_id, list)
   }
 
-  return factories.map((factory) => {
-    const arrivalIds = arrivalByFactory.get(factory.id) ?? []
+  const modelMap = new Map(models.map((model) => [model.id, model.name]))
+  const sizeMap = new Map(sizes.map((size) => [size.id, size.name]))
+  const colorMap = new Map(colors.map((color) => [color.id, color.name]))
+  const factorySourcingItems: FactorySourcingItemsByFactory = {}
+
+  const mappedFactories = factories.map((factory) => {
+    const arrivalsForFactory = arrivalByFactory.get(factory.id) ?? []
+    const arrivalIds = arrivalsForFactory.map((arrival) => arrival.id)
     const relevantItems = arrivalItems.filter((item) => arrivalIds.includes(item.factory_arrival_id))
+    const openItems = arrivalsForFactory.flatMap((arrival) =>
+      arrivalItems
+        .filter((item) => item.factory_arrival_id === arrival.id)
+        .map((item) => ({
+          arrival,
+          item,
+          remainingQuantity: Math.max(item.ordered_quantity - item.received_quantity, 0),
+        }))
+        .filter(({ arrival: currentArrival, remainingQuantity }) => isOpenSourcingArrival(currentArrival.status) && remainingQuantity > 0),
+    )
+    const openArrivalCount = new Set(openItems.map(({ arrival }) => arrival.id)).size
+
+    factorySourcingItems[factory.id] = openItems.map(({ arrival, item, remainingQuantity }) => ({
+      expectedDate: arrival.expectedDate,
+      status: arrival.status,
+      modelName: modelMap.get(item.model_id ?? 0) ?? '',
+      sizeName: sizeMap.get(item.size_id ?? 0) ?? '',
+      colorName: colorMap.get(item.color_id ?? 0) ?? '',
+      orderedQuantity: item.ordered_quantity,
+      receivedQuantity: item.received_quantity,
+      remainingQuantity,
+    }))
 
     return {
       id: factory.id,
@@ -399,16 +619,22 @@ export async function getFactoriesData(): Promise<FactoryData[]> {
       isActive: factory.is_active,
       createdAt: factory.created_at,
       updatedAt: factory.updated_at,
-      arrivalCount: arrivalIds.length,
+      arrivalCount: openArrivalCount,
       pendingQuantity: relevantItems.reduce(
         (sum, item) => sum + Math.max(item.ordered_quantity - item.received_quantity, 0),
         0,
       ),
     }
   })
+
+  return {
+    schemaState,
+    factories: mappedFactories,
+    factorySourcingItems,
+  }
 }
 
-export async function getFactoryArrivalsData(): Promise<FactoryArrivalData[]> {
+export async function getFactoryArrivalsData(): Promise<FactoryArrivalsDataResult> {
   const { supabase } = await getSupabaseWithUser()
   const [factoriesRes, arrivalsRes, arrivalItemsRes, modelsRes, sizesRes, colorsRes] = await Promise.all([
     supabase.from('factories').select('id, name'),
@@ -425,12 +651,13 @@ export async function getFactoryArrivalsData(): Promise<FactoryArrivalData[]> {
     supabase.from('colors').select('id, name, rgb_code'),
   ])
 
-  if (
-    isMissingSchemaError(factoriesRes.error) ||
-    isMissingSchemaError(arrivalsRes.error) ||
-    isMissingSchemaError(arrivalItemsRes.error)
-  ) {
-    return []
+  const schemaState = getSourcingSchemaState([factoriesRes.error, arrivalsRes.error, arrivalItemsRes.error])
+
+  if (schemaState.status === 'missing') {
+    return {
+      schemaState,
+      arrivals: [],
+    }
   }
 
   const factories = ensure(factoriesRes.data as Array<{ id: number; name: string }> | null, factoriesRes.error)
@@ -445,10 +672,12 @@ export async function getFactoryArrivalsData(): Promise<FactoryArrivalData[]> {
   const sizeMap = new Map(sizes.map((size) => [size.id, size.name]))
   const colorMap = new Map(colors.map((color) => [color.id, color]))
 
-  return arrivals.map((arrival) => {
-    const items = arrivalItems
-      .filter((item) => item.factory_arrival_id === arrival.id)
-      .map((item) => ({
+  return {
+    schemaState,
+    arrivals: arrivals.map((arrival) => {
+      const items = arrivalItems
+        .filter((item) => item.factory_arrival_id === arrival.id)
+        .map((item) => ({
         id: item.id,
         modelId: item.model_id,
         modelName: modelMap.get(item.model_id) ?? '',
@@ -481,7 +710,8 @@ export async function getFactoryArrivalsData(): Promise<FactoryArrivalData[]> {
       remainingQuantity: Math.max(totalOrderedQuantity - totalReceivedQuantity, 0),
       items,
     }
-  })
+    }),
+  }
 }
 
 export async function getCurrentStockRow(
@@ -538,6 +768,17 @@ export async function runInventoryAdjustment(inventoryId: number, newQuantity: n
   const { error } = await supabase.rpc('apply_inventory_adjustment', {
     p_inventory_id: inventoryId,
     p_new_quantity: newQuantity,
+  })
+
+  if (error) throw new Error(error.message)
+}
+
+export async function runRevertTransaction(transactionId: number, memo?: string | null) {
+  const { supabase } = await getSupabaseWithUser()
+  const normalizedMemo = memo?.trim() ? memo.trim() : null
+  const { error } = await supabase.rpc('revert_inventory_transaction', {
+    p_transaction_id: transactionId,
+    p_memo: normalizedMemo,
   })
 
   if (error) throw new Error(error.message)

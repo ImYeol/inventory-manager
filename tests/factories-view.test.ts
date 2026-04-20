@@ -35,6 +35,7 @@ describe('FactoriesView', () => {
 
     render(
       React.createElement(FactoriesView, {
+        schemaState: { status: 'ready', message: null },
         factories: [
           {
             id: 1,
@@ -59,6 +60,20 @@ describe('FactoriesView', () => {
             pendingQuantity: 6,
           },
         ],
+        factorySourcingItems: {
+          2: [
+            {
+              expectedDate: '2026-04-22',
+              status: '예정',
+              modelName: 'LP01',
+              sizeName: 'S',
+              colorName: '네이비',
+              orderedQuantity: 6,
+              receivedQuantity: 0,
+              remainingQuantity: 6,
+            },
+          ],
+        },
       }),
     )
 
@@ -83,6 +98,9 @@ describe('FactoriesView', () => {
     expect(screen.getByRole('dialog', { name: '부산 협력사' })).toBeTruthy()
     expect(screen.getByText('김철수')).toBeTruthy()
     expect(screen.getByText('잔여 6개')).toBeTruthy()
+    expect(screen.getByRole('table', { name: '상품 소싱 내역' })).toBeTruthy()
+    expect(screen.getByText('LP01')).toBeTruthy()
+    expect(screen.getByText('네이비 / S')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: '다시 활성화' }))
 
@@ -94,7 +112,9 @@ describe('FactoriesView', () => {
 
     render(
       React.createElement(FactoriesView, {
+        schemaState: { status: 'ready', message: null },
         factories: [],
+        factorySourcingItems: {},
       }),
     )
 
@@ -120,5 +140,25 @@ describe('FactoriesView', () => {
         }),
       ),
     )
+  })
+
+  it('shows the setup banner and disables factory registration when sourcing schema is missing', async () => {
+    render(
+      React.createElement(FactoriesView, {
+        schemaState: {
+          status: 'missing',
+          message: '소싱 스키마가 아직 배포되지 않았습니다. supabase/schema.sql 적용 후 다시 시도하세요.',
+        },
+        factories: [],
+        factorySourcingItems: {},
+      }),
+    )
+
+    expect(screen.getByText('소싱 스키마가 아직 배포되지 않았습니다. supabase/schema.sql 적용 후 다시 시도하세요.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '공장 등록' }).getAttribute('disabled')).not.toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '공장 등록' }))
+
+    expect(screen.queryByRole('dialog', { name: '공장 등록' })).toBeNull()
   })
 })

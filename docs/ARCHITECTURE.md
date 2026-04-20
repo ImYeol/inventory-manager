@@ -198,6 +198,7 @@ src/
 ### Canonical owner
 - `settings`가 네이버/쿠팡 연결 상태와 credential 편집의 단일 owner다.
 - 저장소는 기존 `shipping_provider_credentials`를 재사용한다.
+- 쿠팡 credential payload는 `accessKey`, `secretKey`, `vendorId`, `defaultDeliveryCompanyCode`를 함께 저장한다.
 - provider별 deep link는 query param 또는 section id로 처리한다.
   - 예: `/settings?section=store-connections&provider=naver`
 
@@ -210,11 +211,12 @@ src/
 ### Data flow
 1. 사용자가 엑셀 업로드
 2. 시트 파싱으로 courier rows 생성
-3. 연결된 provider만 주문 조회
-4. 이름/주소 정규화 비교
-5. 각 업로드 row에 classification 부여
-6. classification 필터로 preview table 조정
-7. provider별 발송 payload 계산
+3. 쿠팡은 courier row의 날짜 컬럼 범위를 기준으로 `GET /api/v5/vendors/{vendorId}/ordersheets`를 조회하고, 필요 시 `nextToken`으로 다음 페이지를 이어서 수집한다.
+4. 연결된 provider만 주문 조회
+5. 이름/주소 정규화 비교
+6. 각 업로드 row에 classification 부여
+7. classification 필터로 preview table 조정
+8. provider별 발송 payload 계산
 
 ### Row classification model
 ```text
@@ -226,13 +228,14 @@ shipping_preview_rows
 - channel_badge        # naver | coupang | unclassified | ambiguous
 - classification_source # auto | manual
 - naver_order_ref
-- coupang_order_ref
+- coupang_shipment_ref # shipmentBoxId + orderId + vendorItemIds[]
 - match_reason
 ```
 
 ### Matching rule
 - 이름은 trim 후 정확 일치 기준을 우선한다.
 - 주소는 공백 제거 + lowercasing 후 포함 관계를 본다.
+- 쿠팡 shipment 후보가 2개 이상이면 `ambiguous`로 표시하고 자동 발송 대상에서 제외한다.
 - 두 provider가 동시에 매칭되면 `ambiguous`로 표시하고 자동 발송 대상에서 제외한다.
 - 어떤 provider도 매칭되지 않으면 `unclassified`로 남긴다.
 
@@ -246,6 +249,9 @@ shipping_preview_rows
 - provider action group은 `상태 chip + 갱신 + 반영`을 한 묶음으로 둔다.
 - `중복 후보`는 row badge와 summary count에는 남길 수 있지만, 기본 filter set의 canonical 대상은 아니다.
 - 자동 분류 후 사용자가 바꾼 row는 `classification_source=manual`로 보호하고, provider 갱신 시 분류값을 덮어쓰지 않는다.
+- 운송장 번호가 없는 row도 preview에는 남기되, provider 반영 payload에서는 제외한다.
+- 쿠팡 반영 payload는 `POST /api/v4/vendors/{vendorId}/orders/invoices`와 `orderSheetInvoiceApplyDtos[]`를 사용한다.
+- 쿠팡 v1 업로드는 `splitShipping=false`, `preSplitShipped=false`, `estimatedShippingDate=""`, `deliveryCompanyCode=defaultDeliveryCompanyCode`를 기본값으로 사용한다.
 
 ## Shared Component Strategy
 

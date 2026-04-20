@@ -38,6 +38,7 @@ function parseCoupangSettingsInput(input: FormData | CoupangSettingsInput): Coup
     accessKey: readField(input, 'accessKey'),
     secretKey: readField(input, 'secretKey'),
     vendorId: readField(input, 'vendorId'),
+    defaultDeliveryCompanyCode: readField(input, 'defaultDeliveryCompanyCode'),
   }
 }
 
@@ -78,7 +79,12 @@ export async function saveCoupangSettings(
 ): Promise<SaveSettingsResult> {
   const credentials = parseCoupangSettingsInput(input)
 
-  if (!credentials.accessKey || !credentials.secretKey || !credentials.vendorId) {
+  if (
+    !credentials.accessKey ||
+    !credentials.secretKey ||
+    !credentials.vendorId ||
+    !credentials.defaultDeliveryCompanyCode
+  ) {
     return {
       success: false,
       error: '쿠팡 API 키 정보를 모두 입력해주세요.',
