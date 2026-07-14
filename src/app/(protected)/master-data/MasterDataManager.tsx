@@ -6,12 +6,18 @@ import { useRouter } from 'next/navigation'
 import { BasicDataTable } from '@/components/ui/basic-data-table'
 import { Badge, StatusBadge } from '@/components/ui/badge-1'
 import { Button } from '@/components/ui/button'
+import { ChannelBadge } from '@/components/ui/channel-badge'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ActionToolbar } from '@/components/ui/toolbar'
+import { FilterToolbar } from '@/components/ui/filter-toolbar'
+import { TableSurface } from '@/components/ui/table-surface'
 import { cx, ui } from '../../components/ui'
+import { syncProducts } from '@/lib/actions/channel-product-sync'
+import { linkVariant } from '@/lib/actions/channel-product-link'
+import type { ProductWorkspaceChannelRef, ProductWorkspaceVariant } from '@/lib/data'
 import {
   createModel,
   createModelColor,
@@ -47,6 +53,8 @@ type MasterDataManagerProps = {
   models: ModelType[]
   warehouses: WarehouseLookup[]
   warehouseStats?: WarehouseStat[]
+  variants?: ProductWorkspaceVariant[]
+  channelProductRefs?: ProductWorkspaceChannelRef[]
 }
 
 type ColorSpec = {
@@ -71,6 +79,7 @@ type PendingModelSetup = {
 }
 
 type ProductRow = ModelType
+type ProductView = 'all' | 'mapping-required' | 'inventory-mismatch' | 'paused'
 
 type WarehouseRow = {
   warehouse: WarehouseLookup
@@ -151,6 +160,8 @@ export default function MasterDataManager({
   models: initialModels,
   warehouses: initialWarehouses,
   warehouseStats = [],
+  variants = [],
+  channelProductRefs = [],
 }: MasterDataManagerProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -169,6 +180,10 @@ export default function MasterDataManager({
   const [pendingModelSetup, setPendingModelSetup] = useState<PendingModelSetup | null>(null)
   const [isApplyingModelSetup, setIsApplyingModelSetup] = useState(false)
   const [isCreatingModel, setIsCreatingModel] = useState(false)
+  const [productQuery, setProductQuery] = useState('')
+  const [productView, setProductView] = useState<ProductView>('all')
+  const [selectedChannelRef, setSelectedChannelRef] = useState<ProductWorkspaceChannelRef | null>(null)
+  const [syncMeta, setSyncMeta] = useState<string | null>(null)
 
   const showToast = (next: { type: 'success' | 'error'; text: string }) => {
     setMessage(next)
@@ -378,6 +393,49 @@ export default function MasterDataManager({
   const warehouseCount = warehouseRows.length
   const totalWarehouseStock = warehouseRows.reduce((sum, item) => sum + item.stockQty, 0)
   const totalWarehouseSku = warehouseRows.reduce((sum, item) => sum + item.skuCount, 0)
+  const hasVariantWorkspace = variants.length > 0 || channelProductRefs.length > 0
+
+  const refsForVariant = (variant: ProductWorkspaceVariant) => channelProductRefs.filter(
+    (ref) => ref.variantId === variant.id || (ref.variantId === null && ref.sellerSku === variant.sellerSku),
+  )
+  const refForChannel = (variant: ProductWorkspaceVariant, channel: ProductWorkspaceChannelRef['channel']) =>
+    refsForVariant(variant).find((ref) => ref.channel === channel) ?? null
+  const filteredVariants = variants.filter((variant) => {
+    const refs = refsForVariant(variant)
+    const query = productQuery.trim().toLowerCase()
+    if (query && !`${variant.modelName} ${variant.sizeName} ${variant.colorName} ${variant.sellerSku}`.toLowerCase().includes(query)) return false
+    if (productView === 'mapping-required') return refs.some((ref) => ref.variantId === null) || refs.length < 2
+    if (productView === 'inventory-mismatch') return refs.some((ref) => ref.channelReported !== null && ref.channelReported !== variant.available)
+    if (productView === 'paused') return refs.some((ref) => ref.listingStatus === 'paused')
+    return true
+  })
+
+  const runSync = () => {
+    setSyncMeta(null)
+    startTransition(async () => {
+      try {
+        const result = await syncProducts()
+        setSyncMeta(`추가 ${result.added} · 갱신 ${result.updated} · 연결 필요 ${result.mappingRequired}${result.failed ? ` · 실패 ${result.failed}` : ''}`)
+        router.refresh()
+      } catch (error) {
+        setSyncMeta(error instanceof Error ? error.message : '동기화에 실패했습니다.')
+      }
+    })
+  }
+
+  const toggleSelectedRefLink = () => {
+    if (!selectedChannelRef) return
+    const nextVariantId = selectedChannelRef.variantId === null ? variants.find((variant) => variant.sellerSku === selectedChannelRef.sellerSku)?.id ?? null : null
+    if (nextVariantId === null && selectedChannelRef.variantId === null) {
+      showToast({ type: 'error', text: '연결할 seller SKU 상품을 찾을 수 없습니다.' })
+      return
+    }
+    runWithToast(
+      async () => { await linkVariant(selectedChannelRef.id, nextVariantId) },
+      nextVariantId === null ? '채널 상품 연결을 해제했습니다.' : '채널 상품을 연결했습니다.',
+      () => setSelectedChannelRef(null),
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -404,7 +462,71 @@ export default function MasterDataManager({
         </TabsList>
 
         <TabsContent value="product" className="m-0">
-          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          {hasVariantWorkspace ? (
+            <TableSurface
+              toolbar={
+                <FilterToolbar>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Input
+                      aria-label="상품 검색"
+                      value={productQuery}
+                      onChange={(event) => setProductQuery(event.target.value)}
+                      placeholder="상품 또는 seller SKU 검색"
+                      className="h-10 w-56"
+                    />
+                    <div className="inline-flex shrink-0 gap-1" aria-label="상품 고정 보기">
+                      {([
+                        ['all', '전체'], ['mapping-required', '연결 필요'], ['inventory-mismatch', '재고 불일치'], ['paused', '판매 중지'],
+                      ] as Array<[ProductView, string]>).map(([value, label]) => (
+                        <Button key={value} type="button" size="sm" variant={productView === value ? 'secondary' : 'ghost'} className="h-9 px-2" onClick={() => setProductView(value)}>
+                          {label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <ActionToolbar className="shrink-0">
+                    {syncMeta ? <span role="status" className="text-xs text-[color:var(--muted-foreground)]">{syncMeta}</span> : null}
+                    <Button type="button" size="sm" className="h-10 px-3" onClick={runSync} disabled={isPending}>동기화</Button>
+                  </ActionToolbar>
+                </FilterToolbar>
+              }
+            >
+              <BasicDataTable<ProductWorkspaceVariant>
+                bare
+                columns={[
+                  { key: 'product', label: '상품 / 옵션' }, { key: 'sku', label: 'seller SKU' },
+                  { key: 'coupang', label: '쿠팡' }, { key: 'naver', label: '네이버' },
+                  { key: 'available', label: '내부 available', align: 'right' }, { key: 'gap', label: 'sync gap', align: 'right' },
+                  { key: 'synced', label: 'last sync' }, { key: 'actions', label: '작업', align: 'right' },
+                ]}
+                rows={filteredVariants}
+                rowKey={(row) => row.id}
+                emptyState="조건에 맞는 상품 옵션이 없습니다."
+                renderCell={(row, columnKey) => {
+                  const coupang = refForChannel(row, 'coupang')
+                  const naver = refForChannel(row, 'naver')
+                  const refs = [coupang, naver].filter((ref): ref is ProductWorkspaceChannelRef => Boolean(ref))
+                  if (columnKey === 'product') return <span className="font-medium text-[color:var(--foreground)]">{row.modelName} · {row.sizeName} / {row.colorName}</span>
+                  if (columnKey === 'sku') return <span className="font-mono text-sm text-[color:var(--muted)]">{row.sellerSku}</span>
+                  if (columnKey === 'coupang' || columnKey === 'naver') {
+                    const channel = columnKey as ProductWorkspaceChannelRef['channel']
+                    const ref = channel === 'coupang' ? coupang : naver
+                    return ref ? <Button type="button" variant="ghost" size="sm" className="h-8 px-1" onClick={() => setSelectedChannelRef(ref)}><ChannelBadge channel={channel} listingStatus={ref.listingStatus} /></Button> : <ChannelBadge channel={channel} listingStatus="unregistered" compact />
+                  }
+                  if (columnKey === 'available') return <span className="font-semibold tabular-nums">{row.available.toLocaleString()}</span>
+                  if (columnKey === 'gap') {
+                    const gaps = refs.map((ref) => ref.channelReported === null ? null : row.available - ref.channelReported).filter((gap): gap is number => gap !== null)
+                    return <span className="font-mono tabular-nums text-[color:var(--muted)]">{gaps.length ? gaps.map((gap) => `${gap > 0 ? '+' : ''}${gap}`).join(' / ') : '—'}</span>
+                  }
+                  if (columnKey === 'synced') return <span className="text-sm text-[color:var(--muted)]">{formatDate(refs.map((ref) => ref.lastSyncedAt).filter(Boolean).sort().at(-1) ?? null)}</span>
+                  if (columnKey === 'actions') return <Button type="button" variant="ghost" size="sm" className="h-8 px-2" onClick={() => setSelectedChannelRef(refs[0] ?? null)} disabled={!refs.length}>상세</Button>
+                  return null
+                }}
+              />
+            </TableSurface>
+          ) : (
+          <div className="space-y-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <ActionToolbar>
               <StatusBadge tone="neutral">{modelCount}개 모델</StatusBadge>
               <StatusBadge tone="neutral">{totalSizes}개 사이즈</StatusBadge>
@@ -485,6 +607,8 @@ export default function MasterDataManager({
               return null
             }}
           />
+          </div>
+          )}
         </TabsContent>
 
         <TabsContent value="warehouse" className="m-0">
@@ -556,6 +680,38 @@ export default function MasterDataManager({
           />
         </TabsContent>
       </Tabs>
+
+      <Modal
+        open={Boolean(selectedChannelRef)}
+        title={selectedChannelRef ? `${selectedChannelRef.channel === 'naver' ? '네이버' : '쿠팡'} 채널 상품` : '채널 상품'}
+        onOpenChange={(open) => { if (!open) setSelectedChannelRef(null) }}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setSelectedChannelRef(null)}>닫기</Button>
+            <Button type="button" onClick={toggleSelectedRefLink} disabled={isPending}>
+              {selectedChannelRef?.variantId === null ? '연결' : '해제'}
+            </Button>
+          </div>
+        }
+      >
+        {selectedChannelRef ? (
+          <div className="space-y-3 text-sm">
+            {selectedChannelRef.imageUrl ? (
+              // Synced provider thumbnails are arbitrary remote URLs and are intentionally not routed through Next image optimization.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={selectedChannelRef.imageUrl} alt="채널 상품 이미지" className="h-24 w-24 rounded-[var(--radius-md)] object-cover" />
+            ) : null}
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+              <dt className="text-[color:var(--muted-foreground)]">가격</dt><dd>{selectedChannelRef.price?.toLocaleString() ?? '—'}</dd>
+              <dt className="text-[color:var(--muted-foreground)]">상품 ID</dt><dd>{selectedChannelRef.externalProductId}</dd>
+              <dt className="text-[color:var(--muted-foreground)]">옵션 ID</dt><dd>{selectedChannelRef.externalVariantId}</dd>
+              <dt className="text-[color:var(--muted-foreground)]">원문 상태</dt><dd>{selectedChannelRef.listingStatus}</dd>
+              <dt className="text-[color:var(--muted-foreground)]">channelReported</dt><dd>{selectedChannelRef.channelReported ?? '—'}</dd>
+              <dt className="text-[color:var(--muted-foreground)]">sync error</dt><dd>{selectedChannelRef.lastSyncError ?? '없음'}</dd>
+            </dl>
+          </div>
+        ) : null}
+      </Modal>
 
       <Modal
         open={isWarehouseModalOpen}

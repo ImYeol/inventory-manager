@@ -6,12 +6,14 @@ import { cleanup, render, screen } from '@testing-library/react'
 const mocks = vi.hoisted(() => ({
   getCatalogData: vi.fn(),
   getTransactionsWithRelations: vi.fn(),
+  getProductWorkspaceData: vi.fn(),
   masterDataManager: vi.fn(),
 }))
 
 vi.mock('@/lib/data', () => ({
   getCatalogData: mocks.getCatalogData,
   getTransactionsWithRelations: mocks.getTransactionsWithRelations,
+  getProductWorkspaceData: mocks.getProductWorkspaceData,
 }))
 
 vi.mock('@/app/(protected)/master-data/MasterDataManager', () => ({
@@ -29,6 +31,7 @@ afterEach(() => {
   cleanup()
   mocks.getCatalogData.mockReset()
   mocks.getTransactionsWithRelations.mockReset()
+  mocks.getProductWorkspaceData.mockReset()
   mocks.masterDataManager.mockReset()
 })
 
@@ -40,11 +43,13 @@ describe('ProductsPage', () => {
 
     mocks.getCatalogData.mockResolvedValue({ models, warehouses })
     mocks.getTransactionsWithRelations.mockResolvedValue({ transactions })
+    mocks.getProductWorkspaceData.mockResolvedValue({ variants: [], channelProductRefs: [] })
 
     render(await ProductsPage())
 
     expect(mocks.getCatalogData).toHaveBeenCalledTimes(1)
     expect(mocks.getTransactionsWithRelations).toHaveBeenCalledTimes(1)
+    expect(mocks.getProductWorkspaceData).toHaveBeenCalledTimes(1)
     expect(mocks.masterDataManager).toHaveBeenCalledWith(
       expect.objectContaining({
         models,

@@ -425,6 +425,84 @@ export async function getCatalogData(): Promise<CatalogData> {
   }
 }
 
+export type ProductWorkspaceVariant = {
+  id: number
+  modelName: string
+  sizeName: string
+  colorName: string
+  sellerSku: string
+  available: number
+}
+
+export type ProductWorkspaceChannelRef = {
+  id: number
+  variantId: number | null
+  channel: 'naver' | 'coupang'
+  externalProductId: string
+  externalVariantId: string
+  productName: string | null
+  optionName: string | null
+  sellerSku: string | null
+  listingStatus: 'active' | 'unregistered' | 'paused' | 'sync-error'
+  channelReported: number | null
+  lastSyncedAt: string | null
+  lastSyncError: string | null
+  imageUrl: string | null
+  price: number | null
+}
+
+export async function getProductWorkspaceData(): Promise<{
+  variants: ProductWorkspaceVariant[]
+  channelProductRefs: ProductWorkspaceChannelRef[]
+}> {
+  const { supabase } = await getSupabaseWithUser()
+  const [variantsRes, modelsRes, sizesRes, colorsRes, inventoryRes, reservationsRes, refsRes] = await Promise.all([
+    supabase.from('product_variants').select('id, model_id, size_id, color_id, seller_sku'),
+    supabase.from('models').select('id, name'),
+    supabase.from('sizes').select('id, name'),
+    supabase.from('colors').select('id, name'),
+    supabase.from('inventory').select('model_id, size_id, color_id, quantity'),
+    supabase.from('inventory_reservations').select('product_variant_id, quantity').eq('status', 'active'),
+    supabase.from('channel_product_refs').select('id, variant_id, channel, external_product_id, external_variant_id, product_name, option_name, seller_sku, listing_status, channel_attributes, channel_reported, last_synced_at, last_sync_error'),
+  ])
+  const responses = [variantsRes, modelsRes, sizesRes, colorsRes, inventoryRes, reservationsRes, refsRes]
+  if (responses.some((response) => response.error)) throw new Error('상품 작업공간 데이터를 불러오지 못했습니다.')
+
+  const models = new Map((modelsRes.data ?? []).map((row) => [Number(row.id), row.name]))
+  const sizes = new Map((sizesRes.data ?? []).map((row) => [Number(row.id), row.name]))
+  const colors = new Map((colorsRes.data ?? []).map((row) => [Number(row.id), row.name]))
+  const onHand = new Map<string, number>()
+  for (const row of inventoryRes.data ?? []) {
+    const key = `${row.model_id}:${row.size_id}:${row.color_id}`
+    onHand.set(key, (onHand.get(key) ?? 0) + row.quantity)
+  }
+  const committed = new Map<number, number>()
+  for (const row of reservationsRes.data ?? []) {
+    const id = Number(row.product_variant_id)
+    committed.set(id, (committed.get(id) ?? 0) + row.quantity)
+  }
+  const variants = (variantsRes.data ?? []).map((row) => ({
+    id: Number(row.id),
+    modelName: models.get(Number(row.model_id)) ?? `모델 #${row.model_id}`,
+    sizeName: sizes.get(Number(row.size_id)) ?? `사이즈 #${row.size_id}`,
+    colorName: colors.get(Number(row.color_id)) ?? `색상 #${row.color_id}`,
+    sellerSku: row.seller_sku,
+    available: (onHand.get(`${row.model_id}:${row.size_id}:${row.color_id}`) ?? 0) - (committed.get(Number(row.id)) ?? 0),
+  }))
+  const channelProductRefs = (refsRes.data ?? []).map((row) => {
+    const attributes = (row.channel_attributes ?? {}) as { imageUrl?: unknown; price?: unknown }
+    return {
+      id: Number(row.id), variantId: row.variant_id === null ? null : Number(row.variant_id), channel: row.channel as 'naver' | 'coupang',
+      externalProductId: row.external_product_id, externalVariantId: row.external_variant_id, productName: row.product_name,
+      optionName: row.option_name, sellerSku: row.seller_sku, listingStatus: row.listing_status as ProductWorkspaceChannelRef['listingStatus'],
+      channelReported: row.channel_reported, lastSyncedAt: row.last_synced_at, lastSyncError: row.last_sync_error,
+      imageUrl: typeof attributes.imageUrl === 'string' ? attributes.imageUrl : null,
+      price: typeof attributes.price === 'number' ? attributes.price : null,
+    }
+  })
+  return { variants, channelProductRefs }
+}
+
 export async function getTransactionsWithRelations() {
   const { supabase } = await getSupabaseWithUser()
   const transactionSelect =
