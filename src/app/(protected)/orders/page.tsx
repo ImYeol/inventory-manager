@@ -1,5 +1,6 @@
 import { PageHeader, ui } from '../../components/ui'
 import { getOrdersWorkspaceData } from '@/lib/actions/order-sync'
+import { getCatalogData, getProductWorkspaceData } from '@/lib/data'
 import OrdersWorkspace from './OrdersWorkspace'
 import type { OrderView } from './OrdersWorkspace'
 
@@ -13,7 +14,28 @@ const viewMap: Record<string, OrderView> = {
 }
 
 export default async function OrdersPage({ searchParams }: { searchParams?: Promise<{ view?: string }> } = {}) {
-  const orders = await getOrdersWorkspaceData()
+  const [orders, catalog, productWorkspace] = await Promise.all([
+    getOrdersWorkspaceData(),
+    getCatalogData(),
+    getProductWorkspaceData(),
+  ])
   const view = viewMap[(await searchParams)?.view ?? 'new'] ?? '신규'
-  return <div className={ui.shell}><PageHeader title="주문" /><OrdersWorkspace orders={orders as never} initialView={view} /></div>
+  const variants = productWorkspace.variants.map((variant) => ({
+    id: String(variant.id),
+    modelId: 0,
+    sizeId: 0,
+    colorId: 0,
+    modelName: variant.modelName,
+    sizeName: variant.sizeName,
+    colorName: variant.colorName,
+    sellerSku: variant.sellerSku,
+    channels: {},
+  }))
+
+  return (
+    <div className={ui.shell}>
+      <PageHeader title="주문" />
+      <OrdersWorkspace orders={orders as never} variants={variants} warehouses={catalog.warehouses} initialView={view} />
+    </div>
+  )
 }

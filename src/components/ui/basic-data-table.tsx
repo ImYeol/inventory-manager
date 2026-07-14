@@ -18,6 +18,7 @@ type BasicDataTableProps<Row> = {
   rowAriaLabel?: (row: Row) => string
   getRowClassName?: (row: Row) => string | undefined
   className?: string
+  tableAriaLabel?: string
   /** Render without the standalone table-shell border, for use inside a TableSurface. */
   bare?: boolean
 }
@@ -32,11 +33,12 @@ export function BasicDataTable<Row>({
   rowAriaLabel,
   getRowClassName,
   className,
+  tableAriaLabel,
   bare,
 }: BasicDataTableProps<Row>) {
   const table = (
       <div className="overflow-x-auto">
-        <Table>
+        <Table aria-label={tableAriaLabel}>
           <TableHeader className="[&_tr:hover]:bg-transparent">
             <TableRow className="ui-table-head text-left">
               {columns.map((column) => (
