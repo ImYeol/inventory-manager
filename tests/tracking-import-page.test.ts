@@ -1,12 +1,31 @@
 // @vitest-environment jsdom
 import React from 'react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import fs from 'node:fs'
 import path from 'node:path'
+
+const mocks = vi.hoisted(() => ({
+  listTrackingPresets: vi.fn(),
+}))
+vi.mock('@/lib/actions/tracking-import', () => ({
+  listTrackingPresets: mocks.listTrackingPresets,
+}))
+
+import TrackingImportPage from '@/app/(protected)/orders/tracking-import/page'
 import TrackingImportWorkspace from '@/app/(protected)/orders/tracking-import/tracking-import-workspace'
 
 describe('TrackingImportWorkspace', () => {
+  it('provides an explicit canonical return link to orders in the page header', async () => {
+    mocks.listTrackingPresets.mockResolvedValue([])
+
+    render(await TrackingImportPage())
+
+    const returnLink = screen.getByRole('link', { name: '주문으로' })
+    expect(returnLink.getAttribute('href')).toBe('/orders')
+    expect(returnLink.querySelector('[aria-hidden="true"]')).toBeTruthy()
+  })
+
   it('shows the file-to-dispatch workflow and reuses a dense preview surface', () => {
     render(React.createElement(TrackingImportWorkspace))
     expect(screen.getByText('파일 → 시트/헤더 → 컬럼 매핑 → 미리보기 → 발송')).toBeTruthy()
