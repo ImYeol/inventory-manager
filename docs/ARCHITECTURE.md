@@ -88,8 +88,8 @@ src/
 └── 입고 예정 (/sourcing/arrivals)
 주문 (/orders)
 └── 송장 업로드 (/orders/tracking-import)
-설정 (/settings)
-└── 스토어 연결
+계정 메뉴
+└── API 설정 → 설정 (/settings?section=store-connections)
 ```
 
 ## 라우트 전략
@@ -104,7 +104,7 @@ src/
 - `/history`: 이력 canonical standalone route (재고 운영 ownership; `/inventory?tab=history`는 embedded view)
 - `/inventory/csv`: 필요 시 분리되는 대량 반영 workspace (조건부)
 - `/shipping`: `/orders/tracking-import` redirect only
-- `/settings`: 스토어 연결
+- `/settings`: 스토어 연결 canonical owner; primary navigation이 아닌 계정 메뉴의 API 설정 deep link로 진입
 - `/analytics`: 독립 화면이 아니라 `/`로 보내는 legacy redirect
 - `/integrations`: legacy alias 또는 redirect 후보
 - `/master-data`: legacy alias, redirect to `/products`

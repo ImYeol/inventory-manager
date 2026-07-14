@@ -26,7 +26,7 @@
 **트레이드오프**: 대량 입력은 CSV 경로가 더 중요해진다.
 
 ## ADR-006: 스토어 연결은 설정 소유로 수렴한다
-**결정**: 네이버/쿠팡 연결 상태와 credential 편집의 canonical owner는 `/settings`다. `/integrations`는 `redirect('/settings')`로 수렴하며, thin alias는 redirect 전 과도기 조치로만 허용한다.
+**결정**: 네이버/쿠팡 연결 상태와 credential 편집의 canonical owner는 `/settings`다. primary navigation에는 설정을 두지 않고, 계정 메뉴의 `API 설정` deep link(`/settings?section=store-connections`)로 진입한다. `/integrations`는 `redirect('/settings')`로 수렴하며, thin alias는 redirect 전 과도기 조치로만 허용한다.
 **이유**: `IntegrationsView`와 `SettingsView`가 동시에 스토어 연결을 설명하면 IA가 중복되고, 사용자는 어디서 연결을 바꾸는지 헷갈린다.  
 **트레이드오프**: 기존 `/integrations` 링크는 호환 경로 또는 redirect 처리가 필요하다.
 
@@ -154,7 +154,7 @@
 **트레이드오프**: 새 UI 작업 전에 카탈로그 검토가 추가되지만, component ownership과 후속 통합 대상이 명확해진다.
 
 ## ADR-029: 주문과 송장 작업은 `/orders`로 수렴하고 재고는 예약과 절대 수량 동기화로 관리한다
-**결정**: sidebar의 canonical IA는 `대시보드 / 주문 / 상품 관리 / 재고 운영 / 소싱 / 설정`이다. `/orders`는 주문과 송장 작업의 owner이고, `/shipping`은 `/orders/tracking-import`로 redirect한다. `ProductVariant`는 판매·재고 단위, `ChannelProductRef`는 채널 상품/옵션 참조다. 재고는 `onHand`, `committed`, `available`, `incoming`, `channelReported`로 분리한다.
+**결정**: primary navigation의 canonical IA는 `대시보드 / 주문 / 상품 관리 / 재고 운영 / 소싱`이다. `/settings`는 primary navigation이 아닌 계정 메뉴의 `API 설정` deep link(`/settings?section=store-connections`)로 접근하는 스토어 연결 owner다. `/orders`는 주문과 송장 작업의 owner이고, `/shipping`은 `/orders/tracking-import`로 redirect한다. `ProductVariant`는 판매·재고 단위, `ChannelProductRef`는 채널 상품/옵션 참조다. 재고는 `onHand`, `committed`, `available`, `incoming`, `channelReported`로 분리한다.
 
 `available = onHand - committed`이며 `incoming`은 보유 수량에 더하지 않는다. 주문 확정은 예약(`committed` 증가)만 원자적으로 반영한다. 외부 발송 성공 후에만 예약 해제와 `onHand` 차감을 같은 원자적 작업으로 수행한다. 채널 동기화는 delta가 아닌 `available`의 절대 수량을 전송하고, 성공 후에만 `channelReported`를 갱신한다.
 

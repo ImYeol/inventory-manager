@@ -40,7 +40,7 @@ afterEach(() => {
 })
 
 describe('Nav', () => {
-  it('renders the task-oriented primary navigation without the old store-connections singleton item', () => {
+  it('renders the five canonical operations destinations without settings', () => {
     render(React.createElement(Nav))
 
     expect(screen.queryByText('Warehouse Console')).toBeNull()
@@ -54,7 +54,7 @@ describe('Nav', () => {
     expect(screen.queryByRole('link', { name: '운송장' })).toBeNull()
     expect(screen.queryByRole('link', { name: '분석' })).toBeNull()
     expect(screen.queryByRole('link', { name: '스토어 연결' })).toBeNull()
-    expect(screen.getAllByRole('link', { name: '설정' }).some((link) => link.getAttribute('href') === '/settings')).toBe(true)
+    expect(within(screen.getByRole('navigation', { name: '주요 메뉴' })).queryByRole('link', { name: '설정' })).toBeNull()
   })
 
   it('opens the mobile drawer and renders the same information architecture', () => {
@@ -70,13 +70,13 @@ describe('Nav', () => {
       ['상품 관리', '/products'],
       ['재고 운영', '/inventory'],
       ['소싱', '/sourcing'],
-      ['설정', '/settings'],
     ] as const
 
     destinations.forEach(([label, href]) => {
       expect(mobileMenu.getByRole('link', { name: label }).getAttribute('href')).toBe(href)
     })
     expect(screen.queryAllByRole('link', { name: '분석' })).toHaveLength(0)
+    expect(mobileMenu.queryByRole('link', { name: '설정' })).toBeNull()
   })
 
   it('marks sourcing as active on sourcing routes', () => {
@@ -88,15 +88,6 @@ describe('Nav', () => {
     expect(sourcingLink.getAttribute('aria-current')).toBe('page')
   })
 
-  it('marks settings as active when the settings route is open', () => {
-    mocks.pathname = '/settings'
-
-    render(React.createElement(Nav))
-
-    const activeLinks = screen.getAllByRole('link', { name: '설정' })
-    expect(activeLinks.some((link) => link.getAttribute('aria-current') === 'page')).toBe(true)
-  })
-
   it('shows the logged-in user profile summary when user data is provided', () => {
     render(React.createElement(Nav, { user: { name: '홍길동', email: 'hong@example.com' } }))
 
@@ -104,5 +95,20 @@ describe('Nav', () => {
 
     expect(screen.getAllByText('홍길동')).toHaveLength(2)
     expect(screen.getAllByText('hong@example.com')).toHaveLength(2)
+  })
+
+  it('keeps API settings in the account menu on desktop and mobile', () => {
+    render(React.createElement(Nav, { user: { name: '홍길동', email: 'hong@example.com' } }))
+
+    fireEvent.pointerDown(screen.getAllByRole('button', { name: /홍길동/ })[0], { button: 0, ctrlKey: false })
+    expect(screen.getByRole('menuitem', { name: 'API 설정' }).getAttribute('href')).toBe('/settings?section=store-connections')
+    expect(screen.getByText('로그아웃')).toBeTruthy()
+
+    cleanup()
+    render(React.createElement(Nav, { user: { name: '홍길동', email: 'hong@example.com' } }))
+    fireEvent.click(screen.getByRole('button', { name: '메뉴 열기' }))
+    const mobileMenu = within(screen.getByRole('dialog', { name: '모바일 메뉴' }))
+    fireEvent.pointerDown(mobileMenu.getByRole('button', { name: /홍길동/ }), { button: 0, ctrlKey: false })
+    expect(screen.getAllByRole('menuitem', { name: 'API 설정' }).some((item) => item.getAttribute('href') === '/settings?section=store-connections')).toBe(true)
   })
 })

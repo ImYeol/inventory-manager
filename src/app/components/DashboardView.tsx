@@ -7,10 +7,10 @@ import type { OperationsDashboardData } from '@/lib/actions/dashboard'
 import { cx, ui } from './ui'
 
 const metricItems = [
-  { key: 'newOrders', label: '신규 주문', href: '/orders?view=new', icon: ArrowDownToLine, tone: 'info' },
-  { key: 'readyToFulfill', label: '출고 준비', href: '/orders?view=ready', icon: PackageCheck, tone: 'success' },
-  { key: 'needsAttention', label: '확인 필요', href: '/orders?view=exception', icon: AlertTriangle, tone: 'warning' },
-  { key: 'dispatchedToday', label: '오늘 발송', href: '/orders?view=fulfilled', icon: ArrowUpFromLine, tone: 'neutral' },
+  { key: 'newOrders', label: '신규 주문', href: '/orders?view=new', icon: ArrowDownToLine },
+  { key: 'readyToFulfill', label: '출고 준비', href: '/orders?view=ready', icon: PackageCheck },
+  { key: 'needsAttention', label: '확인 필요', href: '/orders?view=exception', icon: AlertTriangle },
+  { key: 'dispatchedToday', label: '오늘 발송', href: '/orders?view=fulfilled', icon: ArrowUpFromLine },
 ] as const
 
 const channelMeta = {
@@ -51,9 +51,11 @@ export default function DashboardView({ metrics, flow, warehouses, exceptions, u
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold text-[color:var(--muted-foreground)]">{item.label}</p>
-                    <p className="mt-1 text-2xl font-semibold tracking-tight text-[color:var(--foreground)]">{value}</p>
+                    <p className="mt-1 text-2xl font-semibold tracking-tight text-[color:var(--foreground)]">{value}건</p>
                   </div>
-                  <StatusBadge tone={item.tone} icon={<Icon className="h-3.5 w-3.5" />}>건</StatusBadge>
+                  <span aria-hidden="true" className="shrink-0 text-[color:var(--muted-foreground)]">
+                    <Icon className="h-4 w-4" />
+                  </span>
                 </div>
               </Link>
             </Card>

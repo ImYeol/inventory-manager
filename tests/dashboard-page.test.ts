@@ -49,6 +49,11 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('link', { name: '출고 준비 3건' }).getAttribute('href')).toBe('/orders?view=ready')
     expect(screen.getByRole('link', { name: '확인 필요 2건' }).getAttribute('href')).toBe('/orders?view=exception')
     expect(screen.getByRole('link', { name: '오늘 발송 7건' }).getAttribute('href')).toBe('/orders?view=fulfilled')
+    expect(screen.getByText('4건')).toBeTruthy()
+    expect(screen.getByText('3건')).toBeTruthy()
+    expect(screen.getByText('2건')).toBeTruthy()
+    expect(screen.getByText('7건')).toBeTruthy()
+    expect(screen.queryByText('건')).toBeNull()
 
     expect(screen.getByRole('heading', { name: '최근 14일 입출고' })).toBeTruthy()
     expect(screen.getByLabelText('7/14 입고 8, 출고 3')).toBeTruthy()

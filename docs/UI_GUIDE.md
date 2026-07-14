@@ -195,7 +195,7 @@ src/components/ui/
 - 같은 너비의 긴 filled 버튼을 여러 개 병렬 배치하는 패턴
 
 ## 메뉴 구조
-이 섹션은 canonical 메뉴 순서의 단일 SoT다: **대시보드 → 주문 → 상품 관리 → 재고 운영 → 소싱 → 설정**.
+이 섹션은 canonical primary navigation 순서의 단일 SoT다: **대시보드 → 주문 → 상품 관리 → 재고 운영 → 소싱**. API 설정은 계정 메뉴의 `/settings?section=store-connections` deep link로 제공한다.
 
 - `대시보드`
   - `분석 섹션`
@@ -208,10 +208,10 @@ src/components/ui/
 - `소싱`
   - `외부 공장`
   - `입고 예정`
-- `설정`
-  - `스토어 연결`
+- `계정 메뉴`
+  - `API 설정` → `/settings?section=store-connections`
 
-`/orders`가 주문과 송장 작업의 owner이며, `/shipping`은 `/orders/tracking-import` redirect다. 채널 상태는 `ChannelBadge`로 채널명과 상태 텍스트를 함께 보여 주며, 색만으로 의미를 전달하지 않는다.
+`/settings`는 스토어 연결의 canonical owner로 유지하지만 primary navigation에는 넣지 않는다. `/orders`가 주문과 송장 작업의 owner이며, `/shipping`은 `/orders/tracking-import` redirect다. 채널 상태는 `ChannelBadge`로 채널명과 상태 텍스트를 함께 보여 주며, 색만으로 의미를 전달하지 않는다.
 
 ## Dashboard Pattern
 - dashboard는 quick-start 버튼 행 대신 `KPI strip + analytics cards + operational tables`로 구성한다.

@@ -11,7 +11,7 @@ import {
   LogOut,
   Menu,
   PackageSearch,
-  Settings2,
+  KeyRound,
   ClipboardList,
 } from 'lucide-react'
 import { logout } from '@/app/login/actions'
@@ -44,7 +44,6 @@ const directItems: NavItem[] = [
   { href: '/products', label: '상품 관리', icon: <Database className="h-4 w-4" /> },
   { href: '/inventory', label: '재고 운영', icon: <Boxes className="h-4 w-4" /> },
   { href: '/sourcing', label: '소싱', icon: <PackageSearch className="h-4 w-4" /> },
-  { href: '/settings', label: '설정', icon: <Settings2 className="h-4 w-4" /> },
 ]
 
 function isActivePath(pathname: string, href: string) {
@@ -127,6 +126,13 @@ function NavigationContent({
               <p className="truncate text-xs text-[color:var(--muted-foreground)]">{user?.email ?? '로그인 정보 없음'}</p>
             </div>
             <DropdownMenuSeparator />
+            <DropdownMenuItem asChild className="gap-2">
+              <Link href="/settings?section=store-connections" onClick={onNavigate}>
+                <KeyRound className="h-4 w-4" />
+                API 설정
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem
               onSelect={() => {
                 void logout()
@@ -167,10 +173,7 @@ export default function Nav({ user }: NavProps) {
         <div className="min-w-0 px-3 text-center">
           <p className="truncate text-sm font-semibold text-[color:var(--foreground)]">Seleccase Inventory</p>
         </div>
-        <Link href="/settings" aria-label="설정" className={cx(ui.buttonSecondary, 'h-11 min-w-11 gap-2 px-3')}>
-          <Settings2 className="h-4 w-4" />
-          설정
-        </Link>
+        <span aria-hidden="true" className="h-11 min-w-11" />
       </div>
 
       {mobileOpen ? (

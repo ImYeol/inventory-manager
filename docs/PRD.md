@@ -45,11 +45,11 @@ Seleccase Inventory를 `dashboard 내부 분석 + 주문·송장 작업 + 상품
 └── 입고 예정
 주문
 └── 송장 업로드/반영
-설정
-└── 스토어 연결
+계정 메뉴
+└── API 설정 → 설정 (/settings?section=store-connections)
 ```
 
-승인된 sidebar 순서는 `대시보드 / 주문 / 상품 관리 / 재고 운영 / 소싱 / 설정`이다. `/orders`가 주문 조회, 주문 예약, 송장 업로드/반영의 canonical owner이며, 기존 `/shipping`은 `/orders/tracking-import`로 redirect하는 호환 경로다.
+승인된 primary navigation 순서는 `대시보드 / 주문 / 상품 관리 / 재고 운영 / 소싱`이다. API 설정은 하단 계정 메뉴의 `/settings?section=store-connections` deep link로 제공하며, `/settings`는 송장·연결 흐름의 deep link owner와 연결 편집의 canonical owner로 유지한다. `/orders`가 주문 조회, 주문 예약, 송장 업로드/반영의 canonical owner이며, 기존 `/shipping`은 `/orders/tracking-import`로 redirect하는 호환 경로다.
 
 ## 메뉴 원칙
 - 1차 메뉴는 직접 가치가 있는 목적지여야 한다.
@@ -57,8 +57,8 @@ Seleccase Inventory를 `dashboard 내부 분석 + 주문·송장 작업 + 상품
 - `대시보드`는 KPI와 분석 차트를 함께 가진다.
 - `상품 관리`는 top-level direct item으로 두고, 내부에서 `상품`과 `창고`를 구분한다.
 - `소싱`은 확장형을 유지한다.
-- `주문`, `재고 운영`, `설정`은 direct item으로 유지한다.
-- `스토어 연결`은 도메인 이름으로 유지하되 `설정` 안의 canonical section 또는 child screen으로 둔다.
+- `주문`, `재고 운영`은 direct item으로 유지한다.
+- `API 설정`은 계정 메뉴에서 제공하고, `스토어 연결`은 `/settings`의 canonical section으로 둔다.
 
 ## UI Complexity Budget
 - 새 기능은 새 카드나 새 설명 섹션을 늘리기 전에 기존 toolbar, table, header, action rail 안에서 해결하는 것을 우선한다.
