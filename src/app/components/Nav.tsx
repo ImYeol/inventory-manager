@@ -76,12 +76,11 @@ function NavigationContent({
 
   return (
     <>
-      <div className="border-b border-[color:var(--border)] px-4 py-4">
+      <div className="border-b border-[color:var(--border)] px-4 py-3">
         <h1 className="text-sm font-semibold tracking-tight text-[color:var(--foreground)]">Seleccase Inventory</h1>
-        <p className="mt-0.5 text-xs text-[color:var(--muted-foreground)]">운영 콘솔</p>
       </div>
 
-      <nav className="flex-1 space-y-1.5 overflow-y-auto px-3 py-3.5" aria-label="주요 메뉴">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-3" aria-label="주요 메뉴">
         {directItems.map((item) => (
           <NavLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />
         ))}

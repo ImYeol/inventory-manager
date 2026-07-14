@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
   pathname: '/',
@@ -62,9 +62,19 @@ describe('Nav', () => {
     fireEvent.click(screen.getByRole('button', { name: '메뉴 열기' }))
 
     expect(screen.getByRole('dialog', { name: '모바일 메뉴' })).toBeTruthy()
-    expect(screen.getAllByRole('link', { name: '재고 운영' })).toHaveLength(2)
-    expect(screen.getAllByRole('link', { name: '상품 관리' })).toHaveLength(2)
-    expect(screen.getAllByRole('link', { name: '소싱' })).toHaveLength(2)
+    const mobileMenu = within(screen.getByRole('dialog', { name: '모바일 메뉴' }))
+    const destinations = [
+      ['대시보드', '/'],
+      ['상품 관리', '/products'],
+      ['재고 운영', '/inventory'],
+      ['소싱', '/sourcing'],
+      ['운송장', '/shipping'],
+      ['설정', '/settings'],
+    ] as const
+
+    destinations.forEach(([label, href]) => {
+      expect(mobileMenu.getByRole('link', { name: label }).getAttribute('href')).toBe(href)
+    })
     expect(screen.queryAllByRole('link', { name: '분석' })).toHaveLength(0)
   })
 

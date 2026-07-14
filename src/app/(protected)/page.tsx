@@ -33,14 +33,6 @@ export default async function Home() {
   const todayOutbound = transactions
     .filter((item) => item.date === todayLabel && item.type === '출고')
     .reduce((sum, item) => sum + item.quantity, 0)
-  const attentionItems = catalog
-    .map((model) => ({
-      id: model.id,
-      name: model.name,
-      quantity: model.inventory.reduce((sum, item) => sum + item.quantity, 0),
-    }))
-    .filter((item) => item.quantity <= 10)
-    .sort((a, b) => a.quantity - b.quantity)
   const warehouseTotals = warehouses.map((warehouse) => ({
     id: warehouse.id,
     name: warehouse.name,
@@ -75,13 +67,6 @@ export default async function Home() {
       href: '/history',
       ariaLabel: '오늘 출고 KPI',
     },
-    {
-      label: '주의 품목',
-      value: String(attentionItems.length),
-      description: '재고가 10개 이하인 모델을 우선 확인하세요.',
-      href: '/inventory',
-      ariaLabel: '주의 품목 KPI',
-    },
   ]
 
   return (
@@ -93,7 +78,6 @@ export default async function Home() {
       <DashboardView
         metrics={metrics}
         warehouses={warehouseTotals}
-        attentionItems={attentionItems}
         recentActivities={transactions.slice(0, 6)}
         models={models}
         initialInventoryHistory={initialInventoryHistory}

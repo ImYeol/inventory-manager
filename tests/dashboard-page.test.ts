@@ -62,7 +62,7 @@ beforeEach(() => {
 })
 
 describe('DashboardPage', () => {
-  it('renders the dashboard shell, omits the old quick-start buttons, and wires three local chart strips', async () => {
+  it('renders the reduced dashboard surface and wires three local chart strips', async () => {
     mocks.getAnalyticsData.mockResolvedValue({
       models: [
         { id: 1, name: 'LP01' },
@@ -143,8 +143,10 @@ describe('DashboardPage', () => {
     expect(screen.queryByRole('link', { name: '설정' })).toBeNull()
     const totalInventoryLink = screen.getByRole('link', { name: /전체 재고/ })
     const inboundLink = screen.getByRole('link', { name: /오늘 입고/ })
+    const outboundLink = screen.getByRole('link', { name: /오늘 출고/ })
     expect(totalInventoryLink.getAttribute('href')).toBe('/inventory')
     expect(inboundLink.getAttribute('href')).toBe('/history')
+    expect(outboundLink.getAttribute('href')).toBe('/history')
     expect(totalInventoryLink.className).not.toContain('ui-card')
     expect(inboundLink.className).not.toContain('ui-card')
     expect(totalInventoryLink.closest('section')?.className).toContain('ui-card')
@@ -154,8 +156,9 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('heading', { name: '입출고 현황' }).closest('section')?.className).toContain('ui-card')
     expect(screen.getByRole('heading', { name: '창고별 비교' }).closest('section')?.className).toContain('ui-card')
     expect(screen.getByRole('heading', { name: '창고별 재고' }).closest('section')?.className).toContain('ui-card')
-    expect(screen.getByRole('heading', { name: '주의 품목' }).closest('section')?.className).toContain('ui-card')
     expect(screen.getByRole('heading', { name: '최근 처리 이력' }).closest('section')?.className).toContain('ui-card')
+    expect(screen.queryByRole('heading', { name: '주의 품목' })).toBeNull()
+    expect(screen.queryByRole('table', { name: '주의 품목' })).toBeNull()
     expect(screen.getByRole('combobox', { name: '재고 추이 모델' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: '입출고 현황 모델' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: '창고별 비교 모델' })).toBeTruthy()

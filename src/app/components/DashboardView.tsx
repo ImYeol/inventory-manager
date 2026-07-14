@@ -46,12 +46,6 @@ type RecentActivity = {
   quantity: number
 }
 
-type AttentionItem = {
-  id: number
-  name: string
-  quantity: number
-}
-
 type ModelOption = {
   id: number
   name: string
@@ -61,7 +55,6 @@ type DashboardViewProps = {
   metrics: DashboardMetric[]
   warehouses: WarehouseSummary[]
   recentActivities: RecentActivity[]
-  attentionItems: AttentionItem[]
   models: ModelOption[]
   initialInventoryHistory: InventoryHistoryItem[]
   initialTransactionTrend: TrendItem[]
@@ -360,7 +353,6 @@ export default function DashboardView({
   metrics,
   warehouses,
   recentActivities,
-  attentionItems,
   models,
   initialInventoryHistory,
   initialTransactionTrend,
@@ -370,7 +362,7 @@ export default function DashboardView({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 xl:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-3">
         {metrics.map((metric) => (
           <Card key={metric.label} variant="strong" className="overflow-hidden">
             <Link
@@ -394,100 +386,56 @@ export default function DashboardView({
         <WarehouseCard models={models} initialData={initialWarehouseComparison} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
-        <Card variant="strong" className="overflow-hidden">
-          <CardHeader className="flex flex-row items-start justify-between gap-3 px-4 py-3">
-            <div>
-              <CardTitle>창고별 재고</CardTitle>
-              <CardDescription>창고별 현재 재고를 바로 훑습니다.</CardDescription>
-            </div>
-            <StatusBadge tone="neutral">{warehouses.length}개 창고</StatusBadge>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table aria-label="창고별 재고">
-                <TableHeader>
+      <Card variant="strong" className="overflow-hidden">
+        <CardHeader className="flex flex-row items-start justify-between gap-3 px-4 py-3">
+          <div>
+            <CardTitle>창고별 재고</CardTitle>
+            <CardDescription>창고별 현재 재고를 바로 훑습니다.</CardDescription>
+          </div>
+          <StatusBadge tone="neutral">{warehouses.length}개 창고</StatusBadge>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table aria-label="창고별 재고">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>창고</TableHead>
+                  <TableHead className="text-right">현재 재고</TableHead>
+                  <TableHead className="w-[45%]">비중</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {warehouses.length === 0 ? (
                   <TableRow>
-                    <TableHead>창고</TableHead>
-                    <TableHead className="text-right">현재 재고</TableHead>
-                    <TableHead className="w-[45%]">비중</TableHead>
+                    <TableCell colSpan={3} className="py-8 text-center text-sm text-[color:var(--muted-foreground)]">
+                      등록된 창고가 없습니다.
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {warehouses.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="py-8 text-center text-sm text-[color:var(--muted-foreground)]">
-                        등록된 창고가 없습니다.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    warehouses.map((warehouse) => {
-                      const percent = Math.round((warehouse.quantity / maxWarehouseQty) * 100)
+                ) : (
+                  warehouses.map((warehouse) => {
+                    const percent = Math.round((warehouse.quantity / maxWarehouseQty) * 100)
 
-                      return (
-                        <TableRow key={warehouse.id}>
-                          <TableCell className="font-medium text-[color:var(--foreground)]">{warehouse.name}</TableCell>
-                          <TableCell className="text-right font-semibold text-[color:var(--foreground)]">{warehouse.quantity}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <div className="h-2 flex-1 overflow-hidden rounded-full bg-[color:var(--surface-muted)]">
-                                <div className="h-full rounded-full bg-[color:var(--foreground)]" style={{ width: `${percent}%` }} />
-                              </div>
-                              <span className="w-10 text-right text-xs font-medium text-[color:var(--muted-foreground)]">{percent}%</span>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card variant="strong" className="overflow-hidden">
-          <CardHeader className="flex flex-row items-start justify-between gap-3 px-4 py-3">
-            <div>
-              <CardTitle>주의 품목</CardTitle>
-              <CardDescription>재고가 낮은 항목만 먼저 확인합니다.</CardDescription>
-            </div>
-            <StatusBadge tone="warning">{attentionItems.length}개</StatusBadge>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table aria-label="주의 품목">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>상품</TableHead>
-                    <TableHead className="text-right">재고</TableHead>
-                    <TableHead>상태</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {attentionItems.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="py-8 text-center text-sm text-[color:var(--muted-foreground)]">
-                        현재 부족 또는 품절 품목이 없습니다.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    attentionItems.slice(0, 5).map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium text-[color:var(--foreground)]">{item.name}</TableCell>
-                        <TableCell className="text-right font-semibold text-[color:var(--warning-foreground)]">{item.quantity}</TableCell>
+                    return (
+                      <TableRow key={warehouse.id}>
+                        <TableCell className="font-medium text-[color:var(--foreground)]">{warehouse.name}</TableCell>
+                        <TableCell className="text-right font-semibold text-[color:var(--foreground)]">{warehouse.quantity}</TableCell>
                         <TableCell>
-                          <StatusBadge tone="warning">우선 확인</StatusBadge>
+                          <div className="flex items-center gap-3">
+                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-[color:var(--surface-muted)]">
+                              <div className="h-full rounded-full bg-[color:var(--foreground)]" style={{ width: `${percent}%` }} />
+                            </div>
+                            <span className="w-10 text-right text-xs font-medium text-[color:var(--muted-foreground)]">{percent}%</span>
+                          </div>
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card variant="strong" className="overflow-hidden">
         <CardHeader className="flex flex-row items-start justify-between gap-3 px-4 py-3">
