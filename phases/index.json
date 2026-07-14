@@ -27,6 +27,10 @@
       "dir": "channel-commerce-operations",
       "status": "completed",
       "completed_at": "2026-07-15T01:20:15+0900"
+    },
+    {
+      "dir": "commerce-ux-correction-audit",
+      "status": "pending"
     }
   ]
 }
