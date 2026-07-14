@@ -34,18 +34,18 @@ export function StoreConnectionRow({
             <h2 className="text-base font-semibold text-[color:var(--foreground)]">{provider}</h2>
             <StoreConnectionStatus configured={configured} />
           </div>
-          <dl className="grid gap-2 text-sm text-slate-500 sm:grid-cols-2">
+          <dl className="grid gap-2 text-sm text-[color:var(--muted)] sm:grid-cols-2">
             {summary.map((item) => (
               <div key={item.label} className="space-y-0.5">
-                <dt className="text-xs font-medium uppercase tracking-[0.12em] text-slate-400">{item.label}</dt>
-                <dd translate="no" className="text-sm text-slate-700">
+                <dt className="text-xs font-medium uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">{item.label}</dt>
+                <dd translate="no" className="text-sm text-[color:var(--foreground)]">
                   {item.value ?? '저장된 키 없음'}
                 </dd>
               </div>
             ))}
             <div className="space-y-0.5">
-              <dt className="text-xs font-medium uppercase tracking-[0.12em] text-slate-400">최근 변경</dt>
-              <dd className="text-sm text-slate-700">{formatUpdatedAt(updatedAt)}</dd>
+              <dt className="text-xs font-medium uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">최근 변경</dt>
+              <dd className="text-sm text-[color:var(--foreground)]">{formatUpdatedAt(updatedAt)}</dd>
             </div>
           </dl>
         </div>

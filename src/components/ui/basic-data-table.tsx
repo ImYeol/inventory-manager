@@ -52,7 +52,7 @@ export function BasicDataTable<Row>({
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="!px-4 !py-10 text-center text-sm !text-slate-400">
+                <TableCell colSpan={columns.length} className="!px-4 !py-10 text-center text-sm !text-[color:var(--muted-foreground)]">
                   {emptyState}
                 </TableCell>
               </TableRow>

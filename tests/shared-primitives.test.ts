@@ -174,7 +174,7 @@ describe('shared action and status primitives', () => {
     )
 
     expect(screen.getByLabelText('미연결')).toBeTruthy()
-    expect(screen.getByTestId('muted-status').querySelector('[aria-hidden="true"]')?.className).toContain('bg-slate-400')
+    expect(screen.getByTestId('muted-status').querySelector('[aria-hidden="true"]')?.className).toContain('bg-[color:var(--muted-foreground)]')
   })
 
   it('supports row interaction on the basic data table without breaking cell rendering', () => {

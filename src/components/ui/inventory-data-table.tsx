@@ -85,7 +85,7 @@ export function InventoryDataTable({
                   initial="hidden"
                   animate="visible"
                   variants={rowVariants}
-                  className="border-b border-slate-100 transition-colors hover:bg-slate-50/70 data-[state=selected]:bg-slate-50"
+                  className="border-b border-[color:var(--border)] transition-colors hover:bg-[color:var(--surface-muted)] data-[state=selected]:bg-[color:var(--surface-muted)]"
                 >
                   {visibleColumns.has('modelName') && (
                     <TableCell className={cn(ui.tableCell, 'font-medium text-[color:var(--foreground)]')}>
