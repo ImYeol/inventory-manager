@@ -61,7 +61,7 @@ export default function LoginForm() {
     <form action={formAction} className="space-y-4">
       {state.error ? (
         <p
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          className="rounded-xl border border-[color:var(--hue-danger)] bg-[color:var(--surface-muted)] px-4 py-3 text-sm text-[color:var(--danger-foreground)]"
           aria-live="polite"
           role="status"
         >

@@ -32,13 +32,13 @@ export default async function LoginPage({
       <div className="surface w-full max-w-md p-8 md:p-10">
         <div className="mb-8 space-y-3 text-center">
           <span className={ui.pageKicker}>Inventory Manager</span>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-950">로그인</h1>
-          <p className="mx-auto max-w-sm text-sm leading-6 text-slate-500">
+          <h1 className="text-3xl font-semibold tracking-tight text-[color:var(--foreground)]">로그인</h1>
+          <p className="mx-auto max-w-sm text-sm leading-6 text-[color:var(--muted)]">
             Google 계정으로 로그인해 재고관리 시스템에 접근합니다.
           </p>
           {authError ? (
             <p
-              className="mx-auto max-w-sm rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+              className="mx-auto max-w-sm rounded-xl border border-[color:var(--hue-danger)] bg-[color:var(--surface-muted)] px-4 py-3 text-sm text-[color:var(--danger-foreground)]"
               aria-live="polite"
               role="status"
             >

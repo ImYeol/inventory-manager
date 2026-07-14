@@ -27,7 +27,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-[color:var(--background)] text-[color:var(--foreground)]">
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-slate-950 focus:shadow-lg"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-[color:var(--surface)] focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-[color:var(--foreground)] focus:shadow-[var(--elevation-3)]"
         >
           본문으로 건너뛰기
         </a>
