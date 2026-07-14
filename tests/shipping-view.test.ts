@@ -181,6 +181,8 @@ describe('ShippingView', () => {
     expect(screen.getByRole('cell', { name: '홍길동' })).toBeTruthy()
     expect(screen.getByRole('cell', { name: 'AB-123' })).toBeTruthy()
     expect(screen.getByRole('cell', { name: '010-1234-5678' })).toBeTruthy()
+    expect(screen.getAllByText('네이버').some((element) => element.closest('.ui-badge') !== null)).toBe(true)
+    expect(screen.getAllByText('미분류').some((element) => element.closest('.ui-badge') !== null)).toBe(true)
     expect(screen.getByRole('combobox', { name: '홍길동 분류 변경' }).textContent).toContain('네이버')
     expect(screen.getByRole('combobox', { name: '김철수 분류 변경' }).textContent).toContain('미분류')
     await waitFor(() => {

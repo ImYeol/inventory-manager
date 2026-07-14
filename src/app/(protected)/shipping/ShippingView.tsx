@@ -7,7 +7,8 @@ import { parseExcelRow, type CourierRow } from '@/lib/excel'
 import * as shippingActions from '@/lib/actions/shipping'
 import type { CoupangOrderSheet, NaverOrder } from '@/lib/actions/shipping'
 import type { ShippingSettingsSummary } from '@/lib/shipping-credentials'
-import type { ShippingClassification } from '@/components/ui/shipping-classification-badge'
+import { BasicDataTable } from '@/components/ui/basic-data-table'
+import { ShippingClassificationBadge, type ShippingClassification } from '@/components/ui/shipping-classification-badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { StoreConnectionStatus } from '@/components/ui/store-connection-status'
@@ -40,6 +41,22 @@ type CoupangDateRange = {
   fromDate?: string
   toDate?: string
 }
+
+const shippingPreviewColumns = [
+  { key: 'classification', label: '분류' },
+  { key: 'no', label: 'No' },
+  { key: 'pickupLocation', label: '집화예정장소' },
+  { key: 'receiptDate', label: '접수일자' },
+  { key: 'pickupScheduleDate', label: '집화예정일자' },
+  { key: 'pickupDate', label: '집화일자' },
+  { key: 'reservationType', label: '예약구분' },
+  { key: 'reservationNumber', label: '예약번호' },
+  { key: 'trackingNumber', label: '운송장번호' },
+  { key: 'recipientName', label: '받는분' },
+  { key: 'phone', label: '전화번호' },
+  { key: 'address', label: '주소' },
+  { key: 'reservationMedia', label: '예약매체' },
+]
 
 function ShippingProviderActionGroup({
   label,
@@ -559,7 +576,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
         <CardHeader className="border-b border-[color:var(--border)] px-4 py-3">
           <div className="space-y-1">
             <CardTitle className="text-base">운송장 업로드</CardTitle>
-            <p className="text-sm leading-6 text-slate-500">엑셀을 넣고, 연결 상태를 확인한 뒤, 바로 분류 결과를 확인합니다.</p>
+            <p className="text-sm leading-6 text-[color:var(--muted-foreground)]">엑셀을 넣고, 연결 상태를 확인한 뒤, 바로 분류 결과를 확인합니다.</p>
           </div>
         </CardHeader>
         <CardContent className="px-4 py-4">
@@ -605,17 +622,17 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
                   event.currentTarget.value = ''
                 }}
               />
-              <svg className="h-7 w-7 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <svg className="h-7 w-7 text-[color:var(--muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <path d="M17 8l-5-5-5 5" />
                 <path d="M12 3v12" />
               </svg>
             </label>
 
-            <p className="mt-4 text-sm text-slate-700">운송장 엑셀을 업로드하면 채널별로 바로 분류합니다.</p>
-            <p className="mt-1 text-xs text-slate-500">형식: .xlsx, .xls</p>
-            {fileName ? <p className="mt-3 text-sm font-medium text-slate-800">{fileName}</p> : null}
-            {uploadError ? <p className="mt-3 text-sm text-red-600">{uploadError}</p> : null}
+            <p className="mt-4 text-sm text-[color:var(--muted)]">운송장 엑셀을 업로드하면 채널별로 바로 분류합니다.</p>
+            <p className="mt-1 text-xs text-[color:var(--muted-foreground)]">형식: .xlsx, .xls</p>
+            {fileName ? <p className="mt-3 text-sm font-medium text-[color:var(--foreground)]">{fileName}</p> : null}
+            {uploadError ? <p className="mt-3 text-sm text-[color:var(--danger-foreground)]">{uploadError}</p> : null}
           </div>
         </CardContent>
       </Card>
@@ -675,7 +692,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
 
         <CardContent className="space-y-0 p-0">
           <div className="border-b border-[color:var(--border)] px-4 py-2">
-            <div className={cx(ui.toolbarDense, 'gap-1.5 text-[11px] text-slate-500 md:overflow-visible')}>
+            <div className={cx(ui.toolbarDense, 'gap-1.5 text-[11px] text-[color:var(--muted-foreground)] md:overflow-visible')}>
               <span className={cx(ui.pill, 'px-2 py-0.5 text-[11px]')}>전체 {classificationSummary.total}건</span>
               <span className={cx(ui.pill, 'px-2 py-0.5 text-[11px]')}>네이버 {classificationSummary.naver}건</span>
               <span className={cx(ui.pill, 'px-2 py-0.5 text-[11px]')}>쿠팡 {classificationSummary.coupang}건</span>
@@ -691,58 +708,38 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-max border-collapse text-sm">
-              <thead>
-                <tr className="ui-table-head text-left">
-                  <th className="px-4 py-3 whitespace-nowrap">분류</th>
-                  <th className="px-4 py-3 whitespace-nowrap">No</th>
-                  <th className="px-4 py-3 whitespace-nowrap">집화예정장소</th>
-                  <th className="px-4 py-3 whitespace-nowrap">접수일자</th>
-                  <th className="px-4 py-3 whitespace-nowrap">집화예정일자</th>
-                  <th className="px-4 py-3 whitespace-nowrap">집화일자</th>
-                  <th className="px-4 py-3 whitespace-nowrap">예약구분</th>
-                  <th className="px-4 py-3 whitespace-nowrap">예약번호</th>
-                  <th className="px-4 py-3 whitespace-nowrap">운송장번호</th>
-                  <th className="px-4 py-3 whitespace-nowrap">받는분</th>
-                  <th className="px-4 py-3 whitespace-nowrap">전화번호</th>
-                  <th className="px-4 py-3 whitespace-nowrap">주소</th>
-                  <th className="px-4 py-3 whitespace-nowrap">예약매체</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagedRows.length === 0 ? (
-                  <tr className="border-t border-[color:var(--border)]">
-                    <td colSpan={13} className="px-4 py-12 text-center text-slate-400">
-                      분류할 업로드 행이 없습니다.
-                    </td>
-                  </tr>
-                ) : (
-                  pagedRows.map((row) => (
-                    <tr key={row.key} className="border-t border-[color:var(--border)]">
-                      <td className="px-4 py-3 whitespace-nowrap">{renderClassificationControl(row)}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.no || '-'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.pickupLocation || '-'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.receiptDate || '-'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.pickupScheduleDate || '-'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.pickupDate || '-'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.reservationType || '-'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.reservationNumber || '-'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={cx(ui.pillMuted, 'px-2 py-0.5 font-mono text-xs font-semibold text-slate-800')}>
-                          {row.trackingNumber || '-'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap font-medium text-slate-900">{row.recipientName}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.phone || '-'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.address || '-'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{row.reservationMedia || '-'}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <BasicDataTable
+            className="border-0 shadow-none"
+            columns={shippingPreviewColumns}
+            rows={pagedRows}
+            rowKey={(row) => row.key}
+            emptyState="분류할 업로드 행이 없습니다."
+            renderCell={(row, columnKey) => {
+              if (columnKey === 'classification') {
+                return (
+                  <div className="flex min-w-max items-center gap-2">
+                    <ShippingClassificationBadge classification={row.classification} />
+                    {renderClassificationControl(row)}
+                  </div>
+                )
+              }
+
+              if (columnKey === 'trackingNumber') {
+                return (
+                  <span className={cx(ui.pillMuted, 'whitespace-nowrap px-2 py-0.5 font-mono text-xs font-semibold text-[color:var(--foreground)]')}>
+                    {row.trackingNumber || '-'}
+                  </span>
+                )
+              }
+
+              if (columnKey === 'recipientName') {
+                return <span className="whitespace-nowrap font-medium text-[color:var(--foreground)]">{row.recipientName}</span>
+              }
+
+              const value = row[columnKey as keyof CourierRow]
+              return <span className="whitespace-nowrap text-[color:var(--muted)]">{typeof value === 'string' && value ? value : '-'}</span>
+            }}
+          />
 
           <div className="border-t border-[color:var(--border)] px-4 py-3">
             <div className="flex items-center justify-end gap-2">
@@ -754,7 +751,7 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
               >
                 이전
               </button>
-              <span className="min-w-[5rem] text-center text-sm text-slate-500">
+              <span className="min-w-[5rem] text-center text-sm text-[color:var(--muted-foreground)]">
                 {filteredRows.length > 0 ? `${previewPage} / ${totalPages}` : '0 / 0'}
               </span>
               <button
