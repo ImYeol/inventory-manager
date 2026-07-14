@@ -116,8 +116,8 @@ function ControlStrip({
       <div className="flex w-full flex-col gap-3">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
-            <p className="text-sm font-semibold tracking-tight text-slate-950">{title} 필터</p>
-            <p className="text-xs leading-5 text-slate-500">필터 변경 시 해당 차트만 다시 계산합니다.</p>
+            <p className="text-sm font-semibold tracking-tight text-[color:var(--foreground)]">{title} 필터</p>
+            <p className="text-xs leading-5 text-[color:var(--muted-foreground)]">필터 변경 시 해당 차트만 다시 계산합니다.</p>
           </div>
           <StatusBadge tone={loading ? 'warning' : 'neutral'}>{loading ? '갱신 중' : '최신'}</StatusBadge>
         </div>
@@ -376,12 +376,12 @@ export default function DashboardView({
             <Link
               href={metric.href}
               aria-label={metric.ariaLabel ?? metric.label}
-              className="block h-full rounded-[inherit] px-3.5 py-3 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white md:px-4 md:py-3.5"
+              className="block h-full rounded-[inherit] px-3.5 py-3 transition-colors hover:bg-[color:var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)] md:px-4 md:py-3.5"
             >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{metric.label}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">{metric.label}</p>
               <div className="mt-2 flex items-end justify-between gap-3">
-                <p className="text-2xl font-semibold tracking-tight text-slate-950">{metric.value}</p>
-                <span className="max-w-[11rem] text-right text-xs leading-5 text-slate-500">{metric.description}</span>
+                <p className="text-2xl font-semibold tracking-tight text-[color:var(--foreground)]">{metric.value}</p>
+                <span className="max-w-[11rem] text-right text-xs leading-5 text-[color:var(--muted-foreground)]">{metric.description}</span>
               </div>
             </Link>
           </Card>
@@ -416,7 +416,7 @@ export default function DashboardView({
                 <TableBody>
                   {warehouses.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={3} className="py-8 text-center text-sm text-slate-500">
+                      <TableCell colSpan={3} className="py-8 text-center text-sm text-[color:var(--muted-foreground)]">
                         등록된 창고가 없습니다.
                       </TableCell>
                     </TableRow>
@@ -426,14 +426,14 @@ export default function DashboardView({
 
                       return (
                         <TableRow key={warehouse.id}>
-                          <TableCell className="font-medium text-slate-950">{warehouse.name}</TableCell>
-                          <TableCell className="text-right font-semibold text-slate-950">{warehouse.quantity}</TableCell>
+                          <TableCell className="font-medium text-[color:var(--foreground)]">{warehouse.name}</TableCell>
+                          <TableCell className="text-right font-semibold text-[color:var(--foreground)]">{warehouse.quantity}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
-                                <div className="h-full rounded-full bg-slate-900" style={{ width: `${percent}%` }} />
+                              <div className="h-2 flex-1 overflow-hidden rounded-full bg-[color:var(--surface-muted)]">
+                                <div className="h-full rounded-full bg-[color:var(--foreground)]" style={{ width: `${percent}%` }} />
                               </div>
-                              <span className="w-10 text-right text-xs font-medium text-slate-500">{percent}%</span>
+                              <span className="w-10 text-right text-xs font-medium text-[color:var(--muted-foreground)]">{percent}%</span>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -467,15 +467,15 @@ export default function DashboardView({
                 <TableBody>
                   {attentionItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={3} className="py-8 text-center text-sm text-slate-500">
+                      <TableCell colSpan={3} className="py-8 text-center text-sm text-[color:var(--muted-foreground)]">
                         현재 부족 또는 품절 품목이 없습니다.
                       </TableCell>
                     </TableRow>
                   ) : (
                     attentionItems.slice(0, 5).map((item) => (
                       <TableRow key={item.id}>
-                        <TableCell className="font-medium text-slate-950">{item.name}</TableCell>
-                        <TableCell className="text-right font-semibold text-amber-700">{item.quantity}</TableCell>
+                        <TableCell className="font-medium text-[color:var(--foreground)]">{item.name}</TableCell>
+                        <TableCell className="text-right font-semibold text-[color:var(--warning-foreground)]">{item.quantity}</TableCell>
                         <TableCell>
                           <StatusBadge tone="warning">우선 확인</StatusBadge>
                         </TableCell>
@@ -516,7 +516,7 @@ export default function DashboardView({
               <TableBody>
                 {recentActivities.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-8 text-center text-sm text-slate-500">
+                    <TableCell colSpan={6} className="py-8 text-center text-sm text-[color:var(--muted-foreground)]">
                       최근 처리 이력이 없습니다.
                     </TableCell>
                   </TableRow>
@@ -526,13 +526,13 @@ export default function DashboardView({
                       <TableCell>
                         <StatusBadge tone={activityTone(activity.type)}>{activity.type}</StatusBadge>
                       </TableCell>
-                      <TableCell className="font-medium text-slate-950">{activity.modelName}</TableCell>
+                      <TableCell className="font-medium text-[color:var(--foreground)]">{activity.modelName}</TableCell>
                       <TableCell>
                         {activity.colorName} / {activity.sizeName}
                       </TableCell>
                       <TableCell>{activity.warehouseName}</TableCell>
-                      <TableCell className="text-right font-semibold text-slate-950">{activity.quantity}</TableCell>
-                      <TableCell className="text-right text-slate-500">{activity.date}</TableCell>
+                      <TableCell className="text-right font-semibold text-[color:var(--foreground)]">{activity.quantity}</TableCell>
+                      <TableCell className="text-right text-[color:var(--muted-foreground)]">{activity.date}</TableCell>
                     </TableRow>
                   ))
                 )}

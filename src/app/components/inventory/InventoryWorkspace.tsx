@@ -149,9 +149,9 @@ export default function InventoryWorkspace({
                 key: `${item.id}`,
                 modelName: model.name,
                 option: (
-                  <div className="flex items-center gap-2 text-slate-600">
+                  <div className="flex items-center gap-2 text-[color:var(--muted)]">
                     <span
-                      className="inline-block h-3.5 w-3.5 rounded-full border border-slate-200"
+                      className="inline-block h-3.5 w-3.5 rounded-full border border-[color:var(--border)]"
                       style={{ backgroundColor: color.rgbCode }}
                     />
                     <span>
