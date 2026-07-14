@@ -10,6 +10,7 @@
 - CRITICAL: 클라이언트 컴포넌트에서 직접 외부 API를 호출하지 않는다.
 - 컴포넌트는 shared primitive를 우선 재사용하고, 타입과 액션은 역할별로 분리한다.
 - UI/시각 토큰의 SoT는 `docs/DESIGN.md`, 모션의 SoT는 `docs/MOTION.md`다. 컴포넌트에 색상/크기/radius/duration을 하드코딩하지 말고 토큰만 사용한다.
+- 컴포넌트 재사용의 SoT는 `docs/COMPONENTS.md`다.
 
 개발 프로세스
 - CRITICAL: 새 기능 구현 시 반드시 테스트를 먼저 작성하고, 테스트가 통과하는 구현을 작성한다.
