@@ -14,7 +14,10 @@
     {
       "step": 1,
       "name": "commerce-schema-and-invariants",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-07-15T00:45:09+0900",
+      "completed_at": "2026-07-15T00:52:00+0900",
+      "summary": "Created canonical migration supabase/migrations/20260714154633_channel_commerce_operations.sql and synchronized supabase/schema.sql plus Prisma models for commerce variants, channel references/orders, reservations, fulfillments, and tracking imports. Every new public table has auth.uid() ownership defaults, authenticated owner RLS policy, and user_id index; external IDs and fulfillment idempotency are owner-scoped unique. finalize_order_fulfillment is a security-invoker, empty-search-path RPC that locks authenticated rows, performs one successful external fulfillment's on-hand decrement, reservation release, and OUTBOUND transaction atomically, and returns success without repeat decrement. Verified with npm run test -- --run tests/schema-contract.test.ts tests/commerce-schema.test.ts, npx prisma validate, and npm run lint (0 errors; 4 pre-existing warnings)."
     },
     {
       "step": 2,
