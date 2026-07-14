@@ -63,9 +63,10 @@
 
 | 현재 hand-roll `<table>` | 현재 역할 | 흡수 대상 primitive | 해소 예정 step |
 | --- | --- | --- | --- |
-| `InventoryView` | 조회형 재고 table | `InventoryDataTable` | Step 5–11 |
-| `ShippingView` | 분류 preview | `BasicDataTable` + `ShippingClassificationBadge` | Step 5–11 |
+| `ShippingView` | 분류 preview | `BasicDataTable` + `ShippingClassificationBadge` | Step 7 |
 | `InOutForm` | 편집형 입력 table | `EditableTable` | Step 6 |
+
+> `InventoryView`(재고 매트릭스 화면)는 어느 route에도 연결되지 않은 dead view file이라 Step 5에서 삭제됨(UI_GUIDE §18). 실 사용되는 재고 조회 table은 `InventoryWorkspace`가 이미 `InventoryDataTable` primitive로 렌더한다.
 
 ## 사용 규칙
 
