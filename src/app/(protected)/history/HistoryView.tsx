@@ -272,7 +272,7 @@ export default function HistoryView({
                 필터 초기화
               </Button>
             ) : null}
-            <span className={cx(ui.statusPillDense, 'h-9 rounded-xl px-3 text-xs font-medium text-slate-600')}>
+            <span className={cx(ui.statusPillDense, 'h-9 rounded-xl px-3 text-xs font-medium text-[color:var(--muted)]')}>
               조회 {filtered.length}건
             </span>
           </div>
@@ -280,7 +280,7 @@ export default function HistoryView({
 
         <div role="group" aria-label="조회 필터" className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
           <div data-testid="history-search-field" className="relative w-full sm:w-[12rem] lg:w-[12.5rem]">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute inset-y-0 left-3 my-auto h-4 w-4 text-[color:var(--muted-foreground)]" />
             <label htmlFor="history-search" className="sr-only">
               모델명 검색
             </label>
@@ -295,8 +295,8 @@ export default function HistoryView({
             />
           </div>
 
-          <div className="flex flex-col gap-2 rounded-xl border border-[color:var(--border)] bg-white px-3 py-2 sm:flex-row sm:items-center sm:gap-2.5">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+          <div className="flex flex-col gap-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 sm:flex-row sm:items-center sm:gap-2.5">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-[color:var(--muted-foreground)]">
               <CalendarDays className="h-3.5 w-3.5" />
               <span>기간</span>
             </div>
@@ -309,7 +309,7 @@ export default function HistoryView({
                 onChange={(event) => updateFilters({ dateFrom: event.target.value })}
                 className={cx(ui.controlSm, 'h-8 min-w-0 border-0 px-2 shadow-none sm:w-[9.5rem]')}
               />
-              <span className="text-xs text-slate-400">-</span>
+              <span className="text-xs text-[color:var(--muted-foreground)]">-</span>
               <Input
                 id="history-date-to"
                 aria-label="종료일"
@@ -329,8 +329,8 @@ export default function HistoryView({
           className={cx(
             'rounded-xl border px-3 py-2 text-sm',
             feedback.type === 'success'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-              : 'border-red-200 bg-red-50 text-red-700',
+              ? 'border-[color:var(--hue-success)] bg-[color:var(--surface-muted)] text-[color:var(--success-foreground)]'
+              : 'border-[color:var(--hue-danger)] bg-[color:var(--surface-muted)] text-[color:var(--danger-foreground)]',
           )}
         >
           {feedback.text}
@@ -344,20 +344,20 @@ export default function HistoryView({
         rowKey={(item) => item.id}
         emptyState="이력이 없습니다."
         renderCell={(item, columnKey) => {
-          if (columnKey === 'timestamp') return <span className="text-sm text-slate-700">{formatCreatedAt(item.createdAt)}</span>
+          if (columnKey === 'timestamp') return <span className="text-sm text-[color:var(--muted)]">{formatCreatedAt(item.createdAt)}</span>
           if (columnKey === 'type') {
             const tone = item.type === '입고' ? 'success' : item.type === '출고' ? 'danger' : 'neutral'
             return <StatusBadge tone={tone}>{item.type}</StatusBadge>
           }
           if (columnKey === 'quantity') {
-            return <span className="text-sm font-semibold text-slate-800">{item.quantity}</span>
+            return <span className="text-sm font-semibold text-[color:var(--foreground)]">{item.quantity}</span>
           }
-          if (columnKey === 'model') return <span className="text-sm font-medium text-slate-900">{item.modelName}</span>
+          if (columnKey === 'model') return <span className="text-sm font-medium text-[color:var(--foreground)]">{item.modelName}</span>
           if (columnKey === 'option') {
             return (
-              <div className="flex items-center gap-1.5 text-sm text-slate-700">
+              <div className="flex items-center gap-1.5 text-sm text-[color:var(--muted)]">
                 <span
-                  className="inline-block h-3 w-3 flex-shrink-0 rounded-full border border-slate-200"
+                  className="inline-block h-3 w-3 flex-shrink-0 rounded-full border border-[color:var(--border)]"
                   style={{ backgroundColor: item.colorRgb }}
                 />
                 <span>
@@ -368,19 +368,19 @@ export default function HistoryView({
           }
           if (columnKey === 'source') {
             return (
-              <div className="space-y-1 text-sm text-slate-600">
+              <div className="space-y-1 text-sm text-[color:var(--muted)]">
                 <p>{formatSourceChannel(item.sourceChannel)}</p>
                 {formatSourceReference(item.referenceType, item.referenceId) ? (
-                  <p className="text-xs text-slate-400">{formatSourceReference(item.referenceType, item.referenceId)}</p>
+                  <p className="text-xs text-[color:var(--muted-foreground)]">{formatSourceReference(item.referenceType, item.referenceId)}</p>
                 ) : null}
-                {item.memo ? <p className="text-xs text-slate-500">{item.memo}</p> : null}
+                {item.memo ? <p className="text-xs text-[color:var(--muted-foreground)]">{item.memo}</p> : null}
               </div>
             )
           }
-          if (columnKey === 'warehouse') return <span className="text-sm text-slate-600">{item.warehouse}</span>
+          if (columnKey === 'warehouse') return <span className="text-sm text-[color:var(--muted)]">{item.warehouse}</span>
           if (columnKey === 'action') {
             if (!item.canRevert) {
-              return <span className="text-xs font-medium text-slate-400">{item.revertDisabledReason}</span>
+              return <span className="text-xs font-medium text-[color:var(--muted-foreground)]">{item.revertDisabledReason}</span>
             }
 
             return (
@@ -412,28 +412,28 @@ export default function HistoryView({
             <div key={item.id} className={cx(ui.surface, 'space-y-3 px-4 py-3')}>
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1">
-                  <p className="text-sm text-slate-500">{formatCreatedAt(item.createdAt)}</p>
-                  <p className="text-base font-semibold text-slate-900">{item.modelName}</p>
+                  <p className="text-sm text-[color:var(--muted-foreground)]">{formatCreatedAt(item.createdAt)}</p>
+                  <p className="text-base font-semibold text-[color:var(--foreground)]">{item.modelName}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <StatusBadge tone={item.type === '입고' ? 'success' : item.type === '출고' ? 'danger' : 'neutral'}>
                     {item.type}
                   </StatusBadge>
-                  <span className="text-lg font-bold text-slate-900">{item.quantity}</span>
+                  <span className="text-lg font-bold text-[color:var(--foreground)]">{item.quantity}</span>
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <div className="flex items-center gap-1.5 text-sm text-slate-600">
+                <div className="flex items-center gap-1.5 text-sm text-[color:var(--muted)]">
                   <span
-                    className="inline-block h-3 w-3 rounded-full border border-slate-200"
+                    className="inline-block h-3 w-3 rounded-full border border-[color:var(--border)]"
                     style={{ backgroundColor: item.colorRgb }}
                   />
                   <span>
                     {item.colorName} / {item.sizeName} / {item.warehouse}
                   </span>
                 </div>
-                <div className="space-y-0.5 text-xs text-slate-500">
+                <div className="space-y-0.5 text-xs text-[color:var(--muted-foreground)]">
                   <p>{formatSourceChannel(item.sourceChannel)}</p>
                   {formatSourceReference(item.referenceType, item.referenceId) ? (
                     <p>{formatSourceReference(item.referenceType, item.referenceId)}</p>
@@ -442,7 +442,7 @@ export default function HistoryView({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+              <div className="flex items-center justify-between gap-3 border-t border-[color:var(--border)] pt-3">
                 {item.canRevert ? (
                   <Button
                     type="button"
@@ -459,7 +459,7 @@ export default function HistoryView({
                     되돌리기
                   </Button>
                 ) : (
-                  <span className="text-xs font-medium text-slate-400">{item.revertDisabledReason}</span>
+                  <span className="text-xs font-medium text-[color:var(--muted-foreground)]">{item.revertDisabledReason}</span>
                 )}
               </div>
             </div>
@@ -479,7 +479,7 @@ export default function HistoryView({
           >
             이전
           </Button>
-          <span className="px-3 text-sm text-slate-600">
+          <span className="px-3 text-sm text-[color:var(--muted)]">
             {currentPage} / {totalPages}
           </span>
           <Button
@@ -516,18 +516,18 @@ export default function HistoryView({
         {pendingRevert ? (
           <div className="space-y-4">
             <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-4 py-3">
-              <p className="text-base font-semibold text-slate-950">{pendingRevert.modelName}</p>
-              <p className="mt-1 text-sm text-slate-600">
+              <p className="text-base font-semibold text-[color:var(--foreground)]">{pendingRevert.modelName}</p>
+              <p className="mt-1 text-sm text-[color:var(--muted)]">
                 {pendingRevert.colorName} / {pendingRevert.sizeName} / {pendingRevert.warehouse}
               </p>
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-[color:var(--muted-foreground)]">
                 {pendingRevert.type} {pendingRevert.quantity}개
               </p>
             </div>
 
-            <div className="rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">보정 미리보기</p>
-              <p className="mt-2 text-sm text-slate-700">{pendingRevert.revertSummary}</p>
+            <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">보정 미리보기</p>
+              <p className="mt-2 text-sm text-[color:var(--muted)]">{pendingRevert.revertSummary}</p>
             </div>
 
             <div>
@@ -542,7 +542,7 @@ export default function HistoryView({
               />
             </div>
 
-            {revertError ? <p className="text-sm text-red-600">{revertError}</p> : null}
+            {revertError ? <p className="text-sm text-[color:var(--danger-foreground)]">{revertError}</p> : null}
           </div>
         ) : null}
       </Modal>
