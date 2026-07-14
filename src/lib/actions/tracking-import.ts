@@ -24,7 +24,7 @@ export async function saveTrackingPreset(input: { name: string; channel?: 'naver
 export async function listTrackingPresets(): Promise<SavedTrackingPreset[]> {
   const { supabase, user } = await getSupabaseWithUser()
   const { data, error } = await supabase.from('tracking_import_templates').select('id,name,channel,column_mapping').eq('user_id', user.id).order('name')
-  if (error) throw new Error('저장된 프리셋을 불러오지 못했습니다.')
+  if (error) return []
   return (data ?? []).map((item) => ({ id: Number(item.id), name: item.name, channel: item.channel as SavedTrackingPreset['channel'], mapping: item.column_mapping as TrackingColumnMapping }))
 }
 

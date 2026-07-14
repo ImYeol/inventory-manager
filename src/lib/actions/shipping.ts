@@ -8,12 +8,9 @@ import {
 import {
   fetchCoupangPendingOrders,
   confirmCoupangShipments,
-  type CoupangOrderItem,
   type CoupangOrderSheet,
 } from '../api/coupang'
 import { getRequiredShippingCredentials } from '../shipping-credentials'
-
-export type { NaverOrder, CoupangOrderItem, CoupangOrderSheet }
 
 export async function fetchNaverOrders(): Promise<{
   success: boolean;

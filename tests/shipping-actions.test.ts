@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 const mocks = vi.hoisted(() => ({
   fetchNaverPendingOrders: vi.fn(),
@@ -61,6 +63,12 @@ afterEach(() => {
 })
 
 describe('shipping server actions', () => {
+  it('exports only callable server actions from the use-server module', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/lib/actions/shipping.ts'), 'utf8')
+
+    expect(source).not.toMatch(/^export type /m)
+  })
+
   it('returns a clear user-facing error when naver credentials are not configured', async () => {
     mocks.getRequiredShippingCredentials.mockRejectedValue(
       new mocks.MissingShippingCredentialsError(
