@@ -1,7 +1,7 @@
 {
   "project": "Seleccase Inventory",
   "phase": "channel-commerce-operations",
-  "status": "pending",
+  "status": "completed",
   "steps": [
     {
       "step": 0,
@@ -54,7 +54,10 @@
     {
       "step": 6,
       "name": "inventory-sourcing-dashboard-integration",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-07-15T01:14:53+0900",
+      "completed_at": "2026-07-15T01:20:15+0900",
+      "summary": "Added the shared ProductVariantCombobox with searchable product/option/SKU results and fixed Naver/Coupang ChannelBadge slots; it is reused by inventory add and sourcing arrival entry without free-text product creation. Inventory list now uses product, SKU/option, warehouse, onHand, committed, available, incoming, and status columns; channelReported is not a default table column. Added a toolbar inventory-add flow that routes existing combinations to inbound adjustment. Sourcing arrivals now choose the canonical variant and keep remaining ordered-received quantities as incoming. Dashboard KPI labels were consolidated around new orders, fulfillment preparation, and today dispatch. Verified focused Step 6 tests (4 files, 8 tests) and lint (0 errors; 4 pre-existing warnings). Full npm run test has 56 passing files / 162 passing tests, with two pre-existing unrelated failures: Coupang API expectation omits newly returned nullable sellerSku/externalProductId fields, and settings page expects a logout button not rendered by its mock. npm run build remains blocked by existing order-sync server-action export validation and external Geist font network fetch failure."
     }
   ]
 }
