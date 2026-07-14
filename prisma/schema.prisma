@@ -26,15 +26,16 @@ model AppUser {
 }
 
 model Model {
-  id           BigInt        @id @default(autoincrement()) @db.BigInt
-  userId       String        @map("user_id") @db.Uuid
-  name         String
-  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  sizes        Size[]
-  colors       Color[]
-  inventory    Inventory[]
+  id                  BigInt               @id @default(autoincrement()) @db.BigInt
+  userId              String               @map("user_id") @db.Uuid
+  name                String
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  sizes               Size[]
+  colors              Color[]
+  inventory           Inventory[]
   factoryArrivalItems FactoryArrivalItem[]
-  transactions Transaction[]
+  transactions        Transaction[]
+  productVariants     ProductVariant[]
 
   @@unique([id, userId])
   @@unique([userId, name])
@@ -43,15 +44,17 @@ model Model {
 }
 
 model Size {
-  id           BigInt        @id @default(autoincrement()) @db.BigInt
-  userId       String        @map("user_id") @db.Uuid
-  modelId      BigInt        @map("model_id") @db.BigInt
-  name         String
-  sortOrder    Int           @default(0) @map("sort_order")
-  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  model        Model         @relation(fields: [modelId, userId], references: [id, userId], onDelete: Cascade)
-  inventory    Inventory[]
-  transactions Transaction[]
+  id                  BigInt               @id @default(autoincrement()) @db.BigInt
+  userId              String               @map("user_id") @db.Uuid
+  modelId             BigInt               @map("model_id") @db.BigInt
+  name                String
+  sortOrder           Int                  @default(0) @map("sort_order")
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  model               Model                @relation(fields: [modelId, userId], references: [id, userId], onDelete: Cascade)
+  inventory           Inventory[]
+  transactions        Transaction[]
+  factoryArrivalItems FactoryArrivalItem[]
+  productVariants     ProductVariant[]
 
   @@unique([modelId, id, userId])
   @@unique([userId, modelId, name])
@@ -61,17 +64,19 @@ model Size {
 }
 
 model Color {
-  id           BigInt        @id @default(autoincrement()) @db.BigInt
-  userId       String        @map("user_id") @db.Uuid
-  modelId      BigInt        @map("model_id") @db.BigInt
-  name         String
-  rgbCode      String        @map("rgb_code")
-  textWhite    Boolean       @default(false) @map("text_white")
-  sortOrder    Int           @default(0) @map("sort_order")
-  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  model        Model         @relation(fields: [modelId, userId], references: [id, userId], onDelete: Cascade)
-  inventory    Inventory[]
-  transactions Transaction[]
+  id                  BigInt               @id @default(autoincrement()) @db.BigInt
+  userId              String               @map("user_id") @db.Uuid
+  modelId             BigInt               @map("model_id") @db.BigInt
+  name                String
+  rgbCode             String               @map("rgb_code")
+  textWhite           Boolean              @default(false) @map("text_white")
+  sortOrder           Int                  @default(0) @map("sort_order")
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  model               Model                @relation(fields: [modelId, userId], references: [id, userId], onDelete: Cascade)
+  inventory           Inventory[]
+  transactions        Transaction[]
+  factoryArrivalItems FactoryArrivalItem[]
+  productVariants     ProductVariant[]
 
   @@unique([modelId, id, userId])
   @@unique([userId, modelId, name])
@@ -81,12 +86,13 @@ model Color {
 }
 
 model Warehouse {
-  id        BigInt        @id @default(autoincrement()) @db.BigInt
-  userId    String        @map("user_id") @db.Uuid
-  name      String
-  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  inventory Inventory[]
-  Transaction Transaction[]
+  id                    BigInt                 @id @default(autoincrement()) @db.BigInt
+  userId                String                 @map("user_id") @db.Uuid
+  name                  String
+  createdAt             DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  inventory             Inventory[]
+  Transaction           Transaction[]
+  inventoryReservations InventoryReservation[]
 
   @@unique([id, userId])
   @@unique([userId, name])
@@ -95,17 +101,17 @@ model Warehouse {
 }
 
 model Factory {
-  id        BigInt           @id @default(autoincrement()) @db.BigInt
-  userId    String           @map("user_id") @db.Uuid
-  name      String
-  contactName String?        @map("contact_name")
-  phone     String?
-  email     String?
-  notes     String?
-  isActive  Boolean          @default(true) @map("is_active")
-  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime         @default(now()) @map("updated_at") @db.Timestamptz(6)
-  arrivals  FactoryArrival[]
+  id          BigInt           @id @default(autoincrement()) @db.BigInt
+  userId      String           @map("user_id") @db.Uuid
+  name        String
+  contactName String?          @map("contact_name")
+  phone       String?
+  email       String?
+  notes       String?
+  isActive    Boolean          @default(true) @map("is_active")
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime         @default(now()) @map("updated_at") @db.Timestamptz(6)
+  arrivals    FactoryArrival[]
 
   @@unique([id, userId])
   @@unique([userId, name])
@@ -114,18 +120,18 @@ model Factory {
 }
 
 model FactoryArrival {
-  id           BigInt               @id @default(autoincrement()) @db.BigInt
-  userId       String               @map("user_id") @db.Uuid
-  factoryId    BigInt               @map("factory_id") @db.BigInt
-  referenceCode String?             @map("reference_code")
-  expectedDate DateTime             @map("expected_date") @db.Date
-  status       String
-  sourceChannel String              @map("source_channel")
-  memo         String?
-  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime             @default(now()) @map("updated_at") @db.Timestamptz(6)
-  factory      Factory              @relation(fields: [factoryId, userId], references: [id, userId], onDelete: Cascade)
-  items        FactoryArrivalItem[]
+  id            BigInt               @id @default(autoincrement()) @db.BigInt
+  userId        String               @map("user_id") @db.Uuid
+  factoryId     BigInt               @map("factory_id") @db.BigInt
+  referenceCode String?              @map("reference_code")
+  expectedDate  DateTime             @map("expected_date") @db.Date
+  status        String
+  sourceChannel String               @map("source_channel")
+  memo          String?
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime             @default(now()) @map("updated_at") @db.Timestamptz(6)
+  factory       Factory              @relation(fields: [factoryId, userId], references: [id, userId], onDelete: Cascade)
+  items         FactoryArrivalItem[]
 
   @@unique([id, userId])
   @@index([userId, expectedDate(sort: Asc), createdAt(sort: Desc)], map: "factory_arrivals_user_expected_date_idx")
@@ -155,19 +161,19 @@ model FactoryArrivalItem {
 }
 
 model Inventory {
-  id        BigInt         @id @default(autoincrement()) @db.BigInt
-  userId    String         @map("user_id") @db.Uuid
-  modelId   BigInt         @map("model_id") @db.BigInt
-  sizeId    BigInt         @map("size_id") @db.BigInt
-  colorId   BigInt         @map("color_id") @db.BigInt
-  warehouseId BigInt       @map("warehouse_id") @db.BigInt
-  quantity  Int            @default(0)
-  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime       @default(now()) @map("updated_at") @db.Timestamptz(6)
-  model     Model          @relation(fields: [modelId, userId], references: [id, userId], onDelete: Cascade)
-  size      Size           @relation(fields: [modelId, sizeId, userId], references: [modelId, id, userId], onDelete: Cascade)
-  color     Color          @relation(fields: [modelId, colorId, userId], references: [modelId, id, userId], onDelete: Cascade)
-  warehouse Warehouse      @relation(fields: [warehouseId, userId], references: [id, userId], onDelete: Cascade)
+  id          BigInt    @id @default(autoincrement()) @db.BigInt
+  userId      String    @map("user_id") @db.Uuid
+  modelId     BigInt    @map("model_id") @db.BigInt
+  sizeId      BigInt    @map("size_id") @db.BigInt
+  colorId     BigInt    @map("color_id") @db.BigInt
+  warehouseId BigInt    @map("warehouse_id") @db.BigInt
+  quantity    Int       @default(0)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  model       Model     @relation(fields: [modelId, userId], references: [id, userId], onDelete: Cascade)
+  size        Size      @relation(fields: [modelId, sizeId, userId], references: [modelId, id, userId], onDelete: Cascade)
+  color       Color     @relation(fields: [modelId, colorId, userId], references: [modelId, id, userId], onDelete: Cascade)
+  warehouse   Warehouse @relation(fields: [warehouseId, userId], references: [id, userId], onDelete: Cascade)
 
   @@unique([userId, modelId, sizeId, colorId, warehouseId])
   @@index([modelId, userId], map: "inventory_model_id_user_id_idx")
@@ -176,25 +182,200 @@ model Inventory {
   @@map("inventory")
 }
 
+model ProductVariant {
+  id                    BigInt                 @id @default(autoincrement()) @db.BigInt
+  userId                String                 @map("user_id") @db.Uuid
+  modelId               BigInt                 @map("model_id") @db.BigInt
+  sizeId                BigInt                 @map("size_id") @db.BigInt
+  colorId               BigInt                 @map("color_id") @db.BigInt
+  sellerSku             String                 @map("seller_sku")
+  createdAt             DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime               @default(now()) @map("updated_at") @db.Timestamptz(6)
+  model                 Model                  @relation(fields: [modelId, userId], references: [id, userId], onDelete: Cascade)
+  size                  Size                   @relation(fields: [modelId, sizeId, userId], references: [modelId, id, userId], onDelete: Cascade)
+  color                 Color                  @relation(fields: [modelId, colorId, userId], references: [modelId, id, userId], onDelete: Cascade)
+  channelProductRefs    ChannelProductRef[]
+  orderLines            ChannelOrderLine[]
+  inventoryReservations InventoryReservation[]
+
+  @@unique([id, userId])
+  @@unique([userId, sellerSku])
+  @@unique([userId, modelId, sizeId, colorId])
+  @@index([userId], map: "product_variants_user_id_idx")
+  @@map("product_variants")
+}
+
+model ChannelProductRef {
+  id                BigInt             @id @default(autoincrement()) @db.BigInt
+  userId            String             @map("user_id") @db.Uuid
+  channel           String
+  externalProductId String             @map("external_product_id")
+  externalVariantId String             @map("external_variant_id")
+  variantId         BigInt?            @map("variant_id") @db.BigInt
+  productName       String?            @map("product_name")
+  optionName        String?            @map("option_name")
+  sellerSku         String?            @map("seller_sku")
+  listingStatus     String             @default("active") @map("listing_status")
+  channelAttributes Json               @default("{}") @map("channel_attributes")
+  channelReported   Int?               @map("channel_reported")
+  lastSyncedAt      DateTime?          @map("last_synced_at") @db.Timestamptz(6)
+  lastSyncError     String?            @map("last_sync_error")
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime           @default(now()) @map("updated_at") @db.Timestamptz(6)
+  variant           ProductVariant?    @relation(fields: [variantId, userId], references: [id, userId], onDelete: NoAction)
+  orderLines        ChannelOrderLine[]
+
+  @@unique([id, userId])
+  @@unique([userId, channel, externalProductId, externalVariantId])
+  @@index([userId], map: "channel_product_refs_user_id_idx")
+  @@map("channel_product_refs")
+}
+
+model ChannelOrder {
+  id              BigInt             @id @default(autoincrement()) @db.BigInt
+  userId          String             @map("user_id") @db.Uuid
+  channel         String
+  externalOrderId String             @map("external_order_id")
+  orderStatus     String             @map("order_status")
+  orderedAt       DateTime?          @map("ordered_at") @db.Timestamptz(6)
+  customerName    String?            @map("customer_name")
+  shippingAddress String?            @map("shipping_address")
+  rawPayload      Json               @default("{}") @map("raw_payload")
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime           @default(now()) @map("updated_at") @db.Timestamptz(6)
+  lines           ChannelOrderLine[]
+
+  @@unique([id, userId])
+  @@unique([userId, channel, externalOrderId])
+  @@index([userId], map: "channel_orders_user_id_idx")
+  @@map("channel_orders")
+}
+
+model ChannelOrderLine {
+  id                  BigInt                 @id @default(autoincrement()) @db.BigInt
+  userId              String                 @map("user_id") @db.Uuid
+  channelOrderId      BigInt                 @map("channel_order_id") @db.BigInt
+  channel             String
+  externalLineId      String                 @map("external_line_id")
+  channelProductRefId BigInt?                @map("channel_product_ref_id") @db.BigInt
+  variantId           BigInt?                @map("variant_id") @db.BigInt
+  quantity            Int
+  lineStatus          String                 @map("line_status")
+  rawPayload          Json                   @default("{}") @map("raw_payload")
+  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime               @default(now()) @map("updated_at") @db.Timestamptz(6)
+  order               ChannelOrder           @relation(fields: [channelOrderId, userId], references: [id, userId], onDelete: Cascade)
+  channelProductRef   ChannelProductRef?     @relation(fields: [channelProductRefId, userId], references: [id, userId], onDelete: NoAction)
+  variant             ProductVariant?        @relation(fields: [variantId, userId], references: [id, userId], onDelete: NoAction)
+  reservations        InventoryReservation[]
+  fulfillments        OrderFulfillment[]
+
+  @@unique([id, userId])
+  @@unique([userId, channel, externalLineId])
+  @@index([userId], map: "channel_order_lines_user_id_idx")
+  @@map("channel_order_lines")
+}
+
+model InventoryReservation {
+  id                 BigInt             @id @default(autoincrement()) @db.BigInt
+  userId             String             @map("user_id") @db.Uuid
+  channelOrderLineId BigInt             @map("channel_order_line_id") @db.BigInt
+  productVariantId   BigInt             @map("product_variant_id") @db.BigInt
+  warehouseId        BigInt             @map("warehouse_id") @db.BigInt
+  quantity           Int
+  status             String             @default("active")
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  releasedAt         DateTime?          @map("released_at") @db.Timestamptz(6)
+  orderLine          ChannelOrderLine   @relation(fields: [channelOrderLineId, userId], references: [id, userId], onDelete: Cascade)
+  productVariant     ProductVariant     @relation(fields: [productVariantId, userId], references: [id, userId], onDelete: Cascade)
+  warehouse          Warehouse          @relation(fields: [warehouseId, userId], references: [id, userId], onDelete: Cascade)
+  fulfillments       OrderFulfillment[]
+
+  @@unique([id, userId])
+  @@index([userId], map: "inventory_reservations_user_id_idx")
+  @@map("inventory_reservations")
+}
+
+model TrackingImportTemplate {
+  id            BigInt                @id @default(autoincrement()) @db.BigInt
+  userId        String                @map("user_id") @db.Uuid
+  channel       String?
+  name          String
+  columnMapping Json                  @default("{}") @map("column_mapping")
+  createdAt     DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime              @default(now()) @map("updated_at") @db.Timestamptz(6)
+  batches       TrackingImportBatch[]
+
+  @@unique([id, userId])
+  @@unique([userId, channel, name])
+  @@index([userId], map: "tracking_import_templates_user_id_idx")
+  @@map("tracking_import_templates")
+}
+
+model TrackingImportBatch {
+  id                       BigInt                  @id @default(autoincrement()) @db.BigInt
+  userId                   String                  @map("user_id") @db.Uuid
+  trackingImportTemplateId BigInt?                 @map("tracking_import_template_id") @db.BigInt
+  sourceFilename           String                  @map("source_filename")
+  status                   String                  @default("pending")
+  rowCount                 Int                     @default(0) @map("row_count")
+  resultSummary            Json                    @default("{}") @map("result_summary")
+  error                    String?
+  createdAt                DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt              DateTime?               @map("completed_at") @db.Timestamptz(6)
+  template                 TrackingImportTemplate? @relation(fields: [trackingImportTemplateId, userId], references: [id, userId], onDelete: NoAction)
+  fulfillments             OrderFulfillment[]
+
+  @@unique([id, userId])
+  @@index([userId], map: "tracking_import_batches_user_id_idx")
+  @@map("tracking_import_batches")
+}
+
+model OrderFulfillment {
+  id                     BigInt               @id @default(autoincrement()) @db.BigInt
+  userId                 String               @map("user_id") @db.Uuid
+  channelOrderLineId     BigInt               @map("channel_order_line_id") @db.BigInt
+  inventoryReservationId BigInt               @map("inventory_reservation_id") @db.BigInt
+  trackingImportBatchId  BigInt?              @map("tracking_import_batch_id") @db.BigInt
+  idempotencyKey         String               @map("idempotency_key")
+  externalStatus         String               @default("pending") @map("external_status")
+  localStatus            String               @default("pending") @map("local_status")
+  trackingNumber         String?              @map("tracking_number")
+  carrierCode            String?              @map("carrier_code")
+  externalReference      String?              @map("external_reference")
+  error                  String?
+  fulfilledAt            DateTime?            @map("fulfilled_at") @db.Timestamptz(6)
+  createdAt              DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime             @default(now()) @map("updated_at") @db.Timestamptz(6)
+  orderLine              ChannelOrderLine     @relation(fields: [channelOrderLineId, userId], references: [id, userId], onDelete: Cascade)
+  reservation            InventoryReservation @relation(fields: [inventoryReservationId, userId], references: [id, userId], onDelete: Cascade)
+  batch                  TrackingImportBatch? @relation(fields: [trackingImportBatchId, userId], references: [id, userId], onDelete: NoAction)
+
+  @@unique([id, userId])
+  @@unique([userId, idempotencyKey])
+  @@index([userId], map: "order_fulfillments_user_id_idx")
+  @@map("order_fulfillments")
+}
+
 model Transaction {
-  id        BigInt               @id @default(autoincrement()) @db.BigInt
-  userId    String               @map("user_id") @db.Uuid
-  date      DateTime             @db.Date
-  modelId   BigInt               @map("model_id") @db.BigInt
-  sizeId    BigInt               @map("size_id") @db.BigInt
-  colorId   BigInt               @map("color_id") @db.BigInt
-  type      TransactionTypeValue
-  quantity  Int
-  warehouseId BigInt             @map("warehouse_id") @db.BigInt
-  sourceChannel String?          @map("source_channel")
-  referenceType String?          @map("reference_type")
-  referenceId BigInt?            @map("reference_id") @db.BigInt
-  memo      String?
-  createdAt DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
-  model     Model                @relation(fields: [modelId, userId], references: [id, userId], onDelete: Cascade)
-  size      Size                 @relation(fields: [modelId, sizeId, userId], references: [modelId, id, userId], onDelete: Cascade)
-  color     Color                @relation(fields: [modelId, colorId, userId], references: [modelId, id, userId], onDelete: Cascade)
-  warehouse Warehouse            @relation(fields: [warehouseId, userId], references: [id, userId], onDelete: Cascade)
+  id            BigInt               @id @default(autoincrement()) @db.BigInt
+  userId        String               @map("user_id") @db.Uuid
+  date          DateTime             @db.Date
+  modelId       BigInt               @map("model_id") @db.BigInt
+  sizeId        BigInt               @map("size_id") @db.BigInt
+  colorId       BigInt               @map("color_id") @db.BigInt
+  type          TransactionTypeValue
+  quantity      Int
+  warehouseId   BigInt               @map("warehouse_id") @db.BigInt
+  sourceChannel String?              @map("source_channel")
+  referenceType String?              @map("reference_type")
+  referenceId   BigInt?              @map("reference_id") @db.BigInt
+  memo          String?
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  model         Model                @relation(fields: [modelId, userId], references: [id, userId], onDelete: Cascade)
+  size          Size                 @relation(fields: [modelId, sizeId, userId], references: [modelId, id, userId], onDelete: Cascade)
+  color         Color                @relation(fields: [modelId, colorId, userId], references: [modelId, id, userId], onDelete: Cascade)
+  warehouse     Warehouse            @relation(fields: [warehouseId, userId], references: [id, userId], onDelete: Cascade)
 
   @@index([userId, date(sort: Desc), createdAt(sort: Desc)], map: "transactions_user_date_created_at_idx")
   @@index([modelId, userId], map: "transactions_model_id_user_id_idx")
