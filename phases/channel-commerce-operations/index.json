@@ -22,7 +22,10 @@
     {
       "step": 2,
       "name": "channel-product-sync",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-07-15T00:52:11+0900",
+      "completed_at": "2026-07-15T00:56:26+0900",
+      "summary": "Added server-only Naver POST /external/v1/products/search pagination (size 500) and Coupang seller-products paging plus bounded-concurrency detail snapshots, both normalized with SKU, listing, quantity, price/image, and raw attributes. Added syncProducts(channel?) to upsert channel_product_refs; only an exactly-one seller_sku ProductVariant match sets variant_id, while absent/ambiguous SKUs remain mapping-required without name matching or inventory mutation. Verified with npm run test -- --run tests/naver-api.test.ts tests/coupang-api.test.ts tests/channel-product-sync.test.ts (3 files, 8 tests passed) and npm run lint (0 errors; 4 existing warnings)."
     },
     {
       "step": 3,
