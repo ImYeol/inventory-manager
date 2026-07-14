@@ -5,6 +5,7 @@ import {
   buildNaverMaskedSummary,
   getShippingSettingsSummaryForCurrentUser,
   saveShippingCredentialsForCurrentUser,
+  ShippingCredentialsConfigurationError,
   type CoupangCredentials,
   type NaverCredentials,
   type ShippingSettingsSummary,
@@ -19,6 +20,17 @@ type SaveSettingsResult = {
   success: boolean
   summary?: ShippingSettingsSummaryItem
   error?: string
+}
+
+const encryptionConfigurationErrorMessage =
+  '저장소 보안 설정이 필요합니다. 배포 환경의 서버 전용 암호화 키를 설정한 뒤 다시 시도해주세요.'
+
+function getSaveSettingsError(error: unknown, fallback: string) {
+  if (error instanceof ShippingCredentialsConfigurationError) {
+    return encryptionConfigurationErrorMessage
+  }
+
+  return error instanceof Error ? error.message : fallback
 }
 
 function readField(input: FormData | Record<string, unknown>, key: string) {
@@ -69,7 +81,7 @@ export async function saveNaverSettings(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : '네이버 API 설정을 저장하지 못했습니다.',
+      error: getSaveSettingsError(error, '네이버 API 설정을 저장하지 못했습니다.'),
     }
   }
 }
@@ -102,7 +114,7 @@ export async function saveCoupangSettings(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : '쿠팡 API 설정을 저장하지 못했습니다.',
+      error: getSaveSettingsError(error, '쿠팡 API 설정을 저장하지 못했습니다.'),
     }
   }
 }

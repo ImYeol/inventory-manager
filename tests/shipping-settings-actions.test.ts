@@ -149,6 +149,29 @@ describe('shipping settings server actions', () => {
     expect(String(payload.encrypted_payload)).not.toContain('naver-secret')
   })
 
+  it('returns an actionable secret-free error when server encryption is not configured', async () => {
+    const supabase = createSupabaseMock()
+    delete process.env.SHIPPING_CREDENTIALS_ENCRYPTION_KEY
+
+    mocks.getSupabaseWithUser.mockResolvedValue({
+      supabase: { from: supabase.from },
+      user: { id: 'user-1' },
+    })
+
+    const result = await saveNaverSettings({
+      clientId: 'naver-client-id-1234',
+      clientSecret: 'naver-secret',
+    })
+
+    expect(result).toEqual({
+      success: false,
+      error: '저장소 보안 설정이 필요합니다. 배포 환경의 서버 전용 암호화 키를 설정한 뒤 다시 시도해주세요.',
+    })
+    expect(result.error).not.toContain('SHIPPING_CREDENTIALS_ENCRYPTION_KEY')
+    expect(result.error).not.toContain('naver-secret')
+    expect(supabase.query.upsert).not.toHaveBeenCalled()
+  })
+
   it('accepts form data and stores coupang credentials with masked metadata', async () => {
     const supabase = createSupabaseMock()
     const formData = new FormData()

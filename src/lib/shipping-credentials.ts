@@ -51,6 +51,13 @@ export class MissingShippingCredentialsError extends Error {
   }
 }
 
+export class ShippingCredentialsConfigurationError extends Error {
+  constructor() {
+    super('Shipping credential encryption is not configured.')
+    this.name = 'ShippingCredentialsConfigurationError'
+  }
+}
+
 function getMissingCredentialsMessage(provider: ShippingProvider) {
   return provider === 'naver'
     ? '네이버 API 설정이 필요합니다. 설정에서 API 키를 먼저 저장해주세요.'
@@ -81,7 +88,7 @@ function getEncryptionKey(): Buffer {
   const secret = process.env.SHIPPING_CREDENTIALS_ENCRYPTION_KEY?.trim()
 
   if (!secret) {
-    throw new Error('SHIPPING_CREDENTIALS_ENCRYPTION_KEY 환경변수가 필요합니다.')
+    throw new ShippingCredentialsConfigurationError()
   }
 
   return crypto.createHash('sha256').update(secret).digest()

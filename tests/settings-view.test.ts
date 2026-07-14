@@ -111,4 +111,28 @@ describe('SettingsView', () => {
     expect(screen.getByText('nv-••••1234')).toBeTruthy()
     expect(within(naverSection as HTMLElement).getByText('연결됨')).toBeTruthy()
   })
+
+  it('shows the safe server encryption setup guidance without exposing the environment variable name', async () => {
+    mocks.saveNaverSettings.mockResolvedValue({
+      success: false,
+      error: '저장소 보안 설정이 필요합니다. 배포 환경의 서버 전용 암호화 키를 설정한 뒤 다시 시도해주세요.',
+    })
+
+    render(
+      React.createElement(SettingsView, {
+        summary: {
+          naver: { configured: false, masked: {}, updatedAt: null },
+          coupang: { configured: false, masked: {}, updatedAt: null },
+        },
+      }),
+    )
+
+    fireEvent.change(screen.getByLabelText('네이버 Client ID'), { target: { value: 'client-id' } })
+    fireEvent.change(screen.getByLabelText('네이버 Client Secret'), { target: { value: 'client-secret' } })
+    fireEvent.click(screen.getByRole('button', { name: '네이버 저장' }))
+
+    expect(await screen.findByText('저장소 보안 설정이 필요합니다. 배포 환경의 서버 전용 암호화 키를 설정한 뒤 다시 시도해주세요.')).toBeTruthy()
+    expect(screen.queryByText(/SHIPPING_CREDENTIALS_ENCRYPTION_KEY/)).toBeNull()
+    expect(screen.queryByText('client-secret')).toBeNull()
+  })
 })

@@ -25,6 +25,7 @@ If you use Prisma tooling directly, set `DATABASE_URL` to your Supabase Postgres
 
 Optional shipping integration values:
 
+- `SHIPPING_CREDENTIALS_ENCRYPTION_KEY`
 - `NAVER_CLIENT_ID`
 - `NAVER_CLIENT_SECRET`
 - `COUPANG_ACCESS_KEY`
@@ -32,6 +33,10 @@ Optional shipping integration values:
 - `COUPANG_VENDOR_ID`
 
 These are only needed if you use the Naver or Coupang shipping actions.
+
+`SHIPPING_CREDENTIALS_ENCRYPTION_KEY` is required to save Naver or Coupang credentials from Settings. It is a server-only at-rest encryption master key, not a Naver/Coupang API credential: generate a long random value (for example, `openssl rand -base64 32`), keep it only in the deployment secret store, and never use a `NEXT_PUBLIC_` variable for it.
+
+For rotation, keep the previous key available until every existing encrypted credential row has been re-encrypted with the new key. Do not replace the key first or use a plaintext fallback: rows encrypted by the old key must remain decryptable during the migration.
 
 Optional Prisma seed values:
 
