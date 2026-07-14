@@ -14,6 +14,8 @@ export type CoupangOrderItem = {
   vendorItemId: number
   vendorItemName: string
   shippingCount: number
+  sellerSku?: string | null
+  externalProductId?: string | null
 }
 
 export type CoupangOrderSheet = {
@@ -202,6 +204,8 @@ function mapOrderSheet(order: {
     vendorItemId?: number
     vendorItemName?: string
     shippingCount?: number
+    externalVendorSku?: string
+    sellerProductId?: number | string
   }>
 }): CoupangOrderSheet {
   return {
@@ -218,6 +222,8 @@ function mapOrderSheet(order: {
       vendorItemId: item.vendorItemId ?? 0,
       vendorItemName: item.vendorItemName ?? '',
       shippingCount: item.shippingCount ?? 0,
+      sellerSku: item.externalVendorSku ?? null,
+      externalProductId: item.sellerProductId === undefined ? null : String(item.sellerProductId),
     })),
   }
 }

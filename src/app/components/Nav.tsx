@@ -12,7 +12,7 @@ import {
   Menu,
   PackageSearch,
   Settings2,
-  Truck,
+  ClipboardList,
 } from 'lucide-react'
 import { logout } from '@/app/login/actions'
 import { MenuLink } from '@/components/ui/menu'
@@ -40,10 +40,10 @@ type NavItem = {
 
 const directItems: NavItem[] = [
   { href: '/', label: '대시보드', icon: <LayoutDashboard className="h-4 w-4" /> },
+  { href: '/orders', label: '주문', icon: <ClipboardList className="h-4 w-4" /> },
   { href: '/products', label: '상품 관리', icon: <Database className="h-4 w-4" /> },
   { href: '/inventory', label: '재고 운영', icon: <Boxes className="h-4 w-4" /> },
   { href: '/sourcing', label: '소싱', icon: <PackageSearch className="h-4 w-4" /> },
-  { href: '/shipping', label: '운송장', icon: <Truck className="h-4 w-4" /> },
   { href: '/settings', label: '설정', icon: <Settings2 className="h-4 w-4" /> },
 ]
 

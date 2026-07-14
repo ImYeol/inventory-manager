@@ -17,6 +17,9 @@ export type NaverOrder = {
   quantity: number;
   orderDate: string;
   productOrderStatus: string;
+  sellerSku?: string | null;
+  externalProductId?: string | null;
+  externalVariantId?: string | null;
 };
 
 async function getAccessToken(credentials: NaverCredentials): Promise<string> {
@@ -199,6 +202,11 @@ export async function fetchNaverPendingOrders(
       quantity: number;
       orderDate: string;
       productOrderStatus: string;
+      sellerManagementCode?: string;
+      productId?: string | number;
+      originProductNo?: string | number;
+      channelProductId?: string | number;
+      productSellerCode?: string;
     }) => ({
       productOrderId: order.productOrderId,
       orderId: order.orderId,
@@ -208,6 +216,9 @@ export async function fetchNaverPendingOrders(
       quantity: order.quantity,
       orderDate: order.orderDate,
       productOrderStatus: order.productOrderStatus,
+      sellerSku: order.sellerManagementCode ?? order.productSellerCode ?? null,
+      externalProductId: String(order.productId ?? order.originProductNo ?? '' ) || null,
+      externalVariantId: String(order.channelProductId ?? order.productOrderId),
     })
   );
 }

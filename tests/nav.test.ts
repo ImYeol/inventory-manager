@@ -47,10 +47,11 @@ describe('Nav', () => {
     expect(screen.queryByText('재고 운영 허브 중심의 운영 콘솔')).toBeNull()
     expect(screen.getByRole('heading', { name: 'Seleccase Inventory' })).toBeTruthy()
     expect(screen.getByRole('link', { name: '대시보드' }).getAttribute('href')).toBe('/')
+    expect(screen.getByRole('link', { name: '주문' }).getAttribute('href')).toBe('/orders')
     expect(screen.getByRole('link', { name: '재고 운영' }).getAttribute('href')).toBe('/inventory')
     expect(screen.getByRole('link', { name: '상품 관리' }).getAttribute('href')).toBe('/products')
     expect(screen.getByRole('link', { name: '소싱' }).getAttribute('href')).toBe('/sourcing')
-    expect(screen.getByRole('link', { name: '운송장' }).getAttribute('href')).toBe('/shipping')
+    expect(screen.queryByRole('link', { name: '운송장' })).toBeNull()
     expect(screen.queryByRole('link', { name: '분석' })).toBeNull()
     expect(screen.queryByRole('link', { name: '스토어 연결' })).toBeNull()
     expect(screen.getAllByRole('link', { name: '설정' }).some((link) => link.getAttribute('href') === '/settings')).toBe(true)
@@ -65,10 +66,10 @@ describe('Nav', () => {
     const mobileMenu = within(screen.getByRole('dialog', { name: '모바일 메뉴' }))
     const destinations = [
       ['대시보드', '/'],
+      ['주문', '/orders'],
       ['상품 관리', '/products'],
       ['재고 운영', '/inventory'],
       ['소싱', '/sourcing'],
-      ['운송장', '/shipping'],
       ['설정', '/settings'],
     ] as const
 
