@@ -7,11 +7,13 @@ const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
   syncProducts: vi.fn(),
   linkVariant: vi.fn(),
+  createInternalProduct: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh }) }))
 vi.mock('@/lib/actions/channel-product-sync', () => ({ syncProducts: mocks.syncProducts }))
 vi.mock('@/lib/actions/channel-product-link', () => ({ linkVariant: mocks.linkVariant }))
+vi.mock('@/lib/actions/internal-product', () => ({ createInternalProduct: mocks.createInternalProduct }))
 vi.mock('@/lib/actions', () => ({
   createWarehouse: vi.fn(), createModel: vi.fn(), createModelSize: vi.fn(), createModelColor: vi.fn(),
   deleteWarehouse: vi.fn(), deleteModel: vi.fn(),
@@ -36,7 +38,7 @@ describe('Product management workspace', () => {
     render(React.createElement(MasterDataManager, props))
 
     expect(screen.getByRole('columnheader', { name: '상품 / 옵션' })).toBeTruthy()
-    expect(screen.getByRole('columnheader', { name: 'seller SKU' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: '판매자 SKU' })).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: '쿠팡' })).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: '네이버' })).toBeTruthy()
     expect(screen.getByText('쿠팡 · 판매 중')).toBeTruthy()
@@ -44,10 +46,11 @@ describe('Product management workspace', () => {
     expect(screen.getByText('재고 불일치')).toBeTruthy()
     expect(screen.getByText('판매 중지')).toBeTruthy()
 
+    expect(screen.getAllByRole('row', { name: /LP01/ })).toHaveLength(2)
     fireEvent.click(screen.getByText('연결 필요'))
-    expect(screen.getByText('LP01-M-NV')).toBeTruthy()
+    expect(screen.getAllByText('LP01-M-NV')).toHaveLength(2)
     fireEvent.change(screen.getByRole('textbox', { name: '상품 검색' }), { target: { value: '없는 SKU' } })
-    expect(screen.queryByText('LP01-M-NV')).toBeNull()
+    expect(screen.queryAllByText('LP01-M-NV')).toHaveLength(0)
   })
 
   it('opens one channel detail modal from the badge and links an unlinked ref', async () => {
@@ -62,6 +65,17 @@ describe('Product management workspace', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '연결' }))
     await waitFor(() => expect(mocks.linkVariant).toHaveBeenCalledWith(502, 101))
     expect(mocks.refresh).toHaveBeenCalled()
+  })
+
+  it('always renders the channel-first empty state and internal product creation preview', () => {
+    render(React.createElement(MasterDataManager, { ...props, variants: [], channelProductRefs: [] }))
+    expect(screen.getByText(/쿠팡\/네이버 실제 상품정보/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '내부 상품 등록' }))
+    const dialog = screen.getByRole('dialog', { name: '내부 상품 등록' })
+    fireEvent.change(within(dialog).getByLabelText('사이즈'), { target: { value: 'S, M' } })
+    fireEvent.change(within(dialog).getByLabelText('색상'), { target: { value: '블랙' } })
+    fireEvent.change(within(dialog).getByLabelText('SKU prefix'), { target: { value: 'LP' } })
+    expect(within(dialog).getByText(/판매 옵션 2개 · 예시 LP-S-블랙/)).toBeTruthy()
   })
 
   it('runs sync from the product toolbar and shows inline result metadata', async () => {

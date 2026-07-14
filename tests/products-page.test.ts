@@ -52,8 +52,9 @@ describe('ProductsPage', () => {
     expect(mocks.getProductWorkspaceData).toHaveBeenCalledTimes(1)
     expect(mocks.masterDataManager).toHaveBeenCalledWith(
       expect.objectContaining({
-        models,
         warehouses,
+        variants: [],
+        channelProductRefs: [],
         warehouseStats: [
           expect.objectContaining({
             id: 1,

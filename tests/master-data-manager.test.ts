@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   deleteModel: vi.fn(),
   deleteModelSize: vi.fn(),
   deleteModelColor: vi.fn(),
+  createInternalProduct: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -29,6 +30,7 @@ vi.mock('@/lib/actions', () => ({
   deleteModelSize: mocks.deleteModelSize,
   deleteModelColor: mocks.deleteModelColor,
 }))
+vi.mock('@/lib/actions/internal-product', () => ({ createInternalProduct: mocks.createInternalProduct }))
 
 import MasterDataManager from '@/app/(protected)/master-data/MasterDataManager'
 
@@ -84,13 +86,10 @@ describe('MasterDataManager', () => {
     expect(screen.getByRole('tab', { name: '상품' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: '창고' })).toBeTruthy()
     expect(screen.getByRole('tablist', { name: '상품 관리 보기 전환' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '모델 등록' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '내부 상품 등록' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '창고 등록' })).toBeNull()
-    expect(screen.getByText('1개 모델')).toBeTruthy()
-    expect(screen.getByText('1개 사이즈')).toBeTruthy()
-    expect(screen.getByText('1개 색상')).toBeTruthy()
     expect(screen.queryByText('2개 창고')).toBeNull()
-    expect(screen.getByRole('row', { name: /LP01/ })).toBeTruthy()
+    expect(screen.getByText(/쿠팡\/네이버 실제 상품정보/)).toBeTruthy()
 
     fireEvent.mouseDown(screen.getByRole('tab', { name: '창고' }))
     fireEvent.click(screen.getByRole('tab', { name: '창고' }))
@@ -98,7 +97,7 @@ describe('MasterDataManager', () => {
       expect(screen.getByRole('button', { name: '오금동 삭제' })).toBeTruthy()
     })
 
-    expect(screen.queryByRole('button', { name: '모델 등록' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '내부 상품 등록' })).toBeNull()
     expect(screen.getByRole('button', { name: '창고 등록' })).toBeTruthy()
     expect(screen.getByText('2개 창고')).toBeTruthy()
     expect(screen.getByText('SKU 4개')).toBeTruthy()
@@ -117,58 +116,6 @@ describe('MasterDataManager', () => {
     expect(mocks.refresh).toHaveBeenCalled()
   })
 
-  it('creates a model with initial sizes and colors from the minimal modal', async () => {
-    mocks.createModel.mockResolvedValue({ success: true, id: 11 })
-    mocks.createModelSize.mockResolvedValue({ success: true })
-    mocks.createModelColor.mockResolvedValue({ success: true })
-
-    const { rerender } = render(React.createElement(MasterDataManager, props))
-
-    fireEvent.click(screen.getByRole('button', { name: '모델 등록' }))
-
-    const dialog = screen.getByRole('dialog', { name: '모델 등록' })
-    expect(within(dialog).getByText('기본 텍스트: 검정')).toBeTruthy()
-    fireEvent.change(within(dialog).getByLabelText('모델명'), { target: { value: '블루종 A' } })
-    fireEvent.change(within(dialog).getByLabelText('사이즈'), { target: { value: '230, 240' } })
-    fireEvent.change(within(dialog).getByLabelText('색상'), {
-      target: { value: '블랙|#111111|W, 화이트|#FFFFFF' },
-    })
-
-    fireEvent.click(within(dialog).getByRole('button', { name: '등록' }))
-
-    await waitFor(() => {
-      expect(mocks.createModel).toHaveBeenCalledWith('블루종 A')
-    })
-
-    rerender(
-      React.createElement(MasterDataManager, {
-        ...props,
-        models: [
-          ...props.models,
-          {
-            id: 11,
-            name: '블루종 A',
-            sizes: [],
-            colors: [],
-          },
-        ],
-      }),
-    )
-
-    await waitFor(() => {
-      expect(mocks.createModelSize).toHaveBeenCalledWith(11, '230')
-      expect(mocks.createModelSize).toHaveBeenCalledWith(11, '240')
-      expect(mocks.createModelColor).toHaveBeenCalledWith(11, '블랙', {
-        rgbCode: '#111111',
-        textWhite: true,
-      })
-      expect(mocks.createModelColor).toHaveBeenCalledWith(11, '화이트', {
-        rgbCode: '#FFFFFF',
-        textWhite: false,
-      })
-    })
-    expect(mocks.refresh).toHaveBeenCalled()
-  })
 
   it('deletes a warehouse from the warehouse table through the shared modal', async () => {
     mocks.deleteWarehouse.mockResolvedValue({ success: true })
@@ -191,19 +138,4 @@ describe('MasterDataManager', () => {
     expect(mocks.refresh).toHaveBeenCalled()
   })
 
-  it('asks for confirmation before deleting a model', async () => {
-    mocks.deleteModel.mockResolvedValue({ success: true })
-
-    render(React.createElement(MasterDataManager, props))
-
-    fireEvent.click(screen.getByRole('button', { name: 'LP01 삭제' }))
-
-    const dialog = screen.getByRole('dialog', { name: '모델 삭제 확인' })
-    fireEvent.click(within(dialog).getByRole('button', { name: '삭제' }))
-
-    await waitFor(() => {
-      expect(mocks.deleteModel).toHaveBeenCalledWith(10)
-    })
-    expect(mocks.refresh).toHaveBeenCalled()
-  })
 })

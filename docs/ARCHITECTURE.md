@@ -1,5 +1,11 @@
 # Architecture
 
+## Channel-first product catalog
+
+`/products` owns the channel-first product workspace. `ChannelProductRef` retains provider identifiers and raw option data, including unlinked refs; it is never cloned into `ProductVariant`. Sync runs only in the authenticated `syncProducts` server action. A manually selected internal variant may be linked through `linkVariant`; an exact single seller SKU is only a UI suggestion, never a product-name fallback.
+
+`createInternalProduct` is the authenticated local-only companion action. It creates `models`, `sizes`, `colors`, and bounded `product_variants`, rolls back the created model on failure, and links pre-existing refs only by exact seller SKU. It does not contact a provider API.
+
 ## 현재 코드베이스 기준선
 ```text
 src/
