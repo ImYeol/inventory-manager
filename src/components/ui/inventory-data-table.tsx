@@ -62,9 +62,7 @@ export function InventoryDataTable({
   visibleColumns: Set<InventoryColumnKey>
 }) {
   return (
-    <div className={ui.tableShell}>
-      <div className="relative w-full overflow-auto">
-        <Table>
+    <Table>
           <TableHeader>
             <TableRow>
               {tableHeaders
@@ -119,7 +117,5 @@ export function InventoryDataTable({
             )}
           </TableBody>
         </Table>
-      </div>
-    </div>
   )
 }

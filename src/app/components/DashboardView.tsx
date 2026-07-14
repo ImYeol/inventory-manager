@@ -5,7 +5,6 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { History } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/badge-1'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { FilterToolbar } from '@/components/ui/filter-toolbar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import InventoryTrendChart from '@/app/(protected)/analytics/charts/InventoryTrendChart'
@@ -88,7 +87,6 @@ function ControlStrip({
   onModelChange,
   onDateFromChange,
   onDateToChange,
-  loading,
 }: {
   idPrefix: string
   title: string
@@ -102,90 +100,93 @@ function ControlStrip({
   onModelChange: (next: number | undefined) => void
   onDateFromChange: (next: string) => void
   onDateToChange: (next: string) => void
-  loading: boolean
 }) {
+  // Visible labels stay short; accessible names carry the chart title so the
+  // three chart strips remain distinguishable to assistive tech.
   return (
-    <FilterToolbar className="gap-3">
-      <div className="flex w-full flex-col gap-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
-            <p className="text-sm font-semibold tracking-tight text-[color:var(--foreground)]">{title} 필터</p>
-            <p className="text-xs leading-5 text-[color:var(--muted-foreground)]">필터 변경 시 해당 차트만 다시 계산합니다.</p>
-          </div>
-          <StatusBadge tone={loading ? 'warning' : 'neutral'}>{loading ? '갱신 중' : '최신'}</StatusBadge>
+    <div className={cx('grid items-end gap-2.5', showPeriod ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-3')}>
+      {showPeriod ? (
+        <div className="space-y-1.5">
+          <label htmlFor={`${idPrefix}-period`} className={ui.label}>
+            기간
+          </label>
+          <Select value={period} onValueChange={(next) => onPeriodChange?.(next as Period)}>
+            <SelectTrigger id={`${idPrefix}-period`} aria-label={`${title} 기간`} className={cx(ui.controlSm, 'w-full')}>
+              <SelectValue placeholder="기간 선택" />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(periodLabels) as Period[]).map((option) => (
+                <SelectItem key={option} value={option}>
+                  {periodLabels[option]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
+      ) : null}
 
-        <div className={cx('grid items-end gap-2.5', showPeriod ? 'lg:grid-cols-4' : 'lg:grid-cols-3')}>
-          {showPeriod ? (
-            <div className="space-y-1.5">
-              <label id={`${idPrefix}-period-label`} className={ui.label}>
-                {title} 기간
-              </label>
-              <Select value={period} onValueChange={(next) => onPeriodChange?.(next as Period)}>
-                <SelectTrigger aria-labelledby={`${idPrefix}-period-label`} className={cx(ui.controlSm, 'w-full')}>
-                  <SelectValue placeholder="기간 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(periodLabels) as Period[]).map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {periodLabels[option]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : null}
-
-          <div className="space-y-1.5">
-            <label id={`${idPrefix}-model-label`} className={ui.label}>
-              {title} 모델
-            </label>
-            <Select
-              value={selectedModel !== undefined ? String(selectedModel) : 'all'}
-              onValueChange={(value) => onModelChange(value === 'all' ? undefined : Number(value))}
-            >
-              <SelectTrigger aria-labelledby={`${idPrefix}-model-label`} className={ui.controlSm}>
-                <SelectValue placeholder="전체" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">전체</SelectItem>
-                {models.map((model) => (
-                  <SelectItem key={model.id} value={String(model.id)}>
-                    {model.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor={`${idPrefix}-from`} className={ui.label}>
-              {title} 시작일
-            </label>
-            <input
-              id={`${idPrefix}-from`}
-              type="date"
-              value={dateFrom}
-              onChange={(event) => onDateFromChange(event.target.value)}
-              className={ui.controlSm}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor={`${idPrefix}-to`} className={ui.label}>
-              {title} 종료일
-            </label>
-            <input
-              id={`${idPrefix}-to`}
-              type="date"
-              value={dateTo}
-              onChange={(event) => onDateToChange(event.target.value)}
-              className={ui.controlSm}
-            />
-          </div>
-        </div>
+      <div className="space-y-1.5">
+        <label htmlFor={`${idPrefix}-model`} className={ui.label}>
+          모델
+        </label>
+        <Select
+          value={selectedModel !== undefined ? String(selectedModel) : 'all'}
+          onValueChange={(value) => onModelChange(value === 'all' ? undefined : Number(value))}
+        >
+          <SelectTrigger id={`${idPrefix}-model`} aria-label={`${title} 모델`} className={ui.controlSm}>
+            <SelectValue placeholder="전체" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">전체</SelectItem>
+            {models.map((model) => (
+              <SelectItem key={model.id} value={String(model.id)}>
+                {model.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-    </FilterToolbar>
+
+      <div className="space-y-1.5">
+        <label htmlFor={`${idPrefix}-from`} className={ui.label}>
+          시작일
+        </label>
+        <input
+          id={`${idPrefix}-from`}
+          type="date"
+          aria-label={`${title} 시작일`}
+          value={dateFrom}
+          onChange={(event) => onDateFromChange(event.target.value)}
+          className={ui.controlSm}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <label htmlFor={`${idPrefix}-to`} className={ui.label}>
+          종료일
+        </label>
+        <input
+          id={`${idPrefix}-to`}
+          type="date"
+          aria-label={`${title} 종료일`}
+          value={dateTo}
+          onChange={(event) => onDateToChange(event.target.value)}
+          className={ui.controlSm}
+        />
+      </div>
+    </div>
+  )
+}
+
+function ChartCardHeader({ title, description, loading }: { title: string; description: string; loading: boolean }) {
+  return (
+    <CardHeader className="flex flex-row items-start justify-between gap-3">
+      <div className="min-w-0">
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </div>
+      <StatusBadge tone={loading ? 'warning' : 'neutral'}>{loading ? '갱신 중' : '최신'}</StatusBadge>
+    </CardHeader>
   )
 }
 
@@ -218,10 +219,7 @@ function TrendCard({
 
   return (
     <Card variant="strong" className="h-full overflow-hidden">
-      <CardHeader>
-        <CardTitle>재고 추이</CardTitle>
-        <CardDescription>선택한 조건의 재고 흐름을 시간 축으로 확인합니다.</CardDescription>
-      </CardHeader>
+      <ChartCardHeader title="재고 추이" description="선택한 조건의 재고 흐름을 시간 축으로 확인합니다." loading={loading} />
       <CardContent className="space-y-3 px-3 py-3">
         <ControlStrip
           idPrefix="trend"
@@ -235,7 +233,6 @@ function TrendCard({
           onModelChange={setSelectedModel}
           onDateFromChange={setDateFrom}
           onDateToChange={setDateTo}
-          loading={loading}
         />
         <InventoryTrendChart data={data} />
       </CardContent>
@@ -272,10 +269,7 @@ function FlowCard({
 
   return (
     <Card variant="strong" className="h-full overflow-hidden">
-      <CardHeader>
-        <CardTitle>입출고 현황</CardTitle>
-        <CardDescription>입고와 출고를 기간별로 나란히 봅니다.</CardDescription>
-      </CardHeader>
+      <ChartCardHeader title="입출고 현황" description="입고와 출고를 기간별로 나란히 봅니다." loading={loading} />
       <CardContent className="space-y-3 px-3 py-3">
         <ControlStrip
           idPrefix="flow"
@@ -289,7 +283,6 @@ function FlowCard({
           onModelChange={setSelectedModel}
           onDateFromChange={setDateFrom}
           onDateToChange={setDateTo}
-          loading={loading}
         />
         <TransactionBarChart data={data} />
       </CardContent>
@@ -325,10 +318,7 @@ function WarehouseCard({
 
   return (
     <Card variant="strong" className="h-full overflow-hidden">
-      <CardHeader>
-        <CardTitle>창고별 비교</CardTitle>
-        <CardDescription>선택한 기간에서 창고별 순변동을 비교합니다.</CardDescription>
-      </CardHeader>
+      <ChartCardHeader title="창고별 비교" description="선택한 기간에서 창고별 순변동을 비교합니다." loading={loading} />
       <CardContent className="space-y-3 px-3 py-3">
         <ControlStrip
           idPrefix="warehouse"
@@ -341,7 +331,6 @@ function WarehouseCard({
           onModelChange={setSelectedModel}
           onDateFromChange={setDateFrom}
           onDateToChange={setDateTo}
-          loading={loading}
         />
         <WarehouseCompareChart data={data} />
       </CardContent>

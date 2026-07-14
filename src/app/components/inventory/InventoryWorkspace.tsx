@@ -7,6 +7,7 @@ import { PageHeader, ui } from '@/app/components/ui'
 import { FixedSheet } from '@/components/ui/fixed-sheet'
 import { InventoryDataTable, type InventoryColumnKey, type InventoryDataRow } from '@/components/ui/inventory-data-table'
 import { InventoryTableToolbar } from '@/components/ui/inventory-table-toolbar'
+import { TableSurface } from '@/components/ui/table-surface'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 type InventoryItem = {
@@ -208,21 +209,26 @@ export default function InventoryWorkspace({
         </TabsList>
 
         <TabsContent value="list" className="m-0">
-          <InventoryTableToolbar
-            warehouses={warehouses}
-            selectedWarehouseId={selectedWarehouseId}
-            onWarehouseChange={setSelectedWarehouseId}
-            search={search}
-            onSearchChange={setSearch}
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
-            columns={ALL_COLUMNS}
-            visibleColumns={visibleColumns}
-            onToggleColumn={toggleColumn}
-            onInbound={() => setOverlayMode('입고')}
-            onOutbound={() => setOverlayMode('출고')}
-          />
-          <InventoryDataTable rows={filteredRows} visibleColumns={visibleColumns} />
+          <TableSurface
+            toolbar={
+              <InventoryTableToolbar
+                warehouses={warehouses}
+                selectedWarehouseId={selectedWarehouseId}
+                onWarehouseChange={setSelectedWarehouseId}
+                search={search}
+                onSearchChange={setSearch}
+                statusFilter={statusFilter}
+                onStatusFilterChange={setStatusFilter}
+                columns={ALL_COLUMNS}
+                visibleColumns={visibleColumns}
+                onToggleColumn={toggleColumn}
+                onInbound={() => setOverlayMode('입고')}
+                onOutbound={() => setOverlayMode('출고')}
+              />
+            }
+          >
+            <InventoryDataTable rows={filteredRows} visibleColumns={visibleColumns} />
+          </TableSurface>
         </TabsContent>
 
         <TabsContent value="history" className="m-0">

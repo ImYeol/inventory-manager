@@ -8,6 +8,7 @@ import { StatusBadge } from '@/components/ui/badge-1'
 import { Button } from '@/components/ui/button'
 import { BasicDataTable } from '@/components/ui/basic-data-table'
 import { FilterToolbar } from '@/components/ui/filter-toolbar'
+import { TableSurface } from '@/components/ui/table-surface'
 import { Input } from '@/components/ui/input'
 import {
   Card,
@@ -66,17 +67,26 @@ describe('shared action and status primitives', () => {
     expect(screen.getByRole('button', { name: '필터' }).className).toContain('ui-button-outline')
   })
 
-  it('keeps input and filter toolbar on shared control and surface tokens', () => {
+  it('binds filter toolbar and table into one data surface on shared tokens', () => {
     render(
       React.createElement(
-        FilterToolbar,
-        null,
-        React.createElement(Input, { 'aria-label': '검색', placeholder: '검색' }),
+        TableSurface,
+        {
+          toolbar: React.createElement(
+            FilterToolbar,
+            null,
+            React.createElement(Input, { 'aria-label': '검색', placeholder: '검색' }),
+          ),
+        },
+        React.createElement('div', null, '표 본문'),
       ),
     )
 
-    expect(screen.getByLabelText('검색').className).toContain('ui-control')
-    expect(screen.getByLabelText('검색').closest('div')?.className).toContain('ui-surface-muted')
+    const input = screen.getByLabelText('검색')
+    expect(input.className).toContain('ui-control')
+    // FilterToolbar is layout-only; the bordered strip lives on the data surface.
+    expect(input.closest('.ui-data-toolbar')).not.toBeNull()
+    expect(input.closest('.ui-data-surface')).not.toBeNull()
   })
 
   it('switches tabs as an intra-page view primitive', () => {

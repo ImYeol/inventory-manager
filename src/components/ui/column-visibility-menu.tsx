@@ -28,7 +28,7 @@ export function ColumnVisibilityMenu<T extends string>({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-10 gap-2 rounded-xl border-[color:var(--border)]">
+        <Button variant="outline" size="sm" className="h-9 gap-2 rounded-lg border-[color:var(--border)]">
           <Columns3 className="h-4 w-4" />
           <span>컬럼</span>
         </Button>

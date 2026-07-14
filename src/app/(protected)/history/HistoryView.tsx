@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { StatusBadge } from '@/components/ui/badge-1'
 import { BasicDataTable } from '@/components/ui/basic-data-table'
 import { FilterToolbar } from '@/components/ui/filter-toolbar'
+import { TableSurface } from '@/components/ui/table-surface'
 import { Modal } from '@/components/ui/modal'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cx, ui } from '../../components/ui'
@@ -228,7 +229,52 @@ export default function HistoryView({
 
   return (
     <div className={embedded ? 'space-y-3' : 'space-y-4'}>
-      <FilterToolbar className="gap-3 sm:flex-col sm:flex-nowrap sm:items-stretch sm:justify-start">
+      {feedback ? (
+        <div
+          role="status"
+          className={cx(
+            'rounded-xl border px-3 py-2 text-sm',
+            feedback.type === 'success'
+              ? 'border-[color:var(--hue-success)] bg-[color:var(--surface-muted)] text-[color:var(--success-foreground)]'
+              : 'border-[color:var(--hue-danger)] bg-[color:var(--surface-muted)] text-[color:var(--danger-foreground)]',
+          )}
+        >
+          {feedback.text}
+        </div>
+      ) : null}
+
+      <TableSurface
+        footer={
+          totalPages > 1 ? (
+            <div className="flex w-full items-center justify-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={currentPage === 1}
+                className="h-9 px-4"
+              >
+                이전
+              </Button>
+              <span className="px-3 text-sm text-[color:var(--muted)]">
+                {currentPage} / {totalPages}
+              </span>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={currentPage === totalPages}
+                className="h-9 px-4"
+              >
+                다음
+              </Button>
+            </div>
+          ) : undefined
+        }
+        toolbar={
+          <FilterToolbar className="gap-3 sm:flex-col sm:flex-nowrap sm:items-stretch sm:justify-start">
         <div
           role="group"
           aria-label="기본 필터"
@@ -321,24 +367,12 @@ export default function HistoryView({
             </div>
           </div>
         </div>
-      </FilterToolbar>
-
-      {feedback ? (
-        <div
-          role="status"
-          className={cx(
-            'rounded-xl border px-3 py-2 text-sm',
-            feedback.type === 'success'
-              ? 'border-[color:var(--hue-success)] bg-[color:var(--surface-muted)] text-[color:var(--success-foreground)]'
-              : 'border-[color:var(--hue-danger)] bg-[color:var(--surface-muted)] text-[color:var(--danger-foreground)]',
-          )}
-        >
-          {feedback.text}
-        </div>
-      ) : null}
-
-      <BasicDataTable
-        className="hidden md:block"
+          </FilterToolbar>
+        }
+      >
+        <BasicDataTable
+          bare
+          className="hidden md:block"
         columns={tableColumns}
         rows={paged}
         rowKey={(item) => item.id}
@@ -404,12 +438,12 @@ export default function HistoryView({
         }}
       />
 
-      <div className="space-y-2 md:hidden">
+      <div className="divide-y divide-[color:var(--border)] md:hidden">
         {paged.length === 0 ? (
-          <div className={ui.emptyState}>이력이 없습니다.</div>
+          <div className="px-4 py-10 text-center text-sm text-[color:var(--muted-foreground)]">이력이 없습니다.</div>
         ) : (
           paged.map((item) => (
-            <div key={item.id} className={cx(ui.surface, 'space-y-3 px-4 py-3')}>
+            <div key={item.id} className="space-y-3 px-4 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1">
                   <p className="text-sm text-[color:var(--muted-foreground)]">{formatCreatedAt(item.createdAt)}</p>
@@ -466,34 +500,7 @@ export default function HistoryView({
           ))
         )}
       </div>
-
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => setPage((current) => Math.max(1, current - 1))}
-            disabled={currentPage === 1}
-            className="h-10 px-4"
-          >
-            이전
-          </Button>
-          <span className="px-3 text-sm text-[color:var(--muted)]">
-            {currentPage} / {totalPages}
-          </span>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-            disabled={currentPage === totalPages}
-            className="h-10 px-4"
-          >
-            다음
-          </Button>
-        </div>
-      )}
+      </TableSurface>
 
       <Modal
         open={pendingRevert !== null}

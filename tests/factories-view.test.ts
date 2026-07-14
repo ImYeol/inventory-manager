@@ -83,7 +83,7 @@ describe('FactoriesView', () => {
     expect(screen.queryByText('행의 상세 버튼으로 공장 정보를 확인하고 상태를 변경합니다.')).toBeNull()
     expect(screen.queryByText(/총 \d+개/)).toBeNull()
     expect(screen.getByRole('table', { name: '공장 목록' })).toBeTruthy()
-    expect(screen.getByRole('table', { name: '공장 목록' }).closest('.ui-table-shell')).toBeTruthy()
+    expect(screen.getByRole('table', { name: '공장 목록' }).closest('.ui-data-surface')).toBeTruthy()
 
     fireEvent.change(screen.getByRole('searchbox', { name: '공장 검색' }), { target: { value: '부산' } })
     expect(screen.getByRole('row', { name: /부산 협력사/ })).toBeTruthy()

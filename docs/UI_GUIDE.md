@@ -124,17 +124,26 @@ src/components/ui/
 ├── store-connection-row.tsx
 ├── store-connection-status.tsx
 ├── table.tsx
+├── table-surface.tsx
 ├── tabs.tsx
 └── toolbar.tsx
 ```
 
 ### Required Behavior
+- `table-surface`
+  - filter toolbar + table을 하나의 이음새 없는 bordered surface로 묶는다
+  - `toolbar` strip → divider → table body → optional `footer` 구조
+  - 조회 화면은 filter 박스와 table shell을 별도 카드 2개로 쌓지 않고 이 primitive 하나로 수렴한다
+  - child table은 자체 border를 갖지 않는다 (`InventoryDataTable`은 shell 없이, `BasicDataTable`은 `bare`로 렌더)
 - `inventory-data-table`
   - dense rows
   - configurable visible columns
   - subtle row motion
+  - shell 없이 `TableSurface` 안에서 렌더된다
 - `filter-toolbar`
-  - compact search / dropdown / reset / action cluster
+  - `TableSurface` toolbar slot 안의 layout (좌측 filter cluster + 우측 meta cluster)
+  - compact search / dropdown / reset / count meta
+  - bordered 박스가 아니라 layout만 담당한다
 - `editable-table`
   - dense, token-consuming editable input table with add/delete/duplicate row actions and inline validation
 - `card`
@@ -201,6 +210,7 @@ src/components/ui/
 - 차트는 `거래 추이`, `재고 추이`, `창고별 변동 비교` 3개만 유지한다.
 - 각 차트는 자기 전용 control strip를 가진다.
 - control strip은 큰 segmented button rail이 아니라 compact filter row를 기본으로 한다.
+- control strip은 차트 카드 안에 중첩된 filter 박스(card-in-card)로 두지 않는다. 카드 header에 title·상태 badge를, body 상단에 label만 붙인 compact filter row를 바로 둔다.
 - 기간, 모델, 시작일, 종료일 control은 같은 baseline과 compact height를 유지해야 한다.
 - KPI strip은 바깥 wrapper card 없이 개별 card를 바로 grid에 둔다. card 안에 card를 넣어 border가 끊겨 보이게 만들지 않는다.
 - dashboard card surface는 끊기지 않는 shared card border language를 사용해야 한다.
@@ -254,7 +264,7 @@ src/components/ui/
 - 상품명, 옵션, 창고, 현재 재고, 최근 입고, 최근 출고, 상태를 우선한다.
 - 컬럼 숨김/표시를 지원한다.
 - 행 애니메이션은 짧은 fade/slide-in 정도만 허용한다.
-- 목록 표는 filter/action toolbar 바로 아래에 붙어야 하고, 위에 별도 summary section을 하나 더 끼워 넣지 않는다.
+- 목록 표는 filter/action toolbar와 `TableSurface` 하나로 묶여 이음새 없이 이어져야 하고, 위에 별도 summary section을 하나 더 끼워 넣지 않는다.
 
 ### 이력 표
 - 목록과 같은 필터 감각을 유지하되, 변동 시각과 출처 메타를 더 먼저 보여준다.
@@ -287,7 +297,8 @@ src/components/ui/
 - 외부 공장과 입고 예정은 카드형 요약보다 필터 가능한 table/workspace로 먼저 구성한다.
 - register/detail 같은 짧은 editing flow는 modal로 보조하고, surface 자체를 card summary로 대체하지 않는다.
 - header 다음에 `toolbar -> section title -> table/list`가 바로 이어져야 한다.
-- table/list를 설명용 wrapper card로 한 번 더 감싸지 않는다. shell이 필요하면 table shell 하나만 둔다.
+- filter toolbar와 table은 `TableSurface` 하나로 묶어 이음새 없는 단일 surface로 읽히게 한다. filter 박스와 table shell을 별도 카드 2개로 쌓지 않는다.
+- table/list를 설명용 wrapper card로 한 번 더 감싸지 않는다. shell이 필요하면 `TableSurface` 하나만 둔다.
 
 ## 운송장 패턴
 

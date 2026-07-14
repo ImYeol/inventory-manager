@@ -43,8 +43,22 @@ export function InventoryTableToolbar<T extends string>({
 }: InventoryTableToolbarProps<T>) {
   return (
     <FilterToolbar>
-      <div className="flex flex-1 flex-col gap-2.5 lg:flex-row lg:flex-wrap lg:items-center">
-        <div className="min-w-[11rem]">
+      <div className="flex min-w-0 flex-1 flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
+        <div className="w-full sm:w-[15rem] lg:max-w-[16rem] lg:flex-1">
+          <label htmlFor="inventory-search" className="sr-only">
+            상품명 검색
+          </label>
+          <Input
+            id="inventory-search"
+            type="search"
+            placeholder="상품명 검색"
+            value={search}
+            onChange={(event) => onSearchChange(event.target.value)}
+            className="ui-control-sm"
+          />
+        </div>
+
+        <div className="w-full sm:w-[11rem]">
           <label htmlFor="inventory-warehouse" className="sr-only">
             창고 선택
           </label>
@@ -66,14 +80,7 @@ export function InventoryTableToolbar<T extends string>({
           </Select>
         </div>
 
-        <div className="min-w-[15rem] flex-1">
-          <label htmlFor="inventory-search" className="sr-only">
-            상품명 검색
-          </label>
-          <Input id="inventory-search" type="search" placeholder="상품명 검색" value={search} onChange={(event) => onSearchChange(event.target.value)} />
-        </div>
-
-        <div className="min-w-[10rem]">
+        <div className="w-full sm:w-[9.5rem]">
           <label htmlFor="inventory-status" className="sr-only">
             상태 필터
           </label>
@@ -96,22 +103,10 @@ export function InventoryTableToolbar<T extends string>({
 
       <div className="flex flex-wrap items-center gap-2">
         <ColumnVisibilityMenu columns={columns} visibleColumns={visibleColumns} onToggle={onToggleColumn} />
-        <Button
-          type="button"
-          onClick={onInbound}
-          variant="success"
-          size="sm"
-          className="h-10 gap-2 rounded-xl px-3"
-        >
+        <Button type="button" onClick={onInbound} variant="success" size="sm" className="h-9 gap-2 rounded-lg px-3">
           입고
         </Button>
-        <Button
-          type="button"
-          variant="warning"
-          onClick={onOutbound}
-          size="sm"
-          className="h-10 gap-2 rounded-xl px-3"
-        >
+        <Button type="button" variant="outline" onClick={onOutbound} size="sm" className="h-9 gap-2 rounded-lg px-3">
           출고
         </Button>
       </div>

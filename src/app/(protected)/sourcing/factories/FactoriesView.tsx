@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { TableSurface } from '@/components/ui/table-surface'
 import { PageHeader, cx, ui } from '@/app/components/ui'
 
 type FactoryData = {
@@ -59,6 +60,7 @@ function SelectField<Value extends string | number>({
   options,
   onValueChange,
   disabled,
+  hideLabel,
 }: {
   label: string
   value: Value | null
@@ -66,10 +68,11 @@ function SelectField<Value extends string | number>({
   options: Array<SelectOption<Value>>
   onValueChange: (value: Value | null) => void
   disabled?: boolean
+  hideLabel?: boolean
 }) {
   return (
-    <div className="min-w-[11rem]">
-      <label className={ui.label}>{label}</label>
+    <div className={hideLabel ? 'w-full sm:w-[11rem]' : 'min-w-[11rem]'}>
+      <label className={hideLabel ? 'sr-only' : ui.label}>{label}</label>
       <Select
         value={value !== null ? String(value) : undefined}
         onValueChange={(next) => onValueChange(next ? (next as Value) : null)}
@@ -214,44 +217,47 @@ export default function FactoriesView({
         </Card>
       ) : null}
 
-      <div className="space-y-4">
-        <FilterToolbar>
-          <div className="flex flex-1 flex-col gap-2.5 lg:flex-row lg:flex-wrap lg:items-end">
-            <div className="min-w-[16rem] flex-1">
-              <label htmlFor="factory-search" className="sr-only">
-                공장 검색
-              </label>
-              <Input
-                id="factory-search"
-                type="search"
-                placeholder="공장명, 연락처, 메모 검색"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
+      <TableSurface
+        toolbar={
+          <FilterToolbar>
+            <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="w-full sm:w-[18rem] lg:max-w-[22rem] lg:flex-1">
+                <label htmlFor="factory-search" className="sr-only">
+                  공장 검색
+                </label>
+                <Input
+                  id="factory-search"
+                  type="search"
+                  placeholder="공장명, 연락처, 메모 검색"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  className="ui-control-sm"
+                />
+              </div>
+
+              <SelectField
+                hideLabel
+                label="상태 필터"
+                value={statusFilter}
+                placeholder="전체 상태"
+                options={[
+                  { value: 'all', label: '전체 상태' },
+                  { value: 'active', label: '활성' },
+                  { value: 'inactive', label: '비활성' },
+                ]}
+                onValueChange={(value) => setStatusFilter((value ?? 'all') as FactoryStatusFilter)}
               />
             </div>
 
-            <SelectField
-              label="상태 필터"
-              value={statusFilter}
-              placeholder="전체 상태"
-              options={[
-                { value: 'all', label: '전체 상태' },
-                { value: 'active', label: '활성' },
-                { value: 'inactive', label: '비활성' },
-              ]}
-              onValueChange={(value) => setStatusFilter((value ?? 'all') as FactoryStatusFilter)}
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={ui.pillMuted}>전체 {factories.length}개</span>
-            <span className={ui.pillMuted}>표시 {filteredFactories.length}개</span>
-          </div>
-        </FilterToolbar>
-
-        <div className={ui.tableShell}>
-          <div className="overflow-x-auto">
-            <Table aria-label="공장 목록">
+            <div className={ui.dataMeta}>
+              <span className="tabular-nums">전체 {factories.length}</span>
+              <span aria-hidden>·</span>
+              <span className="tabular-nums">표시 {filteredFactories.length}</span>
+            </div>
+          </FilterToolbar>
+        }
+      >
+        <Table aria-label="공장 목록">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[18rem]">공장</TableHead>
@@ -306,9 +312,7 @@ export default function FactoriesView({
                 )}
               </TableBody>
             </Table>
-          </div>
-        </div>
-      </div>
+      </TableSurface>
 
       <Modal
         open={selectedFactory !== null}

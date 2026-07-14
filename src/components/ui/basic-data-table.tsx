@@ -18,6 +18,8 @@ type BasicDataTableProps<Row> = {
   rowAriaLabel?: (row: Row) => string
   getRowClassName?: (row: Row) => string | undefined
   className?: string
+  /** Render without the standalone table-shell border, for use inside a TableSurface. */
+  bare?: boolean
 }
 
 export function BasicDataTable<Row>({
@@ -30,9 +32,9 @@ export function BasicDataTable<Row>({
   rowAriaLabel,
   getRowClassName,
   className,
+  bare,
 }: BasicDataTableProps<Row>) {
-  return (
-    <div className={cn('ui-table-shell', className)}>
+  const table = (
       <div className="overflow-x-auto">
         <Table>
           <TableHeader className="[&_tr:hover]:bg-transparent">
@@ -97,6 +99,11 @@ export function BasicDataTable<Row>({
           </TableBody>
         </Table>
       </div>
-    </div>
   )
+
+  if (bare) {
+    return <div className={className}>{table}</div>
+  }
+
+  return <div className={cn('ui-table-shell', className)}>{table}</div>
 }
