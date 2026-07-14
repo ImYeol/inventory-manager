@@ -344,13 +344,13 @@ export default function ArrivalsView({
 
       {schemaState.status === 'missing' && schemaState.message ? (
         <Card variant="muted" className="mb-4 overflow-hidden">
-          <CardContent className="px-4 py-3 text-sm font-medium text-slate-700">{schemaState.message}</CardContent>
+          <CardContent className="px-4 py-3 text-sm font-medium text-[color:var(--muted)]">{schemaState.message}</CardContent>
         </Card>
       ) : null}
 
       {message ? (
         <Card variant="muted" className="mb-4 overflow-hidden">
-          <CardContent className="px-4 py-3 text-sm text-slate-700">{message}</CardContent>
+          <CardContent className="px-4 py-3 text-sm text-[color:var(--muted)]">{message}</CardContent>
         </Card>
       ) : null}
 
@@ -408,7 +408,7 @@ export default function ArrivalsView({
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">등록 항목</h2>
+              <h2 className="text-sm font-semibold text-[color:var(--foreground)]">등록 항목</h2>
               <button type="button" onClick={() => setRows((current) => [...current, createRow()])} className={ui.buttonSecondary}>
                 행 추가
               </button>
@@ -416,10 +416,10 @@ export default function ArrivalsView({
 
             <div className="space-y-3">
               {normalizedRows.map((row, index) => (
-                <Card key={row.key} variant="default" className={cx('overflow-hidden', row.error && 'border-amber-200')}>
+                <Card key={row.key} variant="default" className={cx('overflow-hidden', row.error && 'border-[color:var(--hue-warning)]')}>
                   <CardContent className="space-y-3 px-3 py-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-slate-700">항목 #{index + 1}</span>
+                      <span className="text-sm font-semibold text-[color:var(--muted)]">항목 #{index + 1}</span>
                       <button
                         type="button"
                         onClick={() =>
@@ -428,7 +428,7 @@ export default function ArrivalsView({
                             return next.length === 0 ? [createRow()] : next
                           })
                         }
-                        className="text-sm text-slate-400 hover:text-slate-950"
+                        className="text-sm text-[color:var(--muted-foreground)] hover:text-[color:var(--foreground)]"
                       >
                         삭제
                       </button>
@@ -505,7 +505,7 @@ export default function ArrivalsView({
                       />
                     </div>
 
-                    {row.error ? <p className="text-xs font-medium text-amber-700">{row.error}</p> : null}
+                    {row.error ? <p className="text-xs font-medium text-[color:var(--warning-foreground)]">{row.error}</p> : null}
                   </CardContent>
                 </Card>
               ))}
@@ -514,8 +514,8 @@ export default function ArrivalsView({
 
           <Card variant="default" className="overflow-hidden">
             <CardContent className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
-              <div className="text-sm text-slate-600">
-                유효 항목 <span className="font-semibold text-slate-950">{normalizedRows.filter((row) => row.valid).length}</span>건
+              <div className="text-sm text-[color:var(--muted)]">
+                유효 항목 <span className="font-semibold text-[color:var(--foreground)]">{normalizedRows.filter((row) => row.valid).length}</span>건
               </div>
                 <button
                   type="button"
@@ -532,13 +532,13 @@ export default function ArrivalsView({
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold tracking-tight text-slate-950">예정 목록</h2>
+              <h2 className="text-base font-semibold tracking-tight text-[color:var(--foreground)]">예정 목록</h2>
             </div>
             <span className={ui.pill}>총 {arrivals.length}건</span>
           </div>
 
           <div className={ui.tableShell}>
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-[color:var(--border)]">
               {arrivals.length === 0 ? (
                 <div className={ui.emptyState}>등록된 예정 입고가 없습니다.</div>
               ) : (
@@ -547,7 +547,7 @@ export default function ArrivalsView({
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="text-base font-semibold text-slate-950">{arrival.factoryName}</h3>
+                          <h3 className="text-base font-semibold text-[color:var(--foreground)]">{arrival.factoryName}</h3>
                           <StatusBadge
                             tone={
                               arrival.status === '예정'
@@ -563,13 +563,13 @@ export default function ArrivalsView({
                             {arrival.status}
                           </StatusBadge>
                         </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[color:var(--muted-foreground)]">
                           <span>{arrival.expectedDate}</span>
                           <StatusBadge tone={arrival.sourceChannel === 'csv' ? 'info' : 'neutral'} className="px-2.5 py-1">
                             {arrival.sourceChannel === 'csv' ? 'CSV 등록' : '수동 등록'}
                           </StatusBadge>
                         </div>
-                        {arrival.memo ? <p className="mt-2 text-sm text-slate-600">{arrival.memo}</p> : null}
+                        {arrival.memo ? <p className="mt-2 text-sm text-[color:var(--muted)]">{arrival.memo}</p> : null}
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <span className={ui.pillMuted}>총 수량 {arrival.totalOrderedQuantity}개</span>
@@ -580,8 +580,8 @@ export default function ArrivalsView({
                     <div className="space-y-3 border-t border-[color:var(--border)] pt-4">
                       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                         <div>
-                          <p className="text-sm font-semibold text-slate-950">입고 반영</p>
-                          <p className="mt-1 text-sm text-slate-500">창고를 선택하고 항목별 수량을 조정한 뒤 한 번에 반영합니다.</p>
+                          <p className="text-sm font-semibold text-[color:var(--foreground)]">입고 반영</p>
+                          <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">창고를 선택하고 항목별 수량을 조정한 뒤 한 번에 반영합니다.</p>
                         </div>
                         <div className="min-w-0 md:w-64">
                           <SelectField
@@ -616,14 +616,14 @@ export default function ArrivalsView({
                               <div className="space-y-1">
                                 <div className="flex items-center justify-between gap-3">
                                   <div>
-                                    <p className="text-sm font-semibold text-slate-950">{item.modelName}</p>
-                                    <p className="mt-1 text-sm text-slate-500">
+                                    <p className="text-sm font-semibold text-[color:var(--foreground)]">{item.modelName}</p>
+                                    <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
                                       {item.colorName} / {item.sizeName}
                                     </p>
                                   </div>
                                   <span className={cx(ui.pillMuted, 'shrink-0')}>잔여 {item.remainingQuantity}</span>
                                 </div>
-                                <p className="text-xs text-slate-500">
+                                <p className="text-xs text-[color:var(--muted-foreground)]">
                                   주문 {item.orderedQuantity} · 받은 {item.receivedQuantity}
                                 </p>
                               </div>
@@ -657,9 +657,9 @@ export default function ArrivalsView({
                       </div>
 
                       <div className="flex flex-col gap-3 border-t border-[color:var(--border)] pt-3 md:flex-row md:items-center md:justify-between">
-                        <div className="text-sm text-slate-600">
+                        <div className="text-sm text-[color:var(--muted)]">
                           선택된 창고로{' '}
-                          <span className="font-semibold text-slate-950">
+                          <span className="font-semibold text-[color:var(--foreground)]">
                             {arrival.items.reduce((sum, item) => sum + (receiveDrafts[arrival.id]?.quantities[item.id] ?? item.remainingQuantity), 0)}
                           </span>
                           건을 반영합니다.

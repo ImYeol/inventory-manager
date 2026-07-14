@@ -204,13 +204,13 @@ export default function FactoriesView({
 
       {schemaState.status === 'missing' && schemaState.message ? (
         <Card variant="muted" className="mb-4 overflow-hidden">
-          <CardContent className="px-4 py-3 text-sm font-medium text-slate-700">{schemaState.message}</CardContent>
+          <CardContent className="px-4 py-3 text-sm font-medium text-[color:var(--muted)]">{schemaState.message}</CardContent>
         </Card>
       ) : null}
 
       {message ? (
         <Card variant="muted" className="mb-4 overflow-hidden">
-          <CardContent className="px-4 py-3 text-sm text-slate-700">{message}</CardContent>
+          <CardContent className="px-4 py-3 text-sm text-[color:var(--muted)]">{message}</CardContent>
         </Card>
       ) : null}
 
@@ -265,30 +265,30 @@ export default function FactoriesView({
               <TableBody>
                 {filteredFactories.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-10 text-center text-sm text-slate-500">
+                    <TableCell colSpan={6} className="py-10 text-center text-sm text-[color:var(--muted-foreground)]">
                       조건에 맞는 공장이 없습니다.
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredFactories.map((factory) => (
                     <TableRow key={factory.id} data-state={factory.id === selectedFactory?.id ? 'selected' : undefined}>
-                      <TableCell className="max-w-[18rem] font-medium text-slate-950">
+                      <TableCell className="max-w-[18rem] font-medium text-[color:var(--foreground)]">
                         <button
                           type="button"
                           onClick={() => openDetail(factory.id)}
-                          className="w-full truncate text-left font-medium text-slate-950 hover:underline"
+                          className="w-full truncate text-left font-medium text-[color:var(--foreground)] hover:underline"
                         >
                           {factory.name}
                         </button>
-                        {factory.notes ? <p className="mt-1 line-clamp-2 text-xs text-slate-500">{factory.notes}</p> : null}
+                        {factory.notes ? <p className="mt-1 line-clamp-2 text-xs text-[color:var(--muted-foreground)]">{factory.notes}</p> : null}
                       </TableCell>
                       <TableCell className="max-w-[18rem] break-words">
                         {[factory.contactName, factory.phone, factory.email].filter(Boolean).join(' · ') || '연락처 정보 없음'}
                       </TableCell>
-                      <TableCell className="w-[7rem] text-right font-semibold tabular-nums text-slate-950">
+                      <TableCell className="w-[7rem] text-right font-semibold tabular-nums text-[color:var(--foreground)]">
                         {factory.arrivalCount}건
                       </TableCell>
-                      <TableCell className="w-[7rem] text-right font-semibold tabular-nums text-slate-950">
+                      <TableCell className="w-[7rem] text-right font-semibold tabular-nums text-[color:var(--foreground)]">
                         {factory.pendingQuantity}개
                       </TableCell>
                       <TableCell className="w-[7rem] align-middle">
@@ -333,7 +333,7 @@ export default function FactoriesView({
           <div className="space-y-4">
             {schemaState.status === 'missing' && schemaState.message ? (
               <Card variant="muted" className="overflow-hidden">
-                <CardContent className="px-4 py-3 text-sm font-medium text-slate-700">{schemaState.message}</CardContent>
+                <CardContent className="px-4 py-3 text-sm font-medium text-[color:var(--muted)]">{schemaState.message}</CardContent>
               </Card>
             ) : null}
 
@@ -349,32 +349,32 @@ export default function FactoriesView({
               <Card variant="default" className="overflow-hidden">
                 <CardContent className="px-4 py-3">
                   <dl className="space-y-1">
-                    <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">담당자</dt>
-                    <dd className="text-sm font-medium text-slate-950">{selectedFactory.contactName || '없음'}</dd>
+                    <dt className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">담당자</dt>
+                    <dd className="text-sm font-medium text-[color:var(--foreground)]">{selectedFactory.contactName || '없음'}</dd>
                   </dl>
                 </CardContent>
               </Card>
               <Card variant="default" className="overflow-hidden">
                 <CardContent className="px-4 py-3">
                   <dl className="space-y-1">
-                    <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">전화번호</dt>
-                    <dd className="text-sm font-medium text-slate-950">{selectedFactory.phone || '없음'}</dd>
+                    <dt className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">전화번호</dt>
+                    <dd className="text-sm font-medium text-[color:var(--foreground)]">{selectedFactory.phone || '없음'}</dd>
                   </dl>
                 </CardContent>
               </Card>
               <Card variant="default" className="overflow-hidden">
                 <CardContent className="px-4 py-3">
                   <dl className="space-y-1">
-                    <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">이메일</dt>
-                    <dd className="text-sm font-medium text-slate-950">{selectedFactory.email || '없음'}</dd>
+                    <dt className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">이메일</dt>
+                    <dd className="text-sm font-medium text-[color:var(--foreground)]">{selectedFactory.email || '없음'}</dd>
                   </dl>
                 </CardContent>
               </Card>
               <Card variant="default" className="overflow-hidden">
                 <CardContent className="px-4 py-3">
                   <dl className="space-y-1">
-                    <dt className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">메모</dt>
-                    <dd className="text-sm font-medium text-slate-950">{selectedFactory.notes || '없음'}</dd>
+                    <dt className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">메모</dt>
+                    <dd className="text-sm font-medium text-[color:var(--foreground)]">{selectedFactory.notes || '없음'}</dd>
                   </dl>
                 </CardContent>
               </Card>
@@ -382,7 +382,7 @@ export default function FactoriesView({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold text-slate-950">상품 소싱 내역</h3>
+                <h3 className="text-sm font-semibold text-[color:var(--foreground)]">상품 소싱 내역</h3>
                 <span className={cx(ui.pillMuted, 'tabular-nums')}>열림 {selectedFactorySourcingItems.length}건</span>
               </div>
 
@@ -403,24 +403,24 @@ export default function FactoriesView({
                     <TableBody>
                       {selectedFactorySourcingItems.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="py-8 text-center text-sm text-slate-500">
+                          <TableCell colSpan={7} className="py-8 text-center text-sm text-[color:var(--muted-foreground)]">
                             열려 있는 소싱 내역이 없습니다.
                           </TableCell>
                         </TableRow>
                       ) : (
                         selectedFactorySourcingItems.map((item, index) => (
                           <TableRow key={`${item.expectedDate}-${item.modelName}-${item.sizeName}-${item.colorName}-${index}`}>
-                            <TableCell className="font-medium text-slate-950">{item.expectedDate}</TableCell>
-                            <TableCell className="font-medium text-slate-950">{item.modelName}</TableCell>
+                            <TableCell className="font-medium text-[color:var(--foreground)]">{item.expectedDate}</TableCell>
+                            <TableCell className="font-medium text-[color:var(--foreground)]">{item.modelName}</TableCell>
                             <TableCell>{item.colorName} / {item.sizeName}</TableCell>
                             <TableCell>
                               <StatusBadge tone={getArrivalStatusTone(item.status)} className="px-2.5 py-1">
                                 {item.status}
                               </StatusBadge>
                             </TableCell>
-                            <TableCell className="text-right font-medium tabular-nums text-slate-950">{item.orderedQuantity}</TableCell>
-                            <TableCell className="text-right font-medium tabular-nums text-slate-950">{item.receivedQuantity}</TableCell>
-                            <TableCell className="text-right font-semibold tabular-nums text-slate-950">{item.remainingQuantity}</TableCell>
+                            <TableCell className="text-right font-medium tabular-nums text-[color:var(--foreground)]">{item.orderedQuantity}</TableCell>
+                            <TableCell className="text-right font-medium tabular-nums text-[color:var(--foreground)]">{item.receivedQuantity}</TableCell>
+                            <TableCell className="text-right font-semibold tabular-nums text-[color:var(--foreground)]">{item.remainingQuantity}</TableCell>
                           </TableRow>
                         ))
                       )}
@@ -456,7 +456,7 @@ export default function FactoriesView({
         <div className="space-y-3">
           {schemaState.status === 'missing' && schemaState.message ? (
             <Card variant="muted" className="overflow-hidden">
-              <CardContent className="px-4 py-3 text-sm font-medium text-slate-700">{schemaState.message}</CardContent>
+              <CardContent className="px-4 py-3 text-sm font-medium text-[color:var(--muted)]">{schemaState.message}</CardContent>
             </Card>
           ) : null}
 
