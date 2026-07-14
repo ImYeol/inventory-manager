@@ -46,7 +46,10 @@
     {
       "step": 5,
       "name": "tracking-import-and-fulfillment",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-07-15T01:10:24+0900",
+      "completed_at": "2026-07-15T01:14:30+0900",
+      "summary": "Added the orders-owned /orders/tracking-import workspace with file, header/mapping preset, preview, and dispatch stages using TableSurface, BasicDataTable, and Select; legacy /shipping now redirects and its duplicate owner was removed. Added immutable built-in presets, header fingerprints, normalized-row-only batch persistence, matching priority/exclusion rules, Naver 30-row dispatch batching, external-success-only fulfillment recording, RPC finalization, and RECONCILE_REQUIRED handling. Verified preset/matching/finalize/reconcile behavior with npm run test -- --run tests/excel.test.ts tests/tracking-import.test.ts tests/fulfillment.test.ts tests/shipping-page.test.ts (4 files, 7 tests passed) and npm run lint (0 errors; 4 existing warnings)."
     },
     {
       "step": 6,
