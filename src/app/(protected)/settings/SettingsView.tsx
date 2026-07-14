@@ -148,8 +148,8 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
         }
       >
         <div className="space-y-1">
-          <p className="text-sm font-medium text-slate-950">네이버 API</p>
-          <p className="text-sm text-slate-500">Client ID와 Secret을 직접 갱신합니다.</p>
+          <p className="text-sm font-medium text-[color:var(--foreground)]">네이버 API</p>
+          <p className="text-sm text-[color:var(--muted-foreground)]">Client ID와 Secret을 직접 갱신합니다.</p>
         </div>
         <form id="naver-settings" className="space-y-4" onSubmit={handleNaverSave}>
           <div className="grid gap-4">
@@ -182,8 +182,14 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
               />
             </div>
           </div>
-          {naverError ? <p className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm text-red-700')}>{naverError}</p> : null}
-          {naverMessage ? <p className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm text-emerald-700')}>{naverMessage}</p> : null}
+          {naverError ? (
+            <p className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm text-[color:var(--danger-foreground)]')}>{naverError}</p>
+          ) : null}
+          {naverMessage ? (
+            <p className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm text-[color:var(--success-foreground)]')}>
+              {naverMessage}
+            </p>
+          ) : null}
         </form>
       </StoreConnectionRow>
 
@@ -203,8 +209,8 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
         }
       >
         <div className="space-y-1">
-          <p className="text-sm font-medium text-slate-950">쿠팡 API</p>
-          <p className="text-sm text-slate-500">Access Key, Secret Key, Vendor ID와 기본 택배사 코드를 관리합니다.</p>
+          <p className="text-sm font-medium text-[color:var(--foreground)]">쿠팡 API</p>
+          <p className="text-sm text-[color:var(--muted-foreground)]">Access Key, Secret Key, Vendor ID와 기본 택배사 코드를 관리합니다.</p>
         </div>
         <form id="coupang-settings" className="space-y-4" onSubmit={handleCoupangSave}>
           <div className="grid gap-4">
@@ -270,8 +276,14 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
               />
             </div>
           </div>
-          {coupangError ? <p className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm text-red-700')}>{coupangError}</p> : null}
-          {coupangMessage ? <p className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm text-emerald-700')}>{coupangMessage}</p> : null}
+          {coupangError ? (
+            <p className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm text-[color:var(--danger-foreground)]')}>{coupangError}</p>
+          ) : null}
+          {coupangMessage ? (
+            <p className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm text-[color:var(--success-foreground)]')}>
+              {coupangMessage}
+            </p>
+          ) : null}
         </form>
       </StoreConnectionRow>
     </div>

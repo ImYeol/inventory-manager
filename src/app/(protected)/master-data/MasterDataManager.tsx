@@ -387,8 +387,8 @@ export default function MasterDataManager({
             ui.surfaceMuted,
             'px-4 py-3 text-sm font-medium',
             message.type === 'success'
-              ? 'text-slate-700'
-              : 'text-red-700',
+              ? 'text-[color:var(--success-foreground)]'
+              : 'text-[color:var(--danger-foreground)]',
           )}
           role="status"
           aria-live="polite"
@@ -430,12 +430,12 @@ export default function MasterDataManager({
             emptyState="등록된 상품이 없습니다."
             renderCell={(row, columnKey) => {
               if (columnKey === 'name') {
-                return <span className="font-medium text-slate-950">{row.name}</span>
+                return <span className="font-medium text-[color:var(--foreground)]">{row.name}</span>
               }
 
               if (columnKey === 'sizes') {
                 return row.sizes.length === 0 ? (
-                  <span className="text-sm text-slate-500">없음</span>
+                  <span className="text-sm text-[color:var(--muted-foreground)]">없음</span>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {row.sizes.map((size) => (
@@ -449,7 +449,7 @@ export default function MasterDataManager({
 
               if (columnKey === 'colors') {
                 return row.colors.length === 0 ? (
-                  <span className="text-sm text-slate-500">없음</span>
+                  <span className="text-sm text-[color:var(--muted-foreground)]">없음</span>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {row.colors.map((color) => (
@@ -515,23 +515,23 @@ export default function MasterDataManager({
             emptyState="등록된 창고가 없습니다."
             renderCell={(row, columnKey) => {
               if (columnKey === 'warehouse') {
-                return <span className="font-medium text-slate-950">{row.warehouse.name}</span>
+                return <span className="font-medium text-[color:var(--foreground)]">{row.warehouse.name}</span>
               }
 
               if (columnKey === 'skuCount') {
-                return <span className="font-mono tabular-nums text-slate-600">{row.skuCount.toLocaleString()}</span>
+                return <span className="font-mono tabular-nums text-[color:var(--muted)]">{row.skuCount.toLocaleString()}</span>
               }
 
               if (columnKey === 'stockQty') {
-                return <span className="font-semibold text-slate-950">{row.stockQty.toLocaleString()}</span>
+                return <span className="font-semibold text-[color:var(--foreground)]">{row.stockQty.toLocaleString()}</span>
               }
 
               if (columnKey === 'movement') {
                 return (
-                  <div className="space-y-0.5 text-sm text-slate-600">
+                  <div className="space-y-0.5 text-sm text-[color:var(--muted)]">
                     <p>입고 {row.latestInbound ? `${row.latestInbound.quantity} / ${formatDate(row.latestInbound.date)}` : '없음'}</p>
                     <p>출고 {row.latestOutbound ? `${row.latestOutbound.quantity} / ${formatDate(row.latestOutbound.date)}` : '없음'}</p>
-                    <p className="text-xs text-slate-400">최근 {formatDate(row.latestMovementDate)}</p>
+                    <p className="text-xs text-[color:var(--muted-foreground)]">최근 {formatDate(row.latestMovementDate)}</p>
                   </div>
                 )
               }
@@ -607,7 +607,7 @@ export default function MasterDataManager({
           </div>
         }
       >
-        <p className="text-sm leading-6 text-slate-600">삭제 후에는 창고 재고와 연결된 내역이 더 이상 이 표에서 보이지 않습니다.</p>
+        <p className="text-sm leading-6 text-[color:var(--muted)]">삭제 후에는 창고 재고와 연결된 내역이 더 이상 이 표에서 보이지 않습니다.</p>
       </Modal>
 
       <Modal
@@ -628,7 +628,7 @@ export default function MasterDataManager({
           </div>
         }
       >
-        <p className="text-sm leading-6 text-slate-600">모델을 삭제하면 연결된 사이즈와 색상도 함께 정리됩니다.</p>
+        <p className="text-sm leading-6 text-[color:var(--muted)]">모델을 삭제하면 연결된 사이즈와 색상도 함께 정리됩니다.</p>
       </Modal>
 
       <Modal
@@ -723,7 +723,7 @@ export default function MasterDataManager({
               </Select>
             </div>
 
-            <div className={cx(ui.surfaceMuted, 'px-3 py-2 text-sm text-slate-600')}>
+            <div className={cx(ui.surfaceMuted, 'px-3 py-2 text-sm text-[color:var(--muted)]')}>
               기본 텍스트: {describeColorTone(modelDraft.defaultTextWhite)}
             </div>
           </div>
