@@ -3,6 +3,7 @@
 
 import crypto from 'crypto'
 
+import type { ChannelProductSnapshot } from '../channel-products'
 import type { CoupangCredentials } from '../shipping-credentials'
 
 const BASE_URL = 'https://api-gateway.coupang.com'
@@ -26,6 +27,96 @@ export type CoupangOrderSheet = {
     addr2: string
   }
   orderItems: CoupangOrderItem[]
+}
+
+type CoupangSellerProductListItem = { sellerProductId?: number | string }
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+}
+
+function asString(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null
+}
+
+function asNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = []
+  for (let index = 0; index < items.length; index += limit) {
+    results.push(...await Promise.all(items.slice(index, index + limit).map(mapper)))
+  }
+  return results
+}
+
+function normalizeCoupangProduct(product: unknown): ChannelProductSnapshot[] {
+  const raw = asRecord(product)
+  const sellerProductId = asString(raw.sellerProductId) ?? String(raw.sellerProductId ?? '')
+  if (!sellerProductId) return []
+
+  const vendorItems = Array.isArray(raw.vendorItems) ? raw.vendorItems : []
+  return vendorItems.flatMap((vendorItem) => {
+    const item = asRecord(vendorItem)
+    const vendorItemId = asString(item.vendorItemId) ?? String(item.vendorItemId ?? '')
+    if (!vendorItemId) return []
+    const approvalStatus = asString(item.approvalStatus ?? raw.status ?? raw.statusName)
+    const onSale = item.onSale === true
+    return [{
+      channel: 'coupang' as const,
+      externalProductId: sellerProductId,
+      externalVariantId: vendorItemId,
+      sellerSku: asString(item.externalVendorSku),
+      productName: asString(raw.sellerProductName ?? raw.productName),
+      optionName: asString(item.vendorItemName ?? item.itemName),
+      listingStatus: onSale && approvalStatus !== 'PENDING' ? 'active' as const : 'paused' as const,
+      stockQuantity: asNumber(item.amountInStock),
+      price: asNumber(item.salePrice ?? item.price),
+      imageUrl: asString(item.mainImage ?? raw.imageUrl),
+      rawAttributes: raw,
+    }]
+  })
+}
+
+export async function fetchCoupangProductSnapshots(
+  credentials: CoupangCredentials,
+): Promise<ChannelProductSnapshot[]> {
+  const sellerProductIds: string[] = []
+  let nextToken = ''
+
+  do {
+    const params = new URLSearchParams({ maxPerPage: '100' })
+    if (nextToken) params.set('nextToken', nextToken)
+    const path = `/v2/providers/openapi/apis/api/v1/marketplace/seller-products?${params.toString()}`
+    const res = await fetch(`${BASE_URL}${path}`, {
+      method: 'GET',
+      headers: { Authorization: getAuthHeader('GET', path, credentials), 'Content-Type': 'application/json' },
+    })
+    if (!res.ok) throw new Error(`쿠팡 상품 목록 조회 실패: ${res.status}`)
+    const response = asRecord(await res.json())
+    const items = Array.isArray(response.data) ? response.data as CoupangSellerProductListItem[] : []
+    sellerProductIds.push(...items.flatMap((item) => {
+      const id = item.sellerProductId
+      return typeof id === 'string' || typeof id === 'number' ? [String(id)] : []
+    }))
+    nextToken = typeof response.nextToken === 'string' ? response.nextToken : ''
+  } while (nextToken)
+
+  const details = await mapWithConcurrency(sellerProductIds, 4, async (sellerProductId) => {
+    const path = `/v2/providers/openapi/apis/api/v1/marketplace/seller-products/${sellerProductId}`
+    const res = await fetch(`${BASE_URL}${path}`, {
+      method: 'GET',
+      headers: { Authorization: getAuthHeader('GET', path, credentials), 'Content-Type': 'application/json' },
+    })
+    if (!res.ok) throw new Error(`쿠팡 상품 상세 조회 실패: ${res.status}`)
+    const response = asRecord(await res.json())
+    return normalizeCoupangProduct(response.data)
+  })
+
+  return details.flat()
 }
 
 function generateHmacSignature(
@@ -164,8 +255,7 @@ export async function fetchCoupangPendingOrders(
     })
 
     if (!res.ok) {
-      const text = await res.text()
-      throw new Error(`쿠팡 주문 조회 실패: ${res.status} ${text}`)
+      throw new Error(`쿠팡 주문 조회 실패: ${res.status}`)
     }
 
     const data = await res.json()
@@ -214,16 +304,16 @@ export async function confirmCoupangShipments(
   })
 
   if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`쿠팡 발송 처리 실패: ${res.status} ${text}`)
+    throw new Error(`쿠팡 발송 처리 실패: ${res.status}`)
   }
 
   const data = await res.json()
-  const responseList = Array.isArray(data.data?.responseList) ? data.data.responseList : []
+  const responseList: Array<{ succeed?: boolean; shipmentBoxId?: number }> =
+    Array.isArray(data.data?.responseList) ? data.data.responseList : []
   const failedBoxes = [...new Set(
     responseList
       .filter((item: { succeed?: boolean }) => item.succeed === false)
-      .map((item: { shipmentBoxId: number }) => item.shipmentBoxId),
+      .flatMap((item) => typeof item.shipmentBoxId === 'number' ? [item.shipmentBoxId] : []),
   )]
   const responseCode = typeof data.data?.responseCode === 'number' ? data.data.responseCode : 99
   const responseMessage =

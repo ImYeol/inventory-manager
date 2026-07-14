@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   confirmCoupangShipments,
   fetchCoupangPendingOrders,
+  fetchCoupangProductSnapshots,
 } from '@/lib/api/coupang'
 
 const fetchMock = vi.fn()
@@ -17,6 +18,51 @@ afterEach(() => {
 })
 
 describe('coupang api helpers', () => {
+  it('pages seller products and fetches each detail with bounded concurrency', async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: [{ sellerProductId: 1001 }], nextToken: 'NEXT' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: [{ sellerProductId: 1002 }], nextToken: '' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            sellerProductId: 1001,
+            sellerProductName: '쿠팡 상품',
+            statusName: '승인완료',
+            vendorItems: [{ vendorItemId: 2001, externalVendorSku: 'SKU-CP-1', approvalStatus: 'APPROVED', amountInStock: 7, onSale: true }],
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            sellerProductId: 1002,
+            sellerProductName: '쿠팡 상품 2',
+            vendorItems: [{ vendorItemId: 2002, externalVendorSku: 'SKU-CP-2', approvalStatus: 'PENDING', amountInStock: 0, onSale: false }],
+          },
+        }),
+      })
+
+    await expect(fetchCoupangProductSnapshots({
+      accessKey: 'access-key', secretKey: 'secret-key', vendorId: 'A00012345', defaultDeliveryCompanyCode: 'CJGLS',
+    })).resolves.toEqual([
+      expect.objectContaining({ channel: 'coupang', externalProductId: '1001', externalVariantId: '2001', sellerSku: 'SKU-CP-1', listingStatus: 'active', stockQuantity: 7 }),
+      expect.objectContaining({ channel: 'coupang', externalProductId: '1002', externalVariantId: '2002', sellerSku: 'SKU-CP-2', listingStatus: 'paused', stockQuantity: 0 }),
+    ])
+
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/marketplace/seller-products')
+    expect(String(fetchMock.mock.calls[1][0])).toContain('nextToken=NEXT')
+    expect(String(fetchMock.mock.calls[2][0])).toContain('/marketplace/seller-products/1001')
+  })
+
   it('fetches v5 order sheets with nextToken pagination and maps shipment data', async () => {
     fetchMock
       .mockResolvedValueOnce({
