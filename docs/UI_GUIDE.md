@@ -105,19 +105,27 @@
 
 ```text
 src/components/ui/
-├── card.tsx
-├── select.tsx
 ├── badge-1.tsx
-├── table.tsx
 ├── basic-data-table.tsx
-├── inventory-data-table.tsx
-├── filter-toolbar.tsx
+├── button.tsx
+├── card.tsx
 ├── column-visibility-menu.tsx
-├── tabs.tsx
+├── dropdown-menu.tsx
+├── editable-table.tsx
+├── filter-toolbar.tsx
+├── fixed-sheet.tsx
+├── input.tsx
+├── inventory-data-table.tsx
+├── inventory-table-toolbar.tsx
+├── menu.tsx
 ├── modal.tsx
+├── select.tsx
 ├── shipping-classification-badge.tsx
+├── store-connection-row.tsx
 ├── store-connection-status.tsx
-└── store-connection-row.tsx
+├── table.tsx
+├── tabs.tsx
+└── toolbar.tsx
 ```
 
 ### Required Behavior
@@ -127,6 +135,8 @@ src/components/ui/
   - subtle row motion
 - `filter-toolbar`
   - compact search / dropdown / reset / action cluster
+- `editable-table`
+  - dense, token-consuming editable input table with add/delete/duplicate row actions and inline validation
 - `card`
   - canonical border language for bordered surfaces
   - `default`, `muted`, `strong` variants

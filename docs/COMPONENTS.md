@@ -58,15 +58,15 @@
 | --- | --- | --- | --- |
 | canonical | `BasicDataTable` | generic 조회/preview table의 shared primitive | 해당 없음 |
 | canonical, 저활용 | `InventoryDataTable` | 재고 조회형 canonical이나 현재 사용처는 1곳 | Step 5–11에서 hand-roll 조회 table 흡수 |
-| resolved | `ColumnVisibilityMenu` dead 표기 | `InventoryTableToolbar`의 실제 소비처를 확인해 dead 오탐을 정정; primitive는 canonical 유지 | Step 4 |
+| canonical | `ColumnVisibilityMenu` | `InventoryTableToolbar`의 실제 소비처를 확인했으며, primitive는 canonical 유지 | 해당 없음 |
 | resolved | 편집형 입력 table | `EditableTable`이 tokenized chrome, 행 action, 행 추가, inline validation을 소유하며 소비자가 셀을 렌더 | Step 3 |
 
-| 현재 hand-roll `<table>` | 현재 역할 | 흡수 대상 primitive | 해소 예정 step |
+| 완료된 hand-roll `<table>` 흡수 | 이전 역할 | 수렴 primitive | 해소 step |
 | --- | --- | --- | --- |
-| `ShippingView` | 분류 preview | `BasicDataTable` + `ShippingClassificationBadge` | Step 7 |
-| `InOutForm` | 편집형 입력 table | `EditableTable` | Step 6 |
+| `ShippingView` | 분류 preview | `BasicDataTable` + `ShippingClassificationBadge` | Step 7 (resolved) |
+| `InOutForm` | 편집형 입력 table | `EditableTable` | Step 6 (resolved) |
 
-> `InventoryView`(재고 매트릭스 화면)는 어느 route에도 연결되지 않은 dead view file이라 Step 5에서 삭제됨(UI_GUIDE §18). 실 사용되는 재고 조회 table은 `InventoryWorkspace`가 이미 `InventoryDataTable` primitive로 렌더한다.
+현재 남은 hand-roll 조회/입력 `<table>`은 없다. `InventoryView`(재고 매트릭스 화면)는 어느 route에도 연결되지 않은 dead view file이라 Step 5에서 삭제됐고, 실 사용되는 재고 조회 table은 `InventoryWorkspace`가 `InventoryDataTable` primitive로 렌더한다. dead primitive 또는 dead view는 남아 있지 않다.
 
 ## 사용 규칙
 
