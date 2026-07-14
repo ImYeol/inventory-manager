@@ -54,7 +54,7 @@ describe('Product management workspace', () => {
     mocks.linkVariant.mockResolvedValue({ success: true })
     render(React.createElement(MasterDataManager, props))
 
-    fireEvent.click(screen.getByText('네이버 · 판매 중지'))
+    fireEvent.click(screen.getByText('네이버 · 연결 필요'))
     const dialog = screen.getByRole('dialog', { name: '네이버 채널 상품' })
     expect(within(dialog).getByText('NV-1')).toBeTruthy()
     expect(within(dialog).getByText('권한 확인 필요')).toBeTruthy()

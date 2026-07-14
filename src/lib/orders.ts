@@ -3,6 +3,12 @@ import type { NaverOrder } from './api/naver'
 
 export type OrderChannel = 'naver' | 'coupang'
 
+export type ReservationStock = {
+  warehouseId: number
+  quantity: number
+  committed: number
+}
+
 export type NormalizedOrderLine = {
   externalLineId: string
   externalProductId: string | null
@@ -48,6 +54,18 @@ export function isCancelledOrderStatus(status: string) {
 export function chooseReservationWarehouse(candidates: Array<{ warehouseId: number; available: number }>, quantity: number) {
   const sufficient = candidates.filter((candidate) => candidate.available >= quantity)
   return sufficient.length === 1 ? sufficient[0].warehouseId : null
+}
+
+export function reservationDisposition(
+  quantity: number,
+  stocks: ReservationStock[],
+  hasUniqueVariant = true,
+) {
+  if (!hasUniqueVariant) return { status: 'MAPPING_REQUIRED' as const }
+  const eligible = stocks.filter((stock) => stock.quantity - stock.committed >= quantity)
+  return eligible.length === 1
+    ? { status: 'ACTIVE' as const, warehouseId: eligible[0].warehouseId }
+    : { status: 'EXCEPTION' as const }
 }
 
 export function orderViewFor(status: string, fulfillmentStatus: string) {

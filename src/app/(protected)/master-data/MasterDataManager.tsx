@@ -511,7 +511,12 @@ export default function MasterDataManager({
                   if (columnKey === 'coupang' || columnKey === 'naver') {
                     const channel = columnKey as ProductWorkspaceChannelRef['channel']
                     const ref = channel === 'coupang' ? coupang : naver
-                    return ref ? <Button type="button" variant="ghost" size="sm" className="h-8 px-1" onClick={() => setSelectedChannelRef(ref)}><ChannelBadge channel={channel} listingStatus={ref.listingStatus} /></Button> : <ChannelBadge channel={channel} listingStatus="unregistered" compact />
+                    const badgeStatus = ref?.variantId === null
+                      ? 'mapping-required'
+                      : ref?.lastSyncError
+                        ? 'sync-error'
+                        : ref?.listingStatus
+                    return ref ? <Button type="button" variant="ghost" size="sm" className="h-8 px-1" onClick={() => setSelectedChannelRef(ref)}><ChannelBadge channel={channel} listingStatus={badgeStatus ?? 'unregistered'} /></Button> : <ChannelBadge channel={channel} listingStatus="unregistered" compact />
                   }
                   if (columnKey === 'available') return <span className="font-semibold tabular-nums">{row.available.toLocaleString()}</span>
                   if (columnKey === 'gap') {

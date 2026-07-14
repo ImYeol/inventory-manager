@@ -54,7 +54,7 @@ describe('coupang api helpers', () => {
       accessKey: 'access-key', secretKey: 'secret-key', vendorId: 'A00012345', defaultDeliveryCompanyCode: 'CJGLS',
     })).resolves.toEqual([
       expect.objectContaining({ channel: 'coupang', externalProductId: '1001', externalVariantId: '2001', sellerSku: 'SKU-CP-1', listingStatus: 'active', stockQuantity: 7 }),
-      expect.objectContaining({ channel: 'coupang', externalProductId: '1002', externalVariantId: '2002', sellerSku: 'SKU-CP-2', listingStatus: 'paused', stockQuantity: 0 }),
+      expect.objectContaining({ channel: 'coupang', externalProductId: '1002', externalVariantId: '2002', sellerSku: 'SKU-CP-2', listingStatus: 'approval-pending', stockQuantity: 0 }),
     ])
 
     expect(fetchMock).toHaveBeenCalledTimes(4)
@@ -153,6 +153,8 @@ describe('coupang api helpers', () => {
             vendorItemId: 301,
             vendorItemName: '옵션 1',
             shippingCount: 1,
+            sellerSku: null,
+            externalProductId: null,
           },
         ],
       },
@@ -171,6 +173,8 @@ describe('coupang api helpers', () => {
             vendorItemId: 302,
             vendorItemName: '옵션 2',
             shippingCount: 2,
+            sellerSku: null,
+            externalProductId: null,
           },
         ],
       },

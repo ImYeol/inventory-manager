@@ -83,6 +83,7 @@ function normalizeNaverProduct(product: unknown): ChannelProductSnapshot | null 
   const status = asString(originProduct.statusType)
   const isDisplayed = !displayStatus || ['ON', 'ACTIVE', 'SALE'].includes(displayStatus)
   const isSellable = !status || ['SALE', 'ON', 'ACTIVE'].includes(status)
+  const stockQuantity = asNumber(originProduct.stockQuantity)
   const images = Array.isArray(originProduct.images) ? originProduct.images : []
   const firstImage = asRecord(images[0])
 
@@ -93,8 +94,10 @@ function normalizeNaverProduct(product: unknown): ChannelProductSnapshot | null 
     sellerSku: asString(originProduct.sellerManagementCode),
     productName: asString(originProduct.name),
     optionName: null,
-    listingStatus: isDisplayed && isSellable ? 'active' : 'paused',
-    stockQuantity: asNumber(originProduct.stockQuantity),
+    listingStatus: isDisplayed && isSellable
+      ? stockQuantity === 0 ? 'sold-out' : 'active'
+      : 'paused',
+    stockQuantity,
     price: asNumber(originProduct.salePrice ?? originProduct.price),
     imageUrl: asString(firstImage.url ?? firstImage.imageUrl),
     rawAttributes: raw,

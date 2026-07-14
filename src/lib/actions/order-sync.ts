@@ -5,18 +5,10 @@ import { fetchNaverPendingOrders } from '../api/naver'
 import type { CoupangOrderSheet } from '../api/coupang'
 import type { NaverOrder } from '../api/naver'
 import { getSupabaseWithUser } from '../db'
+import { reservationDisposition } from '../orders'
 import { getRequiredShippingCredentials } from '../shipping-credentials'
 
 type Channel = 'naver' | 'coupang'
-type Stock = { warehouseId: number; quantity: number; committed: number }
-
-export function reservationDisposition(quantity: number, stocks: Stock[], hasUniqueVariant = true) {
-  if (!hasUniqueVariant) return { status: 'MAPPING_REQUIRED' as const }
-  const eligible = stocks.filter((stock) => stock.quantity - stock.committed >= quantity)
-  return eligible.length === 1
-    ? { status: 'ACTIVE' as const, warehouseId: eligible[0].warehouseId }
-    : { status: 'EXCEPTION' as const }
-}
 
 function isCancelled(status: string) {
   return /CANCEL|CANCELED|CANCELLED|취소/i.test(status)
@@ -103,6 +95,7 @@ export async function syncOrders(channel?: Channel): Promise<{ orders: number; l
 export async function getOrdersWorkspaceData() {
   const { supabase } = await getSupabaseWithUser()
   const { data, error } = await supabase.from('channel_orders').select('id,channel,external_order_id,order_status,ordered_at,channel_order_lines(id,quantity,line_status,product_variants(seller_sku),inventory_reservations(warehouse_id,status))').order('ordered_at', { ascending: false })
+  if (error?.code === 'PGRST205' || error?.message.toLowerCase().includes('could not find the table')) return []
   if (error) throw new Error('주문을 불러오지 못했습니다.')
   return data ?? []
 }

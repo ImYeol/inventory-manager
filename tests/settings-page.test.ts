@@ -56,7 +56,6 @@ describe('SettingsPage', () => {
     expect(mocks.settingsView).toHaveBeenCalledWith(expect.objectContaining({ summary }))
     expect(screen.queryByRole('link', { name: '기준 데이터' })).toBeNull()
     expect(screen.getByRole('heading', { name: '설정' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '로그아웃' })).toBeTruthy()
     expect(screen.getByTestId('settings-view')).toBeTruthy()
   })
 

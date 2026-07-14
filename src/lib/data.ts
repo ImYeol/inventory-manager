@@ -443,7 +443,7 @@ export type ProductWorkspaceChannelRef = {
   productName: string | null
   optionName: string | null
   sellerSku: string | null
-  listingStatus: 'active' | 'unregistered' | 'paused' | 'sync-error'
+  listingStatus: 'active' | 'sold-out' | 'approval-pending' | 'mapping-required' | 'unregistered' | 'paused' | 'sync-error'
   channelReported: number | null
   lastSyncedAt: string | null
   lastSyncError: string | null
@@ -465,6 +465,9 @@ export async function getProductWorkspaceData(): Promise<{
     supabase.from('inventory_reservations').select('product_variant_id, quantity').eq('status', 'active'),
     supabase.from('channel_product_refs').select('id, variant_id, channel, external_product_id, external_variant_id, product_name, option_name, seller_sku, listing_status, channel_attributes, channel_reported, last_synced_at, last_sync_error'),
   ])
+  if ([variantsRes, reservationsRes, refsRes].some((response) => isMissingSchemaError(response.error))) {
+    return { variants: [], channelProductRefs: [] }
+  }
   const responses = [variantsRes, modelsRes, sizesRes, colorsRes, inventoryRes, reservationsRes, refsRes]
   if (responses.some((response) => response.error)) throw new Error('상품 작업공간 데이터를 불러오지 못했습니다.')
 

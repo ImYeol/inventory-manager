@@ -2,6 +2,7 @@
   "project": "Seleccase Inventory",
   "phase": "channel-commerce-operations",
   "status": "completed",
+  "completed_at": "2026-07-15T01:20:15+0900",
   "steps": [
     {
       "step": 0,
@@ -57,7 +58,7 @@
       "status": "completed",
       "started_at": "2026-07-15T01:14:53+0900",
       "completed_at": "2026-07-15T01:20:15+0900",
-      "summary": "Added the shared ProductVariantCombobox with searchable product/option/SKU results and fixed Naver/Coupang ChannelBadge slots; it is reused by inventory add and sourcing arrival entry without free-text product creation. Inventory list now uses product, SKU/option, warehouse, onHand, committed, available, incoming, and status columns; channelReported is not a default table column. Added a toolbar inventory-add flow that routes existing combinations to inbound adjustment. Sourcing arrivals now choose the canonical variant and keep remaining ordered-received quantities as incoming. Dashboard KPI labels were consolidated around new orders, fulfillment preparation, and today dispatch. Verified focused Step 6 tests (4 files, 8 tests) and lint (0 errors; 4 pre-existing warnings). Full npm run test has 56 passing files / 162 passing tests, with two pre-existing unrelated failures: Coupang API expectation omits newly returned nullable sellerSku/externalProductId fields, and settings page expects a logout button not rendered by its mock. npm run build remains blocked by existing order-sync server-action export validation and external Geist font network fetch failure."
+      "summary": "Added the shared ProductVariantCombobox with searchable product/option/SKU results and fixed Naver/Coupang ChannelBadge slots; it is reused by inventory add and sourcing arrival entry without free-text product creation. Inventory now shows onHand, committed, available, and incoming per warehouse, while sourcing keeps remaining ordered-received quantities as incoming. Replaced generic dashboard analytics with four order KPIs, a 14-day inbound/outbound view, warehouse onHand/committed/available, order exceptions, and upcoming sourcing; KPI links open the corresponding fixed order view. Expanded ChannelBadge to visible icon+text states for sold out, approval pending, mapping required, paused, and sync error, and persisted channel_reported stock snapshots. Missing optional commerce tables render safe empty states until the migration is applied. Final verification: 58 test files / 164 tests passed, lint passed with 0 errors and 4 pre-existing warnings, and npm run build passed. Browser verification covered dashboard, order exception deep-linking, products fallback, and inventory workspace."
     }
   ]
 }

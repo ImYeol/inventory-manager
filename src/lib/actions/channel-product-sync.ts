@@ -53,6 +53,7 @@ export async function syncProducts(channel?: ChannelName): Promise<ProductSyncRe
         option_name: snapshot.optionName,
         seller_sku: snapshot.sellerSku,
         listing_status: snapshot.listingStatus,
+        channel_reported: snapshot.stockQuantity,
         channel_attributes: {
           stockQuantity: snapshot.stockQuantity,
           price: snapshot.price,

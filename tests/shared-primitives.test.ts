@@ -332,6 +332,9 @@ describe('shared action and status primitives', () => {
         React.createElement(ChannelBadge, { channel: 'naver', listingStatus: 'unregistered' }),
         React.createElement(ChannelBadge, { channel: 'coupang', listingStatus: 'paused' }),
         React.createElement(ChannelBadge, { channel: 'naver', listingStatus: 'sync-error' }),
+        React.createElement(ChannelBadge, { channel: 'coupang', listingStatus: 'approval-pending' }),
+        React.createElement(ChannelBadge, { channel: 'naver', listingStatus: 'sold-out' }),
+        React.createElement(ChannelBadge, { channel: 'coupang', listingStatus: 'mapping-required' }),
       ),
     )
 
@@ -340,6 +343,9 @@ describe('shared action and status primitives', () => {
     expect(screen.getByText('네이버 · 미등록').parentElement?.className).toContain('ui-badge-neutral')
     expect(screen.getByText('쿠팡 · 판매 중지').parentElement?.className).toContain('ui-badge-warning')
     expect(screen.getByText('네이버 · 동기화 오류').parentElement?.className).toContain('ui-badge-danger')
+    expect(screen.getByText('쿠팡 · 승인 대기').parentElement?.className).toContain('ui-badge-warning')
+    expect(screen.getByText('네이버 · 품절').parentElement?.className).toContain('ui-badge-neutral')
+    expect(screen.getByText('쿠팡 · 연결 필요').parentElement?.className).toContain('ui-badge-danger')
   })
 
   it('exposes an accessible label on icon buttons and keeps icon plus text actions visible', () => {

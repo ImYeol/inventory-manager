@@ -1,174 +1,72 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
-  getAnalyticsData: vi.fn(),
-  getTransactionsWithRelations: vi.fn(),
-  getInventoryHistory: vi.fn(),
-  getTransactionTrend: vi.fn(),
-  getWarehouseComparison: vi.fn(),
+  getOperationsDashboard: vi.fn(),
 }))
 
-vi.mock('@/lib/data', () => ({
-  getAnalyticsData: mocks.getAnalyticsData,
-  getTransactionsWithRelations: mocks.getTransactionsWithRelations,
-}))
-
-vi.mock('@/lib/actions/analytics', () => ({
-  getInventoryHistory: mocks.getInventoryHistory,
-  getTransactionTrend: mocks.getTransactionTrend,
-  getWarehouseComparison: mocks.getWarehouseComparison,
-}))
-
-vi.mock('@/app/(protected)/analytics/charts/InventoryTrendChart', () => ({
-  default: ({ data }: { data: unknown[] }) =>
-    React.createElement('div', {
-      'data-testid': 'inventory-trend-chart',
-      'data-count': data.length,
-    }),
-}))
-
-vi.mock('@/app/(protected)/analytics/charts/TransactionBarChart', () => ({
-  default: ({ data }: { data: unknown[] }) =>
-    React.createElement('div', {
-      'data-testid': 'transaction-bar-chart',
-      'data-count': data.length,
-    }),
-}))
-
-vi.mock('@/app/(protected)/analytics/charts/WarehouseCompareChart', () => ({
-  default: ({ data }: { data: unknown[] }) =>
-    React.createElement('div', {
-      'data-testid': 'warehouse-compare-chart',
-      'data-count': data.length,
-    }),
+vi.mock('@/lib/actions/dashboard', () => ({
+  getOperationsDashboard: mocks.getOperationsDashboard,
 }))
 
 import DashboardPage from '@/app/(protected)/page'
 
-async function chooseSelectOption(label: string, optionName: string) {
-  fireEvent.click(screen.getByRole('combobox', { name: label }))
-  fireEvent.click(await screen.findByRole('option', { name: optionName }))
-}
-
 beforeEach(() => {
-  mocks.getAnalyticsData.mockReset()
-  mocks.getTransactionsWithRelations.mockReset()
-  mocks.getInventoryHistory.mockReset()
-  mocks.getTransactionTrend.mockReset()
-  mocks.getWarehouseComparison.mockReset()
+  mocks.getOperationsDashboard.mockReset()
 })
 
 describe('DashboardPage', () => {
-  it('renders the reduced dashboard surface and wires three local chart strips', async () => {
-    mocks.getAnalyticsData.mockResolvedValue({
-      models: [
-        { id: 1, name: 'LP01' },
-        { id: 2, name: 'LP02' },
-      ],
-      inventorySummary: [
-        { modelName: 'LP01', total: 12 },
-        { modelName: 'LP02', total: 5 },
+  it('renders the action-oriented commerce operations dashboard', async () => {
+    mocks.getOperationsDashboard.mockResolvedValue({
+      metrics: {
+        newOrders: 4,
+        readyToFulfill: 3,
+        needsAttention: 2,
+        dispatchedToday: 7,
+      },
+      flow: [
+        { date: '2026-07-14', label: '7/14', inbound: 8, outbound: 3 },
+        { date: '2026-07-15', label: '7/15', inbound: 2, outbound: 7 },
       ],
       warehouses: [
-        { id: 1, name: '오금동' },
-        { id: 2, name: '대자동' },
+        { id: 1, name: '오금동', onHand: 20, committed: 4, available: 16 },
+        { id: 2, name: '대자동', onHand: 10, committed: 3, available: 7 },
       ],
-      catalog: [
-        {
-          id: 1,
-          name: 'LP01',
-          createdAt: '2026-04-13T00:00:00.000Z',
-          sizes: [{ id: 11, name: 'M', sortOrder: 1, modelId: 1 }],
-          colors: [{ id: 21, name: '네이비', rgbCode: '#111111', textWhite: true, sortOrder: 1, modelId: 1 }],
-          inventory: [
-            { id: 101, modelId: 1, sizeId: 11, colorId: 21, warehouseId: 1, warehouseName: '오금동', quantity: 2 },
-            { id: 102, modelId: 1, sizeId: 11, colorId: 21, warehouseId: 2, warehouseName: '대자동', quantity: 10 },
-          ],
-        },
-        {
-          id: 2,
-          name: 'LP02',
-          createdAt: '2026-04-13T00:00:00.000Z',
-          sizes: [{ id: 12, name: 'S', sortOrder: 1, modelId: 2 }],
-          colors: [{ id: 22, name: '블랙', rgbCode: '#000000', textWhite: true, sortOrder: 1, modelId: 2 }],
-          inventory: [{ id: 103, modelId: 2, sizeId: 12, colorId: 22, warehouseId: 1, warehouseName: '오금동', quantity: 5 }],
-        },
+      exceptions: [
+        { id: 10, channel: 'coupang', externalOrderId: 'CP-100', customerName: '홍길동', reason: 'SKU 연결 필요' },
+      ],
+      upcomingSourcing: [
+        { id: 20, expectedDate: '2026-07-18', factoryName: '이우 A공장', referenceCode: 'PO-20', remainingQuantity: 40 },
       ],
     })
-    mocks.getTransactionsWithRelations.mockResolvedValue({
-      models: [{ id: 1, name: 'LP01' }],
-      warehouses: [{ id: 1, name: '오금동' }],
-      transactions: [
-        {
-          id: 1,
-          date: '26.04.13',
-          type: '입고',
-          quantity: 3,
-          warehouseId: 1,
-          warehouse: '오금동',
-          warehouseName: '오금동',
-          createdAt: '2026-04-13T09:00:00.000Z',
-          modelName: 'LP01',
-          sizeName: 'M',
-          colorName: '네이비',
-          colorRgb: '#111111',
-        },
-      ],
-    })
-    mocks.getInventoryHistory.mockResolvedValue([{ label: '2026-04-01', quantity: 7 }])
-    mocks.getTransactionTrend.mockResolvedValue([{ label: '2026-04-01', inbound: 3, outbound: 1 }])
-    mocks.getWarehouseComparison.mockResolvedValue([
-      {
-        modelName: 'LP01',
-        warehouseTotals: [
-          { id: 1, name: '오금동', quantity: 3 },
-          { id: 2, name: '대자동', quantity: 1 },
-        ],
-      },
-    ])
 
     render((await DashboardPage()) as React.ReactElement)
 
-    expect(screen.getByText('대시보드')).toBeTruthy()
-    expect(screen.getByText('주문·재고·입고 예정의 오늘 할 일을 봅니다.')).toBeTruthy()
-    expect(screen.getByTestId('inventory-trend-chart')).toBeTruthy()
-    expect(screen.getByTestId('transaction-bar-chart')).toBeTruthy()
-    expect(screen.getByTestId('warehouse-compare-chart')).toBeTruthy()
-    expect(screen.queryByRole('link', { name: '재고 운영' })).toBeNull()
-    expect(screen.queryByRole('link', { name: '상품 관리' })).toBeNull()
-    expect(screen.queryByRole('link', { name: '운송장' })).toBeNull()
-    expect(screen.queryByRole('link', { name: '설정' })).toBeNull()
-    const totalInventoryLink = screen.getByRole('link', { name: /신규 주문/ })
-    const inboundLink = screen.getByRole('link', { name: /출고 준비/ })
-    const outboundLink = screen.getByRole('link', { name: /오늘 발송/ })
-    expect(totalInventoryLink.getAttribute('href')).toBe('/orders')
-    expect(inboundLink.getAttribute('href')).toBe('/orders')
-    expect(outboundLink.getAttribute('href')).toBe('/orders')
-    expect(totalInventoryLink.className).not.toContain('ui-card')
-    expect(inboundLink.className).not.toContain('ui-card')
-    expect(totalInventoryLink.closest('section')?.className).toContain('ui-card')
-    expect(inboundLink.closest('section')?.className).toContain('ui-card')
-    expect(screen.getByText('신규 주문').closest('section')?.className).toContain('ui-card')
-    expect(screen.getByRole('heading', { name: '재고 추이' }).closest('section')?.className).toContain('ui-card')
-    expect(screen.getByRole('heading', { name: '입출고 현황' }).closest('section')?.className).toContain('ui-card')
-    expect(screen.getByRole('heading', { name: '창고별 비교' }).closest('section')?.className).toContain('ui-card')
-    expect(screen.getByRole('heading', { name: '창고별 재고' }).closest('section')?.className).toContain('ui-card')
-    expect(screen.getByRole('heading', { name: '최근 처리 이력' }).closest('section')?.className).toContain('ui-card')
-    expect(screen.queryByRole('heading', { name: '주의 품목' })).toBeNull()
-    expect(screen.queryByRole('table', { name: '주의 품목' })).toBeNull()
-    expect(screen.getByRole('combobox', { name: '모델 필터' })).toBeTruthy()
-    expect(mocks.getAnalyticsData).toHaveBeenCalledTimes(1)
-    expect(mocks.getTransactionsWithRelations).toHaveBeenCalledTimes(1)
-    expect(mocks.getInventoryHistory).toHaveBeenCalledWith('monthly')
-    expect(mocks.getTransactionTrend).toHaveBeenCalledWith('monthly')
-    expect(mocks.getWarehouseComparison).toHaveBeenCalledWith()
+    expect(screen.getByRole('heading', { name: '대시보드' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: '신규 주문 4건' }).getAttribute('href')).toBe('/orders?view=new')
+    expect(screen.getByRole('link', { name: '출고 준비 3건' }).getAttribute('href')).toBe('/orders?view=ready')
+    expect(screen.getByRole('link', { name: '확인 필요 2건' }).getAttribute('href')).toBe('/orders?view=exception')
+    expect(screen.getByRole('link', { name: '오늘 발송 7건' }).getAttribute('href')).toBe('/orders?view=fulfilled')
 
-    await chooseSelectOption('모델 필터', 'LP01')
-    await waitFor(() => {
-      expect(mocks.getInventoryHistory).toHaveBeenLastCalledWith('monthly', 1, undefined, undefined)
-    })
+    expect(screen.getByRole('heading', { name: '최근 14일 입출고' })).toBeTruthy()
+    expect(screen.getByLabelText('7/14 입고 8, 출고 3')).toBeTruthy()
+    expect(screen.getByRole('table', { name: '창고별 재고 상태' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: '실재고' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: '예약' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: '가용' })).toBeTruthy()
+
+    expect(screen.getByRole('table', { name: '처리해야 할 주문 예외' })).toBeTruthy()
+    expect(screen.getByText('쿠팡')).toBeTruthy()
+    expect(screen.getByText('SKU 연결 필요')).toBeTruthy()
+    expect(screen.getByRole('table', { name: '곧 도착할 소싱' })).toBeTruthy()
+    expect(screen.getByText('이우 A공장')).toBeTruthy()
+    expect(screen.getByText('40개')).toBeTruthy()
+
+    expect(screen.queryByRole('heading', { name: '재고 추이' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: '창고별 비교' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: '최근 처리 이력' })).toBeNull()
+    expect(mocks.getOperationsDashboard).toHaveBeenCalledTimes(1)
   })
 })

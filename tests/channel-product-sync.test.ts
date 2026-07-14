@@ -72,6 +72,7 @@ describe('channel product sync', () => {
           channel: 'naver',
           seller_sku: 'SKU-1',
           variant_id: 42,
+          channel_reported: 9,
           channel_attributes: expect.objectContaining({ stockQuantity: 9, price: 10000 }),
         }),
       ],

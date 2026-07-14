@@ -67,6 +67,14 @@ function normalizeCoupangProduct(product: unknown): ChannelProductSnapshot[] {
     if (!vendorItemId) return []
     const approvalStatus = asString(item.approvalStatus ?? raw.status ?? raw.statusName)
     const onSale = item.onSale === true
+    const stockQuantity = asNumber(item.amountInStock)
+    const listingStatus = approvalStatus === 'PENDING'
+      ? 'approval-pending' as const
+      : onSale && stockQuantity === 0
+        ? 'sold-out' as const
+        : onSale
+          ? 'active' as const
+          : 'paused' as const
     return [{
       channel: 'coupang' as const,
       externalProductId: sellerProductId,
@@ -74,8 +82,8 @@ function normalizeCoupangProduct(product: unknown): ChannelProductSnapshot[] {
       sellerSku: asString(item.externalVendorSku),
       productName: asString(raw.sellerProductName ?? raw.productName),
       optionName: asString(item.vendorItemName ?? item.itemName),
-      listingStatus: onSale && approvalStatus !== 'PENDING' ? 'active' as const : 'paused' as const,
-      stockQuantity: asNumber(item.amountInStock),
+      listingStatus,
+      stockQuantity,
       price: asNumber(item.salePrice ?? item.price),
       imageUrl: asString(item.mainImage ?? raw.imageUrl),
       rawAttributes: raw,

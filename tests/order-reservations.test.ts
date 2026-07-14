@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { reservationDisposition } from '@/lib/actions/order-sync'
+import { reservationDisposition } from '@/lib/orders'
 
 describe('order reservations', () => {
   it('reserves only one warehouse with enough available stock and never decrements on-hand inventory', () => {

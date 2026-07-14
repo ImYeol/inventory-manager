@@ -1,6 +1,13 @@
 export type ChannelName = 'naver' | 'coupang'
 
-export type ChannelListingStatus = 'active' | 'paused' | 'unregistered' | 'sync-error'
+export type ChannelListingStatus =
+  | 'active'
+  | 'sold-out'
+  | 'approval-pending'
+  | 'mapping-required'
+  | 'paused'
+  | 'unregistered'
+  | 'sync-error'
 
 export type ChannelProductSnapshot = {
   channel: ChannelName
