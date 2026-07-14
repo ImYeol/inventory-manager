@@ -14,6 +14,10 @@
       "dir": "inventory-shipping-settings-reset",
       "status": "completed",
       "completed_at": "2026-04-20T05:08:14+0900"
+    },
+    {
+      "dir": "component-layer-unification",
+      "status": "completed"
     }
   ]
 }
