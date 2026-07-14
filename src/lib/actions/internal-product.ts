@@ -21,21 +21,28 @@ export async function createInternalProduct(input: {
   skuPrefix: string
 }) {
   const name = input.name.trim()
-  const sizes = values(input.sizes)
-  const colors = values(input.colors)
+  const optionSizes = values(input.sizes)
+  const optionColors = values(input.colors)
+  const sizes = optionSizes.length > 0 ? optionSizes : ['기본']
+  const colors = optionColors.length > 0 ? optionColors : ['기본']
   const prefix = skuPart(input.skuPrefix)
-  if (!name || !prefix || sizes.length === 0 || colors.length === 0) {
-    throw new Error('상품명, 사이즈, 색상, SKU prefix를 모두 입력해주세요.')
+  if (!name || !prefix) {
+    throw new Error('상품명과 SKU prefix를 입력해주세요.')
   }
-  if (new Set(sizes).size !== sizes.length || new Set(colors).size !== colors.length) {
+  if (new Set(optionSizes).size !== optionSizes.length || new Set(optionColors).size !== optionColors.length) {
     throw new Error('사이즈와 색상 값은 중복할 수 없습니다.')
   }
   if (sizes.length * colors.length > MAX_VARIANTS) {
     throw new Error(`판매 옵션은 최대 ${MAX_VARIANTS}개까지 만들 수 있습니다.`)
   }
 
-  const sellerSkus = sizes.flatMap((size) => colors.map((color) => `${prefix}-${skuPart(size)}-${skuPart(color)}`))
-  if (sellerSkus.some((sku) => sku.split('-').some((part) => !part)) || new Set(sellerSkus).size !== sellerSkus.length) {
+  if (optionSizes.some((size) => !skuPart(size)) || optionColors.some((color) => !skuPart(color))) {
+    throw new Error('판매자 SKU로 변환할 수 없는 옵션 값이 있습니다.')
+  }
+  const skuSizes = optionSizes.length > 0 ? optionSizes : ['']
+  const skuColors = optionColors.length > 0 ? optionColors : ['']
+  const sellerSkus = skuSizes.flatMap((size) => skuColors.map((color) => [prefix, skuPart(size), skuPart(color)].filter(Boolean).join('-')))
+  if (new Set(sellerSkus).size !== sellerSkus.length) {
     throw new Error('고유한 판매자 SKU를 만들 수 없는 값이 있습니다.')
   }
 
@@ -55,9 +62,9 @@ export async function createInternalProduct(input: {
 
     const sizeByName = new Map(createdSizes.map((row) => [row.name, Number(row.id)]))
     const colorByName = new Map(createdColors.map((row) => [row.name, Number(row.id)]))
-    const variants = sizes.flatMap((size) => colors.map((color) => ({
+    const variants = sizes.flatMap((size, sizeIndex) => colors.map((color, colorIndex) => ({
       user_id: user.id, model_id: modelId, size_id: sizeByName.get(size), color_id: colorByName.get(color),
-      seller_sku: `${prefix}-${skuPart(size)}-${skuPart(color)}`,
+      seller_sku: sellerSkus[sizeIndex * colors.length + colorIndex],
     })))
     const { data: createdVariants, error: variantError } = await supabase.from('product_variants').insert(variants).select('id, seller_sku')
     if (variantError || !createdVariants) throw new Error(variantError?.message ?? '판매 옵션 등록에 실패했습니다.')

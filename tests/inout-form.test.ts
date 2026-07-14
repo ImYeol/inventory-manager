@@ -24,6 +24,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
 })
 
 describe('InOutForm', () => {
@@ -44,6 +45,15 @@ describe('InOutForm', () => {
 
     expect(screen.getByText('창고가 없습니다.')).toBeTruthy()
     expect(screen.getByRole('link', { name: '창고 등록하러 가기' }).getAttribute('href')).toBe('/products')
+  })
+
+  it('uses the local calendar date instead of the previous UTC date', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-14T16:00:00.000Z'))
+
+    render(React.createElement(InOutForm, { warehouses: [], models: [] }))
+
+    expect((screen.getByLabelText('날짜') as HTMLInputElement).value).toBe('2026-07-15')
   })
 
   it('selects the only warehouse by default', () => {

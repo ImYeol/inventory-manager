@@ -276,8 +276,8 @@ export default function MasterDataManager({
 
   const toggleSelectedRefLink = () => {
     if (!selectedChannelRef) return
-    const nextVariantId = selectedChannelRef.variantId === null ? Number(selectedVariantId) : null
-    if (!Number.isInteger(nextVariantId) && selectedChannelRef.variantId === null) {
+    const nextVariantId = selectedChannelRef.variantId === null && selectedVariantId ? Number(selectedVariantId) : null
+    if (selectedChannelRef.variantId === null && (!Number.isInteger(nextVariantId) || Number(nextVariantId) <= 0)) {
       showToast({ type: 'error', text: '연결할 내부 판매 옵션을 선택해주세요.' })
       return
     }
@@ -298,6 +298,10 @@ export default function MasterDataManager({
     ...variant, id: String(variant.id), modelId: 0, sizeId: 0, colorId: 0,
     channels: { naver: refForChannel(variant, 'naver')?.listingStatus ?? 'unregistered', coupang: refForChannel(variant, 'coupang')?.listingStatus ?? 'unregistered' },
   }))
+  const draftSizes = splitList(internalProductDraft.sizeText)
+  const draftColors = splitList(internalProductDraft.colorText)
+  const draftVariantCount = Math.max(draftSizes.length, 1) * Math.max(draftColors.length, 1)
+  const draftSkuExample = [internalProductDraft.skuPrefix.trim(), draftSizes[0], draftColors[0]].filter(Boolean).join('-') || '—'
 
   return (
     <div className="space-y-4">
@@ -472,7 +476,11 @@ export default function MasterDataManager({
         footer={
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setSelectedChannelRef(null)}>닫기</Button>
-            <Button type="button" onClick={toggleSelectedRefLink} disabled={isPending}>
+            <Button
+              type="button"
+              onClick={toggleSelectedRefLink}
+              disabled={isPending || (selectedChannelRef?.variantId === null && !selectedVariantId)}
+            >
               {selectedChannelRef?.variantId === null ? '연결' : '해제'}
             </Button>
           </div>
@@ -590,7 +598,7 @@ export default function MasterDataManager({
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <label htmlFor="model-size-text" className={ui.label}>
-                사이즈
+                사이즈 (선택)
               </label>
               <textarea
                 id="model-size-text"
@@ -600,12 +608,12 @@ export default function MasterDataManager({
                 placeholder="예: S, M, L"
                 className={ui.control}
               />
-              <p className={ui.helpText}>쉼표나 줄바꿈으로 구분합니다.</p>
+              <p className={ui.helpText}>쉼표나 줄바꿈으로 구분합니다. 옵션이 없으면 비워두세요.</p>
             </div>
 
             <div className="space-y-2">
               <label htmlFor="model-color-text" className={ui.label}>
-                색상
+                색상 (선택)
               </label>
               <textarea
                 id="model-color-text"
@@ -615,7 +623,7 @@ export default function MasterDataManager({
                 placeholder="예: 블랙, 화이트"
                 className={ui.control}
               />
-              <p className={ui.helpText}>쉼표나 줄바꿈으로 구분합니다.</p>
+              <p className={ui.helpText}>쉼표나 줄바꿈으로 구분합니다. 옵션이 없으면 비워두세요.</p>
             </div>
           </div>
 
@@ -627,7 +635,7 @@ export default function MasterDataManager({
               <Input id="sku-prefix" value={internalProductDraft.skuPrefix} onChange={(event) => setInternalProductDraft((prev) => ({ ...prev, skuPrefix: event.target.value }))} placeholder="예: LP01" />
             </div>
             <div className={cx(ui.surfaceMuted, 'px-3 py-2 text-sm text-[color:var(--muted)]')}>
-              판매 옵션 {splitList(internalProductDraft.sizeText).length * splitList(internalProductDraft.colorText).length}개 · 예시 {internalProductDraft.skuPrefix.trim() && splitList(internalProductDraft.sizeText)[0] && splitList(internalProductDraft.colorText)[0] ? `${internalProductDraft.skuPrefix.trim()}-${splitList(internalProductDraft.sizeText)[0]}-${splitList(internalProductDraft.colorText)[0]}` : '—'}
+              판매 옵션 {draftVariantCount}개 · 예시 {draftSkuExample}
             </div>
           </div>
         </form>

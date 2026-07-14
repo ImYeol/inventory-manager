@@ -328,8 +328,10 @@ describe('shared action and status primitives', () => {
 
     expect(dialog.parentElement).toBe(document.body)
     expect(dialog.getAttribute('aria-describedby')).toBeTruthy()
+    expect(overlay?.tagName).toBe('DIV')
     expect(overlay?.className).toContain('z-0')
     expect(sheet?.className).toContain('z-10')
+    expect(sheet?.className).toContain('rounded-t-[var(--radius-lg)]')
     expect(document.body.style.overflow).toBe('hidden')
 
     fireEvent.keyDown(document, { key: 'Escape' })

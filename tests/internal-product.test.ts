@@ -25,4 +25,17 @@ describe('createInternalProduct', () => {
     await expect(createInternalProduct({ name: '내부 상품', sizes: Array.from({ length: 11 }, (_, index) => `${index}`), colors: Array.from({ length: 10 }, (_, index) => `${index}`), skuPrefix: 'LP' })).rejects.toThrow('최대 100개')
     expect(mocks.getSupabaseWithUser).not.toHaveBeenCalled()
   })
+
+  it('creates one base variant when size and color options are omitted', async () => {
+    const models = query({ id: 1 }); const sizes = query([{ id: 11, name: '기본' }]); const colors = query([{ id: 21, name: '기본' }]); const variants = query([{ id: 101, seller_sku: 'LP01' }]); const refs = query(null)
+    const supabase = { from: vi.fn((table: string) => ({ models, sizes, colors, product_variants: variants, channel_product_refs: refs }[table])) }
+    mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
+
+    await expect(createInternalProduct({ name: '단일 상품', sizes: [], colors: [], skuPrefix: 'LP01' })).resolves.toMatchObject({
+      variantCount: 1,
+      sellerSkus: ['LP01'],
+    })
+    expect(sizes.insert).toHaveBeenCalledWith([{ model_id: 1, name: '기본' }])
+    expect(colors.insert).toHaveBeenCalledWith([{ model_id: 1, name: '기본', rgb_code: '#000000', text_white: false }])
+  })
 })

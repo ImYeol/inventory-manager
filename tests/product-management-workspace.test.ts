@@ -67,15 +67,41 @@ describe('Product management workspace', () => {
     expect(mocks.refresh).toHaveBeenCalled()
   })
 
+  it('does not request a link until an internal variant is selected', async () => {
+    const unmatchedRef = {
+      ...props.channelProductRefs[1],
+      sellerSku: 'UNMATCHED-SKU',
+    }
+    render(React.createElement(MasterDataManager, { ...props, channelProductRefs: [props.channelProductRefs[0], unmatchedRef] }))
+
+    fireEvent.click(screen.getByText('네이버 · 연결 필요'))
+    const dialog = screen.getByRole('dialog', { name: '네이버 채널 상품' })
+    const linkButton = within(dialog).getByRole('button', { name: '연결' }) as HTMLButtonElement
+
+    expect(linkButton.disabled).toBe(true)
+    fireEvent.click(linkButton)
+    expect(mocks.linkVariant).not.toHaveBeenCalled()
+  })
+
   it('always renders the channel-first empty state and internal product creation preview', () => {
     render(React.createElement(MasterDataManager, { ...props, variants: [], channelProductRefs: [] }))
     expect(screen.getByText(/쿠팡\/네이버 실제 상품정보/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '내부 상품 등록' }))
     const dialog = screen.getByRole('dialog', { name: '내부 상품 등록' })
-    fireEvent.change(within(dialog).getByLabelText('사이즈'), { target: { value: 'S, M' } })
-    fireEvent.change(within(dialog).getByLabelText('색상'), { target: { value: '블랙' } })
+    fireEvent.change(within(dialog).getByLabelText(/사이즈/), { target: { value: 'S, M' } })
+    fireEvent.change(within(dialog).getByLabelText(/색상/), { target: { value: '블랙' } })
     fireEvent.change(within(dialog).getByLabelText('SKU prefix'), { target: { value: 'LP' } })
     expect(within(dialog).getByText(/판매 옵션 2개 · 예시 LP-S-블랙/)).toBeTruthy()
+  })
+
+  it('supports a single-SKU internal product without artificial size or color input', () => {
+    render(React.createElement(MasterDataManager, { ...props, variants: [], channelProductRefs: [] }))
+    fireEvent.click(screen.getByRole('button', { name: '내부 상품 등록' }))
+    const dialog = screen.getByRole('dialog', { name: '내부 상품 등록' })
+    fireEvent.change(within(dialog).getByLabelText('SKU prefix'), { target: { value: 'LP01' } })
+
+    expect(within(dialog).getByText(/판매 옵션 1개 · 예시 LP01/)).toBeTruthy()
+    expect(within(dialog).getAllByText(/옵션이 없으면 비워두세요/)).toHaveLength(2)
   })
 
   it('runs sync from the product toolbar and shows inline result metadata', async () => {

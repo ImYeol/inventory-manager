@@ -43,11 +43,11 @@ export function FixedSheet({ open, title, description, onClose, children, classN
 
   return createPortal(
     <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined}>
-      <button type="button" aria-hidden="true" tabIndex={-1} onClick={onClose} className={cn(ui.modalOverlay, '!z-0 cursor-default')} />
+      <div aria-hidden="true" onClick={onClose} className={cn(ui.modalOverlay, '!z-0 cursor-default')} />
       <div
         className={cn(
           ui.surfaceStrong,
-          'absolute inset-x-0 bottom-0 top-10 z-10 overflow-hidden rounded-t-[28px] md:inset-x-[max(2rem,calc(50%-32rem))] md:bottom-8 md:top-8 md:rounded-[28px]',
+          'absolute inset-x-0 bottom-0 top-10 z-10 overflow-hidden rounded-t-[var(--radius-lg)] md:inset-x-[max(2rem,calc(50%-32rem))] md:bottom-8 md:top-8 md:rounded-[var(--radius-lg)]',
           className,
         )}
       >

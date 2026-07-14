@@ -24,7 +24,7 @@
 - 상품 탭은 검색, 고정 보기, 동기화, 내부 상품 등록, 채널 상품 table을 항상 함께 보여주는 table-first surface다.
 - 미연결 채널 상품은 별도 안내 card가 아니라 table의 `연결 필요` badge 행으로 보여준다.
 - 연결 modal은 `ProductVariantCombobox`를 재사용한다. 정확히 하나 일치하는 판매자 SKU만 제안 선택할 수 있고, 상품명 자동 매칭은 금지한다.
-- 내부 상품 등록에는 상품명, 사이즈 값, 색상 값, SKU prefix만 둔다. 색상 hex·텍스트 방향은 업무 입력이 아니다.
+- 내부 상품 등록에는 상품명, 선택형 사이즈·색상 값, SKU prefix만 둔다. 옵션이 없는 단일 SKU는 사이즈·색상을 비워 등록할 수 있으며 색상 hex·텍스트 방향은 업무 입력이 아니다.
 1. 상품 관리는 상품/창고 기준정보의 top-level surface다.
 2. 대시보드는 KPI와 분석을 같은 surface에서 보여준다.
 3. 재고 운영은 list/history-first다.
