@@ -276,6 +276,10 @@ def build_codex_exec_command(root: Path) -> list[str]:
         "danger-full-access",
         "--full-auto",
         "--ephemeral",
+        "--model",
+        "gpt-5.6-terra",
+        "--config",
+        'model_reasoning_effort="medium"',
         "-",
     ]
 

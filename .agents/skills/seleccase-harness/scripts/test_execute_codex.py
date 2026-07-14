@@ -75,6 +75,12 @@ class ExecuteCodexTests(unittest.TestCase):
         self.assertEqual(args.phase_dir, "demo-phase")
         self.assertTrue(args.push)
 
+    def test_build_codex_exec_command_pins_terra_medium(self) -> None:
+        command = ex.build_codex_exec_command(self.fixture.root)
+
+        self.assertIn("gpt-5.6-terra", command)
+        self.assertIn('model_reasoning_effort="medium"', command)
+
     def test_refresh_state_normalizes_legacy_fields(self) -> None:
         phase = self.fixture.load_phase()
         phase["status"] = "in_progress"
