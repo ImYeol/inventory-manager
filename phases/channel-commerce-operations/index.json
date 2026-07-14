@@ -3,12 +3,43 @@
   "phase": "channel-commerce-operations",
   "status": "pending",
   "steps": [
-    { "step": 0, "name": "contract-and-channel-badge", "status": "pending" },
-    { "step": 1, "name": "commerce-schema-and-invariants", "status": "pending" },
-    { "step": 2, "name": "channel-product-sync", "status": "pending" },
-    { "step": 3, "name": "product-management-workspace", "status": "pending" },
-    { "step": 4, "name": "order-ingestion-and-reservations", "status": "pending" },
-    { "step": 5, "name": "tracking-import-and-fulfillment", "status": "pending" },
-    { "step": 6, "name": "inventory-sourcing-dashboard-integration", "status": "pending" }
+    {
+      "step": 0,
+      "name": "contract-and-channel-badge",
+      "status": "completed",
+      "started_at": "2026-07-15T00:32:32+0900",
+      "completed_at": "2026-07-15T00:45:00+0900",
+      "summary": "Recorded the approved orders-owned IA and ProductVariant/ChannelProductRef inventory invariants (reservation, atomic post-fulfillment decrement, and absolute-quantity channel sync) in PRD, Architecture, and ADR. Added the canonical ChannelBadge API (channel, listingStatus, optional compact) with visible channel/status text and semantic Badge tones. Verified with npm run test -- --run tests/shared-primitives.test.ts tests/nav.test.ts and npm run lint (0 errors; 4 existing warnings)."
+    },
+    {
+      "step": 1,
+      "name": "commerce-schema-and-invariants",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "channel-product-sync",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "product-management-workspace",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "order-ingestion-and-reservations",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "tracking-import-and-fulfillment",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "inventory-sourcing-dashboard-integration",
+      "status": "pending"
+    }
   ]
 }
