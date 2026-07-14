@@ -1,0 +1,14 @@
+{
+  "project": "Seleccase Inventory",
+  "phase": "channel-commerce-operations",
+  "status": "pending",
+  "steps": [
+    { "step": 0, "name": "contract-and-channel-badge", "status": "pending" },
+    { "step": 1, "name": "commerce-schema-and-invariants", "status": "pending" },
+    { "step": 2, "name": "channel-product-sync", "status": "pending" },
+    { "step": 3, "name": "product-management-workspace", "status": "pending" },
+    { "step": 4, "name": "order-ingestion-and-reservations", "status": "pending" },
+    { "step": 5, "name": "tracking-import-and-fulfillment", "status": "pending" },
+    { "step": 6, "name": "inventory-sourcing-dashboard-integration", "status": "pending" }
+  ]
+}

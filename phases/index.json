@@ -22,6 +22,10 @@
     {
       "dir": "dashboard-and-naver-settings-simplification",
       "status": "completed"
+    },
+    {
+      "dir": "channel-commerce-operations",
+      "status": "pending"
     }
   ]
 }
