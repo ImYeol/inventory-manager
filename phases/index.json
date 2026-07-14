@@ -18,6 +18,10 @@
     {
       "dir": "component-layer-unification",
       "status": "completed"
+    },
+    {
+      "dir": "dashboard-and-naver-settings-simplification",
+      "status": "pending"
     }
   ]
 }
