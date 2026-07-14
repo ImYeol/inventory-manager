@@ -8,17 +8,17 @@ description: 이 프로젝트의 Harness 워크플로우를 Codex CLI 기준으�
 이 프로젝트는 Harness 프레임워크를 사용한다. 스킬 자체에 제품/IA/UI 가드레일을 중복 기록하지 말고, 아래 문서를 source of truth로 사용한다.
 
 ## Read First
-- `/Users/yeol-mac/Development/seleccase-inventory/AGENTS.md`
-- `/Users/yeol-mac/Development/seleccase-inventory/.codex/config.toml`
-- `/Users/yeol-mac/Development/seleccase-inventory/.codex/hooks.json`
-- `/Users/yeol-mac/Development/seleccase-inventory/docs/PRD.md`
-- `/Users/yeol-mac/Development/seleccase-inventory/docs/ARCHITECTURE.md`
-- `/Users/yeol-mac/Development/seleccase-inventory/docs/UI_GUIDE.md`
-- `/Users/yeol-mac/Development/seleccase-inventory/docs/COMPONENTS.md`
-- `/Users/yeol-mac/Development/seleccase-inventory/docs/DESIGN.md`
-- `/Users/yeol-mac/Development/seleccase-inventory/docs/MOTION.md`
-- `/Users/yeol-mac/Development/seleccase-inventory/docs/ADR.md`
-- `/Users/yeol-mac/Development/seleccase-inventory/phases/index.json`
+- `AGENTS.md`
+- `.codex/config.toml`
+- `.codex/hooks.json`
+- `docs/PRD.md`
+- `docs/ARCHITECTURE.md`
+- `docs/UI_GUIDE.md`
+- `docs/COMPONENTS.md`
+- `docs/DESIGN.md`
+- `docs/MOTION.md`
+- `docs/ADR.md`
+- `phases/index.json`
 
 `AGENTS.md`와 `docs/`가 저장소 계약의 source of truth다. 이 스킬과 충돌하면 문서를 따른다.
 

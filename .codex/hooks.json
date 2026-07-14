@@ -2,22 +2,25 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
-        "handlers": [
+        "matcher": "^(Bash|apply_patch|Edit|Write)$",
+        "hooks": [
           {
             "type": "command",
-            "command": "zsh .codex/hooks/dangerous-cmd-guard.sh",
-            "timeoutSec": 5
+            "command": "zsh \"$(git rev-parse --show-toplevel)/.codex/hooks/dangerous-cmd-guard.sh\"",
+            "timeout": 5,
+            "statusMessage": "Checking command safety"
           },
           {
             "type": "command",
-            "command": "zsh .codex/hooks/ui-review-guard.sh",
-            "timeoutSec": 5
+            "command": "zsh \"$(git rev-parse --show-toplevel)/.codex/hooks/ui-review-guard.sh\"",
+            "timeout": 5,
+            "statusMessage": "Checking UI contract review"
           },
           {
             "type": "command",
-            "command": "zsh .codex/hooks/tdd-guard.sh",
-            "timeoutSec": 5
+            "command": "zsh \"$(git rev-parse --show-toplevel)/.codex/hooks/tdd-guard.sh\"",
+            "timeout": 5,
+            "statusMessage": "Checking test coverage"
           }
         ]
       }

@@ -1,7 +1,4 @@
-import { LogOut } from 'lucide-react'
-import { logout } from '@/app/login/actions'
 import { getShippingSettingsSummary } from '@/lib/actions/shipping-settings'
-import { ActionToolbar, ToolbarButtonAction } from '@/components/ui/toolbar'
 import { PageHeader, ui } from '../../components/ui'
 import SettingsView from './SettingsView'
 
@@ -32,15 +29,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps =
     <div className={ui.shell}>
       <PageHeader
         title="설정"
-        actions={
-          <ActionToolbar>
-            <form action={logout}>
-              <ToolbarButtonAction type="submit" icon={<LogOut className="h-4 w-4" />}>
-                로그아웃
-              </ToolbarButtonAction>
-            </form>
-          </ActionToolbar>
-        }
+        description="네이버·쿠팡 채널 연결에 필요한 API 정보를 관리합니다."
       />
       <SettingsView summary={summary} focusProvider={focusProvider} />
     </div>

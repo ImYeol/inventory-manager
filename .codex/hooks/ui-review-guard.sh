@@ -3,8 +3,7 @@ set -euo pipefail
 
 payload=$(cat)
 
-result=$(
-  PAYLOAD="$payload" python3 <<'PY'
+PAYLOAD="$payload" python3 <<'PY'
 import json
 import os
 import re
@@ -41,64 +40,61 @@ DOC_ROOTS = (
 )
 
 
-def approve():
-    print(json.dumps({"decision": "approve"}))
+def silent():
+    print("{}")
 
-
-raw = os.environ.get("PAYLOAD", "").strip()
-if not raw:
-    approve()
-    raise SystemExit
 
 try:
-    payload = json.loads(raw)
+    payload = json.loads(os.environ.get("PAYLOAD", ""))
 except json.JSONDecodeError:
-    approve()
+    silent()
     raise SystemExit
 
 tool_input = payload.get("tool_input")
 if not isinstance(tool_input, dict):
-    approve()
+    silent()
     raise SystemExit
 
-command = tool_input.get("command") or tool_input.get("cmd")
-if not isinstance(command, str) or not command.strip():
-    command = tool_input.get("cmd")
+command = tool_input.get("command") or tool_input.get("cmd") or ""
+patch = tool_input.get("patch") or ""
+if not isinstance(command, str):
+    command = ""
+if not isinstance(patch, str):
+    patch = ""
 
-if not isinstance(command, str) or not command.strip():
-    approve()
+if not command and not patch:
+    silent()
     raise SystemExit
 
-if not any(re.search(pattern, command) for pattern in MODIFICATION_PATTERNS):
-    approve()
+if command and not patch and not any(re.search(pattern, command) for pattern in MODIFICATION_PATTERNS):
+    silent()
     raise SystemExit
 
 path_candidates = re.findall(r"([A-Za-z0-9_./-]+\.[A-Za-z0-9_]+)", command)
+path_candidates.extend(
+    re.findall(r"^\*\*\* (?:Update|Add|Delete) File: (.+)$", patch, re.MULTILINE)
+)
 normalized_paths = {candidate.lstrip("./") for candidate in path_candidates}
 
 ui_targets = [path for path in normalized_paths if any(path.startswith(root) for root in UI_ROOTS)]
 doc_targets = [path for path in normalized_paths if path in DOC_ROOTS]
 
 if not ui_targets:
-    approve()
+    silent()
     raise SystemExit
 
 if doc_targets:
-    approve()
+    silent()
     raise SystemExit
 
 print(
     json.dumps(
         {
-            "decision": "block",
-            "reason": (
-                "BLOCKED: UI 변경은 shared theme/component/primitive/design token 기준을 "
+            "systemMessage": (
+                "UI 변경은 shared theme/component/primitive/design token 기준을 "
                 "docs/UI_GUIDE.md, docs/ARCHITECTURE.md, docs/ADR.md와 함께 검토하세요."
             ),
         }
     )
 )
 PY
-)
-
-printf '%s\n' "$result"

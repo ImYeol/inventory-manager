@@ -8,22 +8,19 @@ description: "이 저장소의 변경사항을 리뷰할 때 사용한다. revie
 Use this skill for repo-specific review passes.
 
 ## Bundled Scripts
-- Skill directory:
-  `/Users/yeol-mac/Development/seleccase-inventory/.agents/skills/seleccase-review`
-- Primary helper file:
-  `/Users/yeol-mac/Development/seleccase-inventory/.agents/skills/seleccase-review/scripts/review_codex.py`
-- Regression test file:
-  `/Users/yeol-mac/Development/seleccase-inventory/.agents/skills/seleccase-review/scripts/test_review_codex.py`
+- Skill directory: `.agents/skills/seleccase-review`
+- Primary helper file: `.agents/skills/seleccase-review/scripts/review_codex.py`
+- Regression test file: `.agents/skills/seleccase-review/scripts/test_review_codex.py`
 
 ## Read First
-- `/Users/yeol-mac/Development/seleccase-inventory/AGENTS.md`
-- `/Users/yeol-mac/Development/seleccase-inventory/.codex/config.toml`
-- `/Users/yeol-mac/Development/seleccase-inventory/.codex/hooks.json`
-- `/Users/yeol-mac/Development/seleccase-inventory/docs/ARCHITECTURE.md`
-- `/Users/yeol-mac/Development/seleccase-inventory/docs/ADR.md`
-- `/Users/yeol-mac/Development/seleccase-inventory/docs/UI_GUIDE.md`
-- `/Users/yeol-mac/Development/seleccase-inventory/phases/index.json`
-- The active phase index under `/Users/yeol-mac/Development/seleccase-inventory/phases/`
+- `AGENTS.md`
+- `.codex/config.toml`
+- `.codex/hooks.json`
+- `docs/ARCHITECTURE.md`
+- `docs/ADR.md`
+- `docs/UI_GUIDE.md`
+- `phases/index.json`
+- The active phase index under `phases/`
 - The current `step*.md` file for the work being reviewed
 
 ## Review Workflow

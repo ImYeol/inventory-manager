@@ -74,45 +74,93 @@ const activityTone = (type: string) => {
   return 'neutral'
 }
 
-function ControlStrip({
-  idPrefix,
-  title,
+type RangePreset = '7d' | '30d' | '90d' | 'ytd' | 'all' | 'custom'
+
+const rangePresetOptions: { value: RangePreset; label: string }[] = [
+  { value: '7d', label: '최근 7일' },
+  { value: '30d', label: '30일' },
+  { value: '90d', label: '90일' },
+  { value: 'ytd', label: '올해' },
+  { value: 'all', label: '전체' },
+  { value: 'custom', label: '직접 지정' },
+]
+
+function toISODate(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function computePresetRange(preset: RangePreset): { from: string; to: string } {
+  if (preset === 'all' || preset === 'custom') return { from: '', to: '' }
+
+  const today = new Date()
+  const to = toISODate(today)
+
+  if (preset === 'ytd') {
+    return { from: `${today.getFullYear()}-01-01`, to }
+  }
+
+  const days = preset === '7d' ? 6 : preset === '30d' ? 29 : 89
+  const from = new Date(today)
+  from.setDate(from.getDate() - days)
+  return { from: toISODate(from), to }
+}
+
+function DashboardControls({
   models,
-  period,
-  showPeriod,
   selectedModel,
+  onModelChange,
+  period,
+  onPeriodChange,
+  preset,
+  onPresetChange,
   dateFrom,
   dateTo,
-  onPeriodChange,
-  onModelChange,
   onDateFromChange,
   onDateToChange,
 }: {
-  idPrefix: string
-  title: string
   models: ModelOption[]
-  period?: Period
-  showPeriod?: boolean
   selectedModel: number | undefined
+  onModelChange: (next: number | undefined) => void
+  period: Period
+  onPeriodChange: (next: Period) => void
+  preset: RangePreset
+  onPresetChange: (next: RangePreset) => void
   dateFrom: string
   dateTo: string
-  onPeriodChange?: (next: Period) => void
-  onModelChange: (next: number | undefined) => void
   onDateFromChange: (next: string) => void
   onDateToChange: (next: string) => void
 }) {
-  // Visible labels stay short; accessible names carry the chart title so the
-  // three chart strips remain distinguishable to assistive tech.
   return (
-    <div className={cx('grid items-end gap-2.5', showPeriod ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-3')}>
-      {showPeriod ? (
-        <div className="space-y-1.5">
-          <label htmlFor={`${idPrefix}-period`} className={ui.label}>
-            기간
-          </label>
-          <Select value={period} onValueChange={(next) => onPeriodChange?.(next as Period)}>
-            <SelectTrigger id={`${idPrefix}-period`} aria-label={`${title} 기간`} className={cx(ui.controlSm, 'w-full')}>
-              <SelectValue placeholder="기간 선택" />
+    <section className="ui-data-surface">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 px-3.5 py-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-[color:var(--muted-foreground)]">모델</span>
+          <Select
+            value={selectedModel !== undefined ? String(selectedModel) : 'all'}
+            onValueChange={(value) => onModelChange(value === 'all' ? undefined : Number(value))}
+          >
+            <SelectTrigger aria-label="모델 필터" className={cx(ui.controlSm, 'w-[9.5rem]')}>
+              <SelectValue placeholder="전체" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체</SelectItem>
+              {models.map((model) => (
+                <SelectItem key={model.id} value={String(model.id)}>
+                  {model.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-[color:var(--muted-foreground)]">단위</span>
+          <Select value={period} onValueChange={(next) => onPeriodChange(next as Period)}>
+            <SelectTrigger aria-label="집계 단위" className={cx(ui.controlSm, 'w-[6.5rem]')}>
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {(Object.keys(periodLabels) as Period[]).map((option) => (
@@ -123,58 +171,56 @@ function ControlStrip({
             </SelectContent>
           </Select>
         </div>
+
+        <div className={cx(ui.tabsList, 'ml-auto')} role="group" aria-label="기간 범위">
+          {rangePresetOptions.map((option) => {
+            const active = preset === option.value
+            return (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => onPresetChange(option.value)}
+                className={cx(active ? ui.tabActive : ui.tab, 'px-3 text-xs')}
+              >
+                {option.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {preset === 'custom' ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[color:var(--border-strong)] bg-[color-mix(in_srgb,var(--surface-muted)_45%,white)] px-3.5 py-2.5">
+          <div className="flex items-center gap-2">
+            <label htmlFor="dashboard-from" className="text-xs font-medium text-[color:var(--muted-foreground)]">
+              시작일
+            </label>
+            <input
+              id="dashboard-from"
+              type="date"
+              value={dateFrom}
+              max={dateTo || undefined}
+              onChange={(event) => onDateFromChange(event.target.value)}
+              className={cx(ui.controlSm, 'w-[9.5rem]')}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label htmlFor="dashboard-to" className="text-xs font-medium text-[color:var(--muted-foreground)]">
+              종료일
+            </label>
+            <input
+              id="dashboard-to"
+              type="date"
+              value={dateTo}
+              min={dateFrom || undefined}
+              onChange={(event) => onDateToChange(event.target.value)}
+              className={cx(ui.controlSm, 'w-[9.5rem]')}
+            />
+          </div>
+        </div>
       ) : null}
-
-      <div className="space-y-1.5">
-        <label htmlFor={`${idPrefix}-model`} className={ui.label}>
-          모델
-        </label>
-        <Select
-          value={selectedModel !== undefined ? String(selectedModel) : 'all'}
-          onValueChange={(value) => onModelChange(value === 'all' ? undefined : Number(value))}
-        >
-          <SelectTrigger id={`${idPrefix}-model`} aria-label={`${title} 모델`} className={ui.controlSm}>
-            <SelectValue placeholder="전체" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">전체</SelectItem>
-            {models.map((model) => (
-              <SelectItem key={model.id} value={String(model.id)}>
-                {model.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-1.5">
-        <label htmlFor={`${idPrefix}-from`} className={ui.label}>
-          시작일
-        </label>
-        <input
-          id={`${idPrefix}-from`}
-          type="date"
-          aria-label={`${title} 시작일`}
-          value={dateFrom}
-          onChange={(event) => onDateFromChange(event.target.value)}
-          className={ui.controlSm}
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <label htmlFor={`${idPrefix}-to`} className={ui.label}>
-          종료일
-        </label>
-        <input
-          id={`${idPrefix}-to`}
-          type="date"
-          aria-label={`${title} 종료일`}
-          value={dateTo}
-          onChange={(event) => onDateToChange(event.target.value)}
-          className={ui.controlSm}
-        />
-      </div>
-    </div>
+    </section>
   )
 }
 
@@ -190,17 +236,15 @@ function ChartCardHeader({ title, description, loading }: { title: string; descr
   )
 }
 
-function TrendCard({
-  models,
-  initialData,
-}: {
-  models: ModelOption[]
-  initialData: InventoryHistoryItem[]
-}) {
-  const [period, setPeriod] = useState<Period>('monthly')
-  const [selectedModel, setSelectedModel] = useState<number | undefined>()
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+type SharedFilters = {
+  selectedModel: number | undefined
+  period: Period
+  dateFrom: string
+  dateTo: string
+}
+
+function TrendCard({ filters, initialData }: { filters: SharedFilters; initialData: InventoryHistoryItem[] }) {
+  const { selectedModel, period, dateFrom, dateTo } = filters
   const [data, setData] = useState(initialData)
   const [loading, startTransition] = useTransition()
   const didMount = useRef(false)
@@ -220,37 +264,15 @@ function TrendCard({
   return (
     <Card variant="strong" className="h-full overflow-hidden">
       <ChartCardHeader title="재고 추이" description="선택한 조건의 재고 흐름을 시간 축으로 확인합니다." loading={loading} />
-      <CardContent className="space-y-3 px-3 py-3">
-        <ControlStrip
-          idPrefix="trend"
-          title="재고 추이"
-          models={models}
-          period={period}
-          selectedModel={selectedModel}
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-          onPeriodChange={setPeriod}
-          onModelChange={setSelectedModel}
-          onDateFromChange={setDateFrom}
-          onDateToChange={setDateTo}
-        />
+      <CardContent className="px-3 py-3">
         <InventoryTrendChart data={data} />
       </CardContent>
     </Card>
   )
 }
 
-function FlowCard({
-  models,
-  initialData,
-}: {
-  models: ModelOption[]
-  initialData: TrendItem[]
-}) {
-  const [period, setPeriod] = useState<Period>('monthly')
-  const [selectedModel, setSelectedModel] = useState<number | undefined>()
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+function FlowCard({ filters, initialData }: { filters: SharedFilters; initialData: TrendItem[] }) {
+  const { selectedModel, period, dateFrom, dateTo } = filters
   const [data, setData] = useState(initialData)
   const [loading, startTransition] = useTransition()
   const didMount = useRef(false)
@@ -270,36 +292,15 @@ function FlowCard({
   return (
     <Card variant="strong" className="h-full overflow-hidden">
       <ChartCardHeader title="입출고 현황" description="입고와 출고를 기간별로 나란히 봅니다." loading={loading} />
-      <CardContent className="space-y-3 px-3 py-3">
-        <ControlStrip
-          idPrefix="flow"
-          title="입출고 현황"
-          models={models}
-          period={period}
-          selectedModel={selectedModel}
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-          onPeriodChange={setPeriod}
-          onModelChange={setSelectedModel}
-          onDateFromChange={setDateFrom}
-          onDateToChange={setDateTo}
-        />
+      <CardContent className="px-3 py-3">
         <TransactionBarChart data={data} />
       </CardContent>
     </Card>
   )
 }
 
-function WarehouseCard({
-  models,
-  initialData,
-}: {
-  models: ModelOption[]
-  initialData: WarehouseCompareItem[]
-}) {
-  const [selectedModel, setSelectedModel] = useState<number | undefined>()
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+function WarehouseCard({ filters, initialData }: { filters: SharedFilters; initialData: WarehouseCompareItem[] }) {
+  const { selectedModel, dateFrom, dateTo } = filters
   const [data, setData] = useState(initialData)
   const [loading, startTransition] = useTransition()
   const didMount = useRef(false)
@@ -319,19 +320,7 @@ function WarehouseCard({
   return (
     <Card variant="strong" className="h-full overflow-hidden">
       <ChartCardHeader title="창고별 비교" description="선택한 기간에서 창고별 순변동을 비교합니다." loading={loading} />
-      <CardContent className="space-y-3 px-3 py-3">
-        <ControlStrip
-          idPrefix="warehouse"
-          title="창고별 비교"
-          models={models}
-          showPeriod={false}
-          selectedModel={selectedModel}
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-          onModelChange={setSelectedModel}
-          onDateFromChange={setDateFrom}
-          onDateToChange={setDateTo}
-        />
+      <CardContent className="px-3 py-3">
         <WarehouseCompareChart data={data} />
       </CardContent>
     </Card>
@@ -348,6 +337,23 @@ export default function DashboardView({
   initialWarehouseComparison,
 }: DashboardViewProps) {
   const maxWarehouseQty = Math.max(...warehouses.map((warehouse) => warehouse.quantity), 1)
+
+  const [selectedModel, setSelectedModel] = useState<number | undefined>()
+  const [period, setPeriod] = useState<Period>('monthly')
+  const [preset, setPreset] = useState<RangePreset>('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+
+  const handlePresetChange = (next: RangePreset) => {
+    setPreset(next)
+    if (next !== 'custom') {
+      const range = computePresetRange(next)
+      setDateFrom(range.from)
+      setDateTo(range.to)
+    }
+  }
+
+  const filters: SharedFilters = { selectedModel, period, dateFrom, dateTo }
 
   return (
     <div className="space-y-4">
@@ -369,10 +375,24 @@ export default function DashboardView({
         ))}
       </div>
 
+      <DashboardControls
+        models={models}
+        selectedModel={selectedModel}
+        onModelChange={setSelectedModel}
+        period={period}
+        onPeriodChange={setPeriod}
+        preset={preset}
+        onPresetChange={handlePresetChange}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateFromChange={setDateFrom}
+        onDateToChange={setDateTo}
+      />
+
       <div className="grid gap-4 xl:grid-cols-3">
-        <TrendCard models={models} initialData={initialInventoryHistory} />
-        <FlowCard models={models} initialData={initialTransactionTrend} />
-        <WarehouseCard models={models} initialData={initialWarehouseComparison} />
+        <TrendCard filters={filters} initialData={initialInventoryHistory} />
+        <FlowCard filters={filters} initialData={initialTransactionTrend} />
+        <WarehouseCard filters={filters} initialData={initialWarehouseComparison} />
       </div>
 
       <Card variant="strong" className="overflow-hidden">

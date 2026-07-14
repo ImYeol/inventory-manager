@@ -3,14 +3,11 @@ set -euo pipefail
 
 payload=$(cat)
 
-result=$(
-  PAYLOAD="$payload" python3 <<'PY'
+PAYLOAD="$payload" python3 <<'PY'
 import json
 import os
 import re
-import shlex
 import subprocess
-import sys
 from pathlib import Path
 
 
@@ -31,33 +28,34 @@ MODIFICATION_PATTERNS = (
 )
 
 
-def approve() -> None:
-    print(json.dumps({"decision": "approve"}))
+def silent() -> None:
+    print("{}")
 
-
-raw = os.environ.get("PAYLOAD", "").strip()
-if not raw:
-    approve()
-    raise SystemExit
 
 try:
-    payload = json.loads(raw)
+    payload = json.loads(os.environ.get("PAYLOAD", ""))
 except json.JSONDecodeError:
-    approve()
+    silent()
     raise SystemExit
 
 tool_input = payload.get("tool_input")
 if not isinstance(tool_input, dict):
-    approve()
+    silent()
     raise SystemExit
 
-command = tool_input.get("command")
-if not isinstance(command, str) or not command.strip():
-    approve()
+command = tool_input.get("command", "")
+patch = tool_input.get("patch", "")
+if not isinstance(command, str):
+    command = ""
+if not isinstance(patch, str):
+    patch = ""
+
+if not command and not patch:
+    silent()
     raise SystemExit
 
-if not any(re.search(pattern, command) for pattern in MODIFICATION_PATTERNS):
-    approve()
+if command and not patch and not any(re.search(pattern, command) for pattern in MODIFICATION_PATTERNS):
+    silent()
     raise SystemExit
 
 try:
@@ -68,12 +66,15 @@ try:
         check=True,
     ).stdout.splitlines()
 except subprocess.CalledProcessError:
-    approve()
+    silent()
     raise SystemExit
 
 tracked_set = set(tracked)
 
 path_candidates = re.findall(r"([A-Za-z0-9_./-]+\.[A-Za-z0-9_]+)", command)
+path_candidates.extend(
+    re.findall(r"^\*\*\* (?:Update|Add|Delete) File: (.+)$", patch, re.MULTILINE)
+)
 
 implementation_files: list[str] = []
 for candidate in path_candidates:
@@ -92,7 +93,7 @@ for candidate in path_candidates:
     implementation_files.append(normalized)
 
 if not implementation_files:
-    approve()
+    silent()
     raise SystemExit
 
 missing_tests: list[str] = []
@@ -120,16 +121,12 @@ if missing_tests:
     print(
         json.dumps(
             {
-                "decision": "block",
-                "reason": "BLOCKED: 구현 파일 수정 전에 대응 테스트를 추가하세요. "
+                "systemMessage": "구현 파일 변경에 대응 테스트가 확인되지 않았습니다. "
                 + ", ".join(sorted(set(missing_tests))),
             }
         )
     )
     raise SystemExit
 
-approve()
+silent()
 PY
-)
-
-printf '%s\n' "$result"

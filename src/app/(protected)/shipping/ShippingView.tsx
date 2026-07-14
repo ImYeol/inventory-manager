@@ -42,6 +42,13 @@ type CoupangDateRange = {
   toDate?: string
 }
 
+const classificationFilterOptions = [
+  { value: 'all', label: '전체' },
+  { value: 'naver', label: '네이버' },
+  { value: 'coupang', label: '쿠팡' },
+  { value: 'unclassified', label: '미분류' },
+] as const
+
 const shippingPreviewColumns = [
   { key: 'classification', label: '분류' },
   { key: 'no', label: 'No' },
@@ -638,29 +645,30 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
       </Card>
 
       <Card variant="strong" className="overflow-hidden">
-        <CardHeader className="border-b border-[color:var(--border)] px-0 py-0">
-          <div className="px-4 py-2.5">
-            <CardTitle className="text-sm">분류 미리보기</CardTitle>
+        <CardHeader className="border-b border-[color:var(--border)] px-4 py-3">
+          <div className="space-y-1">
+            <CardTitle className="text-base">분류 미리보기</CardTitle>
+            <p className="text-sm leading-6 text-[color:var(--muted-foreground)]">채널을 선택해 분류 결과를 확인하고, 운송장을 각 채널로 전송합니다.</p>
           </div>
-          <div className="border-t border-[color:var(--border)] px-4 py-2">
-            <div className={cx(ui.toolbarDense, 'md:overflow-visible')}>
-              <Select
-                value={classificationFilter}
-                onValueChange={(value) =>
-                  handleClassificationFilterChange(value as 'all' | 'naver' | 'coupang' | 'unclassified')
-                }
-              >
-                <SelectTrigger aria-label="분류 필터" className={cx(ui.controlSm, 'h-8 w-[7.5rem] min-w-[7.5rem] rounded-xl px-2.5 text-xs')}>
-                  <SelectValue placeholder="전체" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">전체</SelectItem>
-                  <SelectItem value="naver">네이버</SelectItem>
-                  <SelectItem value="coupang">쿠팡</SelectItem>
-                  <SelectItem value="unclassified">미분류</SelectItem>
-                </SelectContent>
-              </Select>
-              <div className={cx(ui.actionGroupDense, 'gap-1.5 md:ml-auto')}>
+          <div className="mt-3 flex flex-col gap-2.5 md:flex-row md:flex-wrap md:items-center md:justify-between">
+            <div className={ui.tabsList} role="tablist" aria-label="분류 필터">
+              {classificationFilterOptions.map((option) => {
+                const active = classificationFilter === option.value
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => handleClassificationFilterChange(option.value)}
+                    className={cx(active ? ui.tabActive : ui.tab, 'px-3.5 text-xs')}
+                  >
+                    {option.label}
+                  </button>
+                )
+              })}
+            </div>
+            <div className={cx(ui.actionGroupDense, 'gap-1.5')}>
                 <ShippingProviderActionGroup
                   label="네이버"
                   configured={hasNaverConfig}
@@ -687,7 +695,6 @@ export default function ShippingView({ settingsSummary }: { settingsSummary: Shi
                 />
               </div>
             </div>
-          </div>
         </CardHeader>
 
         <CardContent className="space-y-0 p-0">

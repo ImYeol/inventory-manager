@@ -12,7 +12,7 @@ function normalizedSql(text: string) {
 
 describe('schema contract', () => {
   it('uses warehouse_id across the checked-in schema transition files', () => {
-    const root = '/Users/yeol-mac/Development/seleccase-inventory'
+    const root = process.cwd()
     const prismaSchema = normalizedSql(fs.readFileSync(path.join(root, 'prisma/schema.prisma'), 'utf8'))
     const schemaSql = normalizedSql(fs.readFileSync(path.join(root, 'supabase/schema.sql'), 'utf8'))
     const migrationSql = normalizedSql(

@@ -1,0 +1,48 @@
+# Block destructive command forms when Codex requests execution outside the sandbox.
+prefix_rule(
+    pattern = ["rm", "-rf"],
+    decision = "forbidden",
+    justification = "Remove only the intended path after reviewing it.",
+    match = ["rm -rf tmp"],
+    not_match = ["rm -f tmp/file"],
+)
+
+prefix_rule(
+    pattern = ["git", "reset", "--hard"],
+    decision = "forbidden",
+    justification = "Use a reversible patch or commit instead of discarding tracked changes.",
+    match = ["git reset --hard HEAD"],
+    not_match = ["git reset HEAD~1"],
+)
+
+prefix_rule(
+    pattern = ["git", "checkout", "--"],
+    decision = "forbidden",
+    justification = "Use an explicit reversible edit instead of discarding tracked changes.",
+    match = ["git checkout -- src/app/page.tsx"],
+    not_match = ["git checkout feature/example"],
+)
+
+prefix_rule(
+    pattern = ["git", "clean", "-fd"],
+    decision = "forbidden",
+    justification = "Review untracked files manually before deletion.",
+    match = ["git clean -fd"],
+    not_match = ["git clean -nfd"],
+)
+
+prefix_rule(
+    pattern = ["git", "push", "--force"],
+    decision = "forbidden",
+    justification = "Use a normal push; force pushes are prohibited for this project.",
+    match = ["git push --force origin main"],
+    not_match = ["git push origin main"],
+)
+
+prefix_rule(
+    pattern = ["git", "push", "--force-with-lease"],
+    decision = "forbidden",
+    justification = "Use a normal push; force pushes are prohibited for this project.",
+    match = ["git push --force-with-lease origin main"],
+    not_match = ["git push origin main"],
+)

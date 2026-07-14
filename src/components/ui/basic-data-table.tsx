@@ -43,6 +43,7 @@ export function BasicDataTable<Row>({
                 <TableHead
                   key={column.key}
                   className={cn(
+                    'whitespace-nowrap',
                     column.align === 'right' && 'text-right',
                   )}
                 >

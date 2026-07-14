@@ -28,31 +28,33 @@ export function StoreConnectionRow({
 }) {
   return (
     <Card variant="strong">
-      <CardHeader className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold text-[color:var(--foreground)]">{provider}</h2>
-            <StoreConnectionStatus configured={configured} />
-          </div>
-          <dl className="grid gap-2 text-sm text-[color:var(--muted)] sm:grid-cols-2">
+      <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-semibold text-[color:var(--foreground)]">{provider}</h2>
+          <StoreConnectionStatus configured={configured} />
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </CardHeader>
+
+      <CardContent className="space-y-5 pt-0">
+        {configured ? (
+          <dl className="grid gap-x-4 gap-y-2 rounded-xl bg-[color:var(--surface-muted)] px-4 py-3 text-sm sm:grid-cols-2">
             {summary.map((item) => (
-              <div key={item.label} className="space-y-0.5">
-                <dt className="text-xs font-medium uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">{item.label}</dt>
-                <dd translate="no" className="text-sm text-[color:var(--foreground)]">
-                  {item.value ?? '저장된 키 없음'}
+              <div key={item.label} className="flex items-baseline justify-between gap-3">
+                <dt className="text-xs font-medium text-[color:var(--muted-foreground)]">{item.label}</dt>
+                <dd translate="no" className="truncate text-sm font-medium text-[color:var(--foreground)]">
+                  {item.value ?? '—'}
                 </dd>
               </div>
             ))}
-            <div className="space-y-0.5">
-              <dt className="text-xs font-medium uppercase tracking-[0.12em] text-[color:var(--muted-foreground)]">최근 변경</dt>
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-xs font-medium text-[color:var(--muted-foreground)]">최근 변경</dt>
               <dd className="text-sm text-[color:var(--foreground)]">{formatUpdatedAt(updatedAt)}</dd>
             </div>
           </dl>
-        </div>
-        {action ? <div className="flex shrink-0 items-start justify-end md:justify-self-end">{action}</div> : null}
-      </CardHeader>
-
-      {children ? <CardContent className="space-y-4 pt-0">{children}</CardContent> : null}
+        ) : null}
+        {children}
+      </CardContent>
     </Card>
   )
 }
