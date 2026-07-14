@@ -27,8 +27,8 @@ afterEach(() => {
 })
 
 describe('InOutForm', () => {
-  async function openComboboxAndPick(label: string, option: string) {
-    const trigger = screen.getByRole('combobox', { name: label })
+  async function openComboboxAndPick(label: string, option: string, index = 0) {
+    const trigger = screen.getAllByRole('combobox', { name: label })[index]
     fireEvent.click(trigger)
     fireEvent.click(await screen.findByRole('option', { name: option }))
     return trigger
@@ -95,6 +95,26 @@ describe('InOutForm', () => {
     expect(screen.queryByRole('button', { name: '초기화' })).toBeNull()
     expect(screen.getByRole('button', { name: '행 추가' })).toBeTruthy()
     expect(screen.getAllByRole('button', { name: '행 복제' }).length).toBeGreaterThan(0)
+  })
+
+  it('shows incomplete row validation through the editable table', async () => {
+    render(
+      React.createElement(InOutForm, {
+        warehouses: [{ id: 7, name: '본사 창고' }],
+        models: [
+          {
+            id: 1,
+            name: 'LP01',
+            sizes: [{ id: 11, name: 'S', sortOrder: 1, modelId: 1 }],
+            colors: [{ id: 21, name: '네이비', rgbCode: '#111111', textWhite: true, sortOrder: 1, modelId: 1 }],
+          },
+        ],
+      }),
+    )
+
+    await openComboboxAndPick('모델', 'LP01')
+
+    expect(screen.getByRole('alert').textContent).toContain('사이즈, 색상, 수량 필요')
   })
 
   it('locks the overlay to the requested transaction type', () => {

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useCallback, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createTransactions, getCurrentStock } from '@/lib/actions'
-import { Card, CardContent } from '@/components/ui/card'
+import { EditableTable } from '@/components/ui/editable-table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cx, ui } from '../../components/ui'
 
@@ -330,14 +330,14 @@ export default function InOutForm({
 
         <div>
           {warehouses.length === 0 ? (
-            <div className={cx(ui.surfaceMuted, 'flex h-11 items-center gap-2 rounded-lg border border-dashed border-[color:var(--border)] px-3 py-2.5 text-sm text-slate-500')}>
+            <div className={cx(ui.surfaceMuted, 'flex h-11 items-center gap-2 rounded-lg border border-dashed border-[color:var(--border)] px-3 py-2.5 text-sm text-[color:var(--muted-foreground)]')}>
               창고가 없습니다.
-              <Link href="/products" className="text-slate-700 underline underline-offset-2">
+              <Link href="/products" className="text-[color:var(--foreground)] underline underline-offset-2">
                 창고 등록하러 가기
               </Link>
             </div>
           ) : lockedWarehouseId ? (
-            <div className={cx(ui.surfaceMuted, 'flex h-11 items-center rounded-lg px-3 text-sm font-medium text-slate-700')}>
+            <div className={cx(ui.surfaceMuted, 'flex h-11 items-center rounded-lg px-3 text-sm font-medium text-[color:var(--foreground)]')}>
               {warehouses.find((warehouse) => warehouse.id === selectedWarehouseId)?.name ?? '선택된 창고'}
             </div>
           ) : (
@@ -356,117 +356,106 @@ export default function InOutForm({
         </div>
       </div>
 
-      <Card variant="strong" className="overflow-hidden">
-        <CardContent className="p-0">
-          <div className={cx(ui.tableShell, 'overflow-x-auto border-0 shadow-none')}>
-          <table className="w-full text-sm">
-              <thead>
-              <tr className="ui-table-head text-left">
-                <th className="px-3 py-3">모델</th>
-                <th className="px-3 py-3">사이즈</th>
-                <th className="px-3 py-3">색상</th>
-                <th className="px-3 py-3 text-right">수량</th>
-                <th className="px-3 py-3 text-right">재고</th>
-                <th className="px-3 py-3 text-right">행 작업</th>
-              </tr>
-            </thead>
-            <tbody>
-              {resolvedRows.map((row, idx) => {
-                const model = row.model
-                const selectedColor = model?.colors.find((color) => color.id === row.colorId)
-                const hasError = rowErrors[idx].length > 0
+      <EditableTable
+        columns={[
+          { key: 'model', header: '모델' },
+          { key: 'size', header: '사이즈' },
+          { key: 'color', header: '색상' },
+          { key: 'quantity', header: '수량', align: 'right' },
+          { key: 'stock', header: '재고', align: 'right' },
+        ]}
+        rows={resolvedRows}
+        getRowKey={(row) => row.key}
+        renderCell={(row, columnKey) => {
+          const selectedColor = row.model?.colors.find((color) => color.id === row.colorId)
 
-                return (
-                  <tr key={row.key} className={cx('border-t border-[color:var(--border)]', hasError && 'bg-red-50/60')}>
-                    <td className="px-3 py-2.5">
-                      <SelectControl
-                        id={`transaction-model-${row.key}`}
-                        value={row.modelId === '' ? '' : String(row.modelId)}
-                        onValueChange={(value) => handleModelChange(row.key, value ?? '')}
-                        options={[
-                          { value: '', label: '모델 선택' },
-                          ...models.map((entry) => ({ value: String(entry.id), label: entry.name })),
-                        ]}
-                        placeholder="모델 선택"
-                        ariaLabel="모델"
-                      />
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <SelectControl
-                        id={`transaction-size-${row.key}`}
-                        value={row.sizeId === '' ? '' : String(row.sizeId)}
-                        onValueChange={(value) => handleSizeChange(row.key, value ?? '')}
-                        options={[
-                          { value: '', label: '사이즈' },
-                          ...(model?.sizes ?? []).map((size) => ({ value: String(size.id), label: size.name })),
-                        ]}
-                        placeholder="사이즈"
-                        ariaLabel="사이즈"
-                        disabled={!row.modelId}
-                      />
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-2">
-                        {selectedColor ? (
-                          <span className="h-3.5 w-3.5 rounded-full border border-[color:var(--border)]" style={{ backgroundColor: selectedColor.rgbCode }} />
-                        ) : null}
-                        <SelectControl
-                          id={`transaction-color-${row.key}`}
-                          value={row.colorId === '' ? '' : String(row.colorId)}
-                          onValueChange={(value) => handleColorChange(row.key, value ?? '')}
-                          options={[
-                            { value: '', label: '색상' },
-                            ...(model?.colors ?? []).map((color) => ({ value: String(color.id), label: color.name })),
-                          ]}
-                          placeholder="색상"
-                          ariaLabel="색상"
-                          disabled={!row.modelId}
-                        />
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <input
-                        type="number"
-                        min={1}
-                        value={row.quantity}
-                        onChange={(event) => updateRow(row.key, { quantity: event.target.value ? Number(event.target.value) : '' })}
-                        className={cx(ui.controlSm, 'text-right font-semibold')}
-                        placeholder="0"
-                        disabled={!canInput}
-                      />
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      {row.stockLoading ? (
-                        <span className="text-xs text-slate-400">조회 중…</span>
-                      ) : row.currentStock !== null ? (
-                        <span className="font-semibold text-slate-950">{row.currentStock}</span>
-                      ) : (
-                        <span className="text-xs text-slate-300">-</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center justify-end gap-2">
-                        <button type="button" onClick={() => duplicateRow(row.key)} className="text-sm text-slate-500 hover:text-slate-950" aria-label="행 복제">
-                          복제
-                        </button>
-                        <button type="button" onClick={() => removeRow(row.key)} className="text-sm text-slate-400 hover:text-slate-950" aria-label="행 삭제">
-                          삭제
-                        </button>
-                      </div>
-                      {hasError ? <p className="mt-1 text-right text-xs text-red-600">{rowErrors[idx].join(', ')} 필요</p> : null}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+          switch (columnKey) {
+            case 'model':
+              return (
+                <SelectControl
+                  id={`transaction-model-${row.key}`}
+                  value={row.modelId === '' ? '' : String(row.modelId)}
+                  onValueChange={(value) => handleModelChange(row.key, value ?? '')}
+                  options={[
+                    { value: '', label: '모델 선택' },
+                    ...models.map((entry) => ({ value: String(entry.id), label: entry.name })),
+                  ]}
+                  placeholder="모델 선택"
+                  ariaLabel="모델"
+                />
+              )
+            case 'size':
+              return (
+                <SelectControl
+                  id={`transaction-size-${row.key}`}
+                  value={row.sizeId === '' ? '' : String(row.sizeId)}
+                  onValueChange={(value) => handleSizeChange(row.key, value ?? '')}
+                  options={[
+                    { value: '', label: '사이즈' },
+                    ...(row.model?.sizes ?? []).map((size) => ({ value: String(size.id), label: size.name })),
+                  ]}
+                  placeholder="사이즈"
+                  ariaLabel="사이즈"
+                  disabled={!row.modelId}
+                />
+              )
+            case 'color':
+              return (
+                <div className="flex items-center gap-2">
+                  {selectedColor ? (
+                    <span className="h-3.5 w-3.5 rounded-full border border-[color:var(--border)]" style={{ backgroundColor: selectedColor.rgbCode }} />
+                  ) : null}
+                  <SelectControl
+                    id={`transaction-color-${row.key}`}
+                    value={row.colorId === '' ? '' : String(row.colorId)}
+                    onValueChange={(value) => handleColorChange(row.key, value ?? '')}
+                    options={[
+                      { value: '', label: '색상' },
+                      ...(row.model?.colors ?? []).map((color) => ({ value: String(color.id), label: color.name })),
+                    ]}
+                    placeholder="색상"
+                    ariaLabel="색상"
+                    disabled={!row.modelId}
+                  />
+                </div>
+              )
+            case 'quantity':
+              return (
+                <input
+                  type="number"
+                  min={1}
+                  value={row.quantity}
+                  onChange={(event) => updateRow(row.key, { quantity: event.target.value ? Number(event.target.value) : '' })}
+                  className={cx(ui.controlSm, 'text-right font-semibold')}
+                  placeholder="0"
+                  disabled={!canInput}
+                />
+              )
+            case 'stock':
+              return row.stockLoading ? (
+                <span className="text-xs text-[color:var(--muted-foreground)]">조회 중…</span>
+              ) : row.currentStock !== null ? (
+                <span className="font-semibold text-[color:var(--foreground)]">{row.currentStock}</span>
+              ) : (
+                <span className="text-xs text-[color:var(--muted-foreground)]">-</span>
+              )
+            default:
+              return null
+          }
+        }}
+        onAddRow={addRow}
+        onDeleteRow={removeRow}
+        onDuplicateRow={duplicateRow}
+        rowError={(row) => {
+          const errors = rowErrors[resolvedRows.findIndex((entry) => entry.key === row.key)] ?? []
+          return errors.length > 0 ? `${errors.join(', ')} 필요` : null
+        }}
+        minRows={1}
+      />
 
       <div className="flex flex-col gap-3 border-t border-[color:var(--border)] pt-4 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-foreground)]">
             <span className={ui.pill}>유효 {filledRows.length}건</span>
             <span className={ui.pillMuted}>확인 필요 {invalidRowCount}건</span>
           </div>
@@ -474,7 +463,7 @@ export default function InOutForm({
             <p
               className={cx(
                 'text-xs font-medium',
-                message.error ? 'text-red-600' : 'text-slate-500',
+                message.error ? 'text-[color:var(--danger-foreground)]' : 'text-[color:var(--muted-foreground)]',
               )}
               aria-live="polite"
             >
@@ -483,9 +472,6 @@ export default function InOutForm({
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2 md:justify-end">
-          <button type="button" onClick={addRow} className={ui.buttonSecondary}>
-            행 추가
-          </button>
           <button
             type="button"
             onClick={submitAll}
