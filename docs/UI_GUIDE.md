@@ -1,9 +1,8 @@
 # UI Guide
 
 ## Source Of Truth
-- UI/UX 원칙, design token, shared primitive 규칙의 source of truth는 이 문서다.
+- UI/UX 원칙과 shared primitive 규칙의 source of truth는 이 문서다. 시각 토큰 값과 스케일의 source of truth는 [DESIGN.md](./DESIGN.md), 모션의 source of truth는 [MOTION.md](./MOTION.md)다.
 - 토큰은 `src/app/globals.css`에, page-level preset은 `src/app/components/ui.tsx`에, shared primitive는 `src/components/ui`에 둔다.
-- 별도 루트 디자인 문서는 사용하지 않는다.
 
 ## 컴포넌트 경로 규칙
 - 이 저장소의 shadcn-style 기본 경로는 root `/components/ui`가 아니라 `src/components/ui`다.
@@ -90,6 +89,8 @@
   - `meta cluster`: reset, result count, compact status
 
 ## 디자인 토큰
+값과 스케일의 SoT는 [DESIGN.md](./DESIGN.md), 모션은 [MOTION.md](./MOTION.md)다. 아래 목록은 token 이름만 유지하며 구체적 값은 DESIGN.md를 참조한다.
+
 - `--background`
 - `--foreground`
 - `--surface`
@@ -103,9 +104,7 @@
 - `--shadow`
 
 ### Theme Direction
-- Base: neutral slate
-- Accent: action-first amber
-- Status: green / amber / red / blue by semantics
+- Base: warm neutral / Accent: action-first amber / Status: semantic (green/amber/red/blue)
 - 금지: purple-heavy SaaS gradient, glassmorphism, decorative glow
 
 ## Shared Primitive
@@ -334,6 +333,10 @@ src/components/ui/
 - 긴 설명문 대신 짧은 라벨과 배지를 우선한다.
 - 넓은 빈 여백보다 table viewport를 우선한다.
 
+## Sizing / Density 계약
+- control/button/tab/badge는 [DESIGN.md](./DESIGN.md)의 정의된 size tier만 사용한다.
+- 임의 height를 추가하지 않는다.
+
 ## 버튼과 드롭다운
 - 반복 액션은 icon + text를 기본으로 한다.
 - 같은 시야에서 filled primary 버튼은 1개가 기본이다.
@@ -352,6 +355,7 @@ src/components/ui/
 - page-local border patch로 임시 봉합하지 말고 shared card/surface primitive의 variant와 padding/token을 고쳐서 해결한다.
 
 ## 모션
+- duration, easing, reduced-motion의 SoT는 [MOTION.md](./MOTION.md)다.
 - 허용:
   - dropdown 열림/닫힘
   - table row 초기 진입

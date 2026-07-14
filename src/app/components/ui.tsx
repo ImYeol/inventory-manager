@@ -44,7 +44,7 @@ export const ui = {
   toolbarAction: 'ui-button ui-button-secondary ui-button-sm whitespace-nowrap',
   actionGroupDense: 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap',
   statusPillDense:
-    'inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-0.5 text-[11px] font-semibold text-slate-700',
+    'inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-0.5 text-[11px] font-semibold text-[color:var(--muted)]',
   buttonDense: 'h-8 rounded-xl px-2.5 text-xs',
   iconButton: 'ui-button ui-button-secondary ui-button-icon shrink-0',
   badge: 'ui-badge',
@@ -61,26 +61,26 @@ export const ui = {
   tableCell: 'ui-table-cell',
   emptyState: 'ui-empty px-6 py-14 text-center text-sm md:text-base',
   pageKicker:
-    'inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500',
-  pageTitle: 'text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl',
-  pageLead: 'max-w-2xl text-sm leading-6 text-slate-500 md:text-base',
+    'inline-flex items-center rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--muted-foreground)]',
+  pageTitle: 'text-2xl font-semibold tracking-tight text-[color:var(--foreground)] md:text-3xl',
+  pageLead: 'max-w-2xl text-sm leading-6 text-[color:var(--muted-foreground)] md:text-base',
   number: 'font-mono tabular-nums',
-  helpText: 'text-xs text-slate-500',
+  helpText: 'text-xs text-[color:var(--muted-foreground)]',
   navSectionButton:
-    'group flex w-full items-center justify-between gap-2 rounded-2xl border border-transparent px-3 py-2.5 text-left text-sm font-medium text-slate-600 transition-colors hover:border-slate-200 hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+    'group flex w-full items-center justify-between gap-2 rounded-2xl border border-transparent px-3 py-2.5 text-left text-sm font-medium text-[color:var(--muted)] transition-colors hover:border-[color:var(--border)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)]',
   navItem:
-    'group flex items-center gap-2 rounded-2xl border border-transparent px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:border-slate-200 hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+    'group flex items-center gap-2 rounded-2xl border border-transparent px-3 py-2.5 text-sm font-medium text-[color:var(--muted)] transition-colors hover:border-[color:var(--border)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)]',
   navItemActive:
-    'border-slate-200 bg-slate-50 text-slate-950 shadow-[0_1px_1px_rgba(15,23,42,0.03)]',
+    'border-[color:var(--border-strong)] bg-[color:var(--surface-muted)] text-[color:var(--foreground)] shadow-[var(--elevation-1)]',
   navSubItem:
-    'group flex items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:border-slate-200 hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+    'group flex items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-sm font-medium text-[color:var(--muted-foreground)] transition-colors hover:border-[color:var(--border)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)]',
   desktopSidebar:
     'fixed left-0 top-0 z-30 hidden h-screen w-[17rem] border-r border-[color:var(--border)] bg-[color:var(--surface)] md:flex md:flex-col',
   mobileTopbar:
-    'fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur md:hidden',
-  mobileDrawerScrim: 'fixed inset-0 z-40 bg-slate-950/35 md:hidden',
+    'fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-[color:var(--border)] bg-[color:var(--surface)]/95 px-4 backdrop-blur md:hidden',
+  mobileDrawerScrim: 'fixed inset-0 z-40 bg-[color:var(--foreground)]/35 md:hidden',
   mobileDrawer:
-    'fixed inset-y-0 left-0 z-50 flex w-[min(88vw,22rem)] flex-col border-r border-slate-200 bg-white shadow-xl md:hidden',
+    'fixed inset-y-0 left-0 z-50 flex w-[min(88vw,22rem)] flex-col border-r border-[color:var(--border)] bg-[color:var(--surface)] shadow-[var(--elevation-3)] md:hidden',
   modal: 'ui-modal',
   modalOverlay: 'ui-modal-overlay',
   modalContent: 'ui-modal-content',

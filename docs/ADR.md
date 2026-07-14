@@ -124,3 +124,18 @@
 - Carbon: table에 영향을 주는 액션은 table toolbar에 둔다.
 - PatternFly: action은 영향을 주는 surface 가까이에 둔다.
 - Oracle: 자동 반영 가능한 흐름에는 불필요한 refresh UI를 늘리지 않는다.
+
+## ADR-025: 시각 기반 토큰 계층과 명명 스케일을 도입한다
+**결정**: visual token은 primitive → semantic → component 계층으로 관리한다. primitive/semantic은 `src/app/globals.css`, component preset bridge는 `src/app/components/ui.tsx`, shared primitive는 `src/components/ui/*`가 소유한다. 컴포넌트에 색상, 크기, radius, duration을 하드코딩하지 않는다.
+**이유**: 스케일 부재로 작은 높이가 3종, 이름 없는 radius가 7종, `150ms` 하드코딩이 누적되어 화면별 드리프트가 발생했다.
+**트레이드오프**: 단순한 시각 변경도 먼저 토큰과 primitive 계층을 검토해야 하지만, 이후 변경의 일관성과 검토 가능성이 높아진다.
+
+## ADR-026: base 뉴트럴은 warm으로, 브랜드 accent는 amber로 유지한다
+**결정**: base neutral palette는 warm neutral을 사용하고, action-first 브랜드 accent는 amber를 유지한다.
+**이유**: 노션식 가시성과 따뜻한 표면 깊이를 얻으면서 기존 브랜드의 amber 정체성을 보존한다.
+**트레이드오프**: 기존 cool slate 화면은 warm tone에 맞춰 점진적으로 재조정해야 한다.
+
+## ADR-027: 모션은 semantic tier와 표준 easing으로 통일한다
+**결정**: 모션은 instant/fast/base/slow semantic tier와 표준 easing을 사용하고 `prefers-reduced-motion`을 존중한다.
+**이유**: 고빈도 상호작용의 반응성을 유지하면서 화면별 임의 transition 값을 제거한다.
+**트레이드오프**: 장식적 spring이나 반복 효과의 표현 폭은 줄지만, 운영 데이터의 가독성과 접근성은 높아진다.

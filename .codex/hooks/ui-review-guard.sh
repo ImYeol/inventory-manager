@@ -35,6 +35,8 @@ DOC_ROOTS = (
     "docs/UI_GUIDE.md",
     "docs/ARCHITECTURE.md",
     "docs/ADR.md",
+    "docs/DESIGN.md",
+    "docs/MOTION.md",
 )
 
 

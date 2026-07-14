@@ -14,6 +14,8 @@ description: 이 프로젝트의 Harness 워크플로우를 Codex CLI 기준으�
 - `/Users/yeol-mac/Development/seleccase-inventory/docs/PRD.md`
 - `/Users/yeol-mac/Development/seleccase-inventory/docs/ARCHITECTURE.md`
 - `/Users/yeol-mac/Development/seleccase-inventory/docs/UI_GUIDE.md`
+- `/Users/yeol-mac/Development/seleccase-inventory/docs/DESIGN.md`
+- `/Users/yeol-mac/Development/seleccase-inventory/docs/MOTION.md`
 - `/Users/yeol-mac/Development/seleccase-inventory/docs/ADR.md`
 - `/Users/yeol-mac/Development/seleccase-inventory/phases/index.json`
 
