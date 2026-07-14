@@ -68,7 +68,8 @@ describe('shared action and status primitives', () => {
       expect(document).toContain('절대 수량')
     }
 
-    expect(prd).toContain('대시보드 / 주문 / 상품 관리 / 재고 운영 / 소싱 / 설정')
+    expect(prd).toContain('대시보드 / 주문 / 상품 관리 / 재고 운영 / 소싱')
+    expect(prd).toContain('API 설정은 하단 계정 메뉴')
     expect(architecture).toContain('available = onHand - committed')
     expect(architecture).toContain('외부 발송 성공')
     expect(adr).toContain("`/shipping`은 `/orders/tracking-import`로 redirect")

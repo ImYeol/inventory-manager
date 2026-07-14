@@ -26,4 +26,13 @@ describe('tracking import contracts', () => {
       ['MATCHED', 'naver', true], ['MATCHED', 'coupang', true], ['MATCHED', 'naver', true], ['TRACKING_MISSING', null, false],
     ])
   })
+
+  it('requires a mapped tracking-number column before a row can be dispatchable', () => {
+    const rows = matchTrackingRows([{
+      rowNumber: 1, orderNumber: 'ORDER-1', trackingNumber: '', carrier: '', recipientName: '홍길동', address: '서울', shippedAt: '',
+    }], [{
+      id: 1, externalOrderId: 'ORDER-1', sellerSku: null, recipientName: '홍길동', address: '서울', channel: 'naver',
+    }])
+    expect(rows[0]).toMatchObject({ matchStatus: 'TRACKING_MISSING', dispatchable: false })
+  })
 })

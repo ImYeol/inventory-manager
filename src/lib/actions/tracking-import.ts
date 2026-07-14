@@ -6,15 +6,26 @@ import { BUILT_IN_TRACKING_PRESETS, matchTrackingRows, type TrackingColumnMappin
 
 export type FulfillmentCandidate = { lineId: number; reservationId: number; channel: 'naver' | 'coupang'; externalLineId: string; trackingNumber: string; carrier: string; trackingImportBatchId?: number; shipmentBoxId?: number; orderId?: number; vendorItemId?: number }
 export type TrackingPreviewRow = TrackingMatch & { fulfillmentCandidate?: FulfillmentCandidate }
+export type SavedTrackingPreset = { id: number; name: string; channel: 'naver' | 'coupang' | null; mapping: TrackingColumnMapping }
 
 const keyFor = (row: FulfillmentCandidate) => `${row.channel}:${row.externalLineId}:${row.trackingNumber}`
 
 /** Built-ins are code-owned; only a clone under a new name may be persisted. */
 export async function saveTrackingPreset(input: { name: string; channel?: 'naver' | 'coupang'; mapping: TrackingColumnMapping }) {
-  if (BUILT_IN_TRACKING_PRESETS.some((preset) => preset.name === input.name)) throw new Error('기본 프리셋은 복제 후 저장할 수 있습니다.')
+  const name = input.name.trim()
+  if (!name) throw new Error('프리셋 이름을 입력하세요.')
+  if (BUILT_IN_TRACKING_PRESETS.some((preset) => preset.name === name)) throw new Error('기본 프리셋은 다른 이름으로 복제해 저장하세요.')
   const { supabase, user } = await getSupabaseWithUser()
-  const { error } = await supabase.from('tracking_import_templates').upsert({ user_id: user.id, name: input.name, channel: input.channel ?? null, column_mapping: input.mapping }, { onConflict: 'user_id,channel,name' })
+  const { data, error } = await supabase.from('tracking_import_templates').upsert({ user_id: user.id, name, channel: input.channel ?? null, column_mapping: input.mapping }, { onConflict: 'user_id,channel,name' }).select('id,name,channel,column_mapping').single()
   if (error) throw new Error('프리셋을 저장하지 못했습니다.')
+  return { id: Number(data.id), name: data.name, channel: data.channel as SavedTrackingPreset['channel'], mapping: data.column_mapping as TrackingColumnMapping }
+}
+
+export async function listTrackingPresets(): Promise<SavedTrackingPreset[]> {
+  const { supabase, user } = await getSupabaseWithUser()
+  const { data, error } = await supabase.from('tracking_import_templates').select('id,name,channel,column_mapping').eq('user_id', user.id).order('name')
+  if (error) throw new Error('저장된 프리셋을 불러오지 못했습니다.')
+  return (data ?? []).map((item) => ({ id: Number(item.id), name: item.name, channel: item.channel as SavedTrackingPreset['channel'], mapping: item.column_mapping as TrackingColumnMapping }))
 }
 
 /** Stores only normalized values and a compact validation summary—never uploaded bytes. */
