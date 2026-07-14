@@ -112,7 +112,7 @@ Seleccase Inventory를 `dashboard 내부 분석 + 상품 관리 table-first + �
   - `입고`
   - `출고`
   - `CSV`
-- 단, `CSV`와 `이력`이 한 화면 UX를 과도하게 복잡하게 만들면 `/inventory/csv`, `/inventory/history` 같은 하위 페이지로 분리할 수 있다.
+- `이력`은 이미 top-level `/history` standalone route로 제공되며, `CSV`가 한 화면 UX를 과도하게 복잡하게 만들면 `/inventory/csv` 하위 페이지로 추가 분리할 수 있다.
 - 창고 컨텍스트는 허브 공통 상태로 유지한다.
 
 ### 3. 재고 목록 테이블

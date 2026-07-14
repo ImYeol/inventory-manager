@@ -98,8 +98,8 @@ src/
 - `/products`: 상품과 창고 기준정보 canonical owner
 - `/inventory`: 재고 운영 landing
 - `/inventory?tab=list|history|inbound|outbound`: 목록, 이력, 빠른 입력 중심 워크스페이스
-- `/inventory/csv`: 필요 시 분리되는 대량 반영 workspace
-- `/inventory/history`: 필요 시 분리되는 이력 workspace
+- `/history`: 이력 canonical standalone route (재고 운영 ownership; `/inventory?tab=history`는 embedded view)
+- `/inventory/csv`: 필요 시 분리되는 대량 반영 workspace (조건부)
 - `/shipping`: 엑셀 업로드, 분류 미리보기, 매칭/발송
 - `/settings`: 스토어 연결
 - `/analytics`: 독립 화면이 아니라 `/`로 보내는 legacy redirect
@@ -122,10 +122,10 @@ src/
   - history table
   - column filters / visibility
   - quick inbound / quick outbound entry
+- `/history`
+  - 감사성 조회와 상세 이력 (standalone)
 - `/inventory/csv`
-  - 대량 파일 반영과 preview
-- `/inventory/history`
-  - 감사성 조회와 상세 이력
+  - 대량 파일 반영과 preview (조건부)
 - `/shipping`
   - 업로드
   - 분류 미리보기
@@ -268,15 +268,9 @@ shipping_preview_rows
 - strong card가 header/body를 함께 담는 경우, 절반만 살아 있는 seam이나 corner gap을 page-local border patch로 메우지 않는다. shared card/surface primitive의 variant와 padding/token을 고쳐서 하나의 clipped surface로 정리한다.
 
 ### External table example adaptation
-- 제공된 `project-data-table.tsx` 예시는 그대로의 도메인 필드가 아니라 `table layout`, `column visibility`, `row motion`, `dropdown interaction` 패턴만 가져온다.
-- canonical 위치는 `src/components/ui/project-data-table.tsx` 또는 더 구체적인 `src/components/ui/inventory-data-table.tsx`다.
-- demo의 repository/contributors/avatar/Unsplash 자산은 final inventory table에 필요하지 않으므로 그대로 들여오지 않는다.
-- 구현 단계에서만 다음 누락 의존성을 추가 검토한다.
-  - `class-variance-authority`
-  - `@radix-ui/react-slot`
-  - `@radix-ui/react-icons`
-  - `@radix-ui/react-dropdown-menu`
-  - `@radix-ui/react-avatar`
+- 외부 data-table 예제는 `table layout`, `column visibility`, `row motion`, `dropdown interaction` 패턴만 적응하고 demo 도메인 필드(repository/contributors/avatar/Unsplash)는 들여오지 않는다. 결정 근거는 ADR-010.
+- data-table의 canonical primitive는 `src/components/ui/inventory-data-table.tsx`(조회형)와 `src/components/ui/basic-data-table.tsx`다. 저장소에 없는 예제 파일명을 canonical 위치로 적지 않는다.
+- 관련 의존성(`class-variance-authority`, `@radix-ui/*`)은 이미 설치되어 있다.
 
 ### Canonical primitive ownership
 ```text
