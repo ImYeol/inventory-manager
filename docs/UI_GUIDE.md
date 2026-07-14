@@ -22,7 +22,7 @@
 2. 대시보드는 KPI와 분석을 같은 surface에서 보여준다.
 3. 재고 운영은 list/history-first다.
 4. title, subtitle, helper copy는 최소화한다.
-5. 상태는 badge와 표 셀에서 먼저 보이고, 설명 문장으로 반복하지 않는다. 상태 라벨은 같은 화면에서 중복 표기하지 않는다.
+5. 상태는 badge와 표 셀에서 먼저 보이고, 설명 문장·label·배지에 같은 상태명을 반복하지 않는다.
 6. 하나의 surface에는 primary CTA를 하나만 둔다.
 7. 수동 입출고는 빠르되, 팝업 안의 섹션 수는 작아야 한다.
 8. 스토어 연결은 설정 안에서 관리하고, 운송장은 실행 흐름만 보여준다.
@@ -30,26 +30,21 @@
 10. 같은 내용을 카드, 배지, 문장, 버튼으로 여러 번 말하지 않는다.
 11. `상품 관리`의 탭 언어는 `재고 운영`과 같은 밀도와 역할 규칙을 따른다.
 12. label/select/menu/view 안의 텍스트는 컴포넌트 폭에 맞춰 줄바꿈, 잘림, 정렬 기준을 명확히 가진다.
-13. 화면에서 상태를 보여줄 때는 한 번만 말하고, label/배지/문장에 같은 상태명을 반복하지 않는다.
-14. 대시보드 필터는 compact size와 baseline alignment를 기본으로 한다.
-15. 상위 wrapper card를 늘려서 chrome을 덧씌우는 패턴은 금지한다.
-16. 소싱 화면의 primary surface는 table/workspace다. 카드형 summary보다 작업 표면을 먼저 둔다.
-17. legacy primitive와 duplicate primitive는 남기지 않는다. shared primitive로 수렴되지 않는 변형은 제거 후보로 본다.
-18. 독립 메뉴가 다른 surface에 흡수되면, 이전 view container는 alias만 남기거나 삭제한다. dead view file을 보존하지 않는다.
-19. UI 관련 변경과 검사 스크립트는 항상 shared theme, component, primitive, design token 사용 여부를 함께 검토해야 한다.
-20. 검토 대상은 `src/app`, `src/components/ui`, `docs/UI_GUIDE.md`, `docs/ARCHITECTURE.md`, `docs/ADR.md`, 그리고 이를 검사하는 hooks/scripts까지 포함한다.
-21. 개별 화면에서 `style={{ ... }}`로 색상, border, 배경을 직접 입히는 self-themed UI는 금지한다. semantic variant나 design token을 shared primitive에 추가해 해결한다. 데이터 기반 색상 chip, 진행률 width 같은 표현만 예외로 둔다.
-22. 페이지별 검색창, 툴바, table shell, empty state는 ad-hoc wrapper를 새로 만들지 말고 shared primitive를 재사용한다.
-23. Simple Surface First. 새 요구사항은 새 카드/섹션/설명 박스를 추가하기 전에 기존 toolbar, table, header, action rail 안에서 먼저 해결한다.
-24. 화면마다 component budget을 둔다. 목적을 설명하는 surface보다 실제 작업 surface가 먼저 보여야 하며, 새 기능은 가능한 한 기존 primitive 조합으로 흡수한다.
-25. 전역 액션은 영향을 주는 surface의 toolbar에 둔다. navigation은 link, 데이터 변경은 button으로 분리한다.
-26. action naming은 짧은 동사를 우선한다. provider명, 상태명, 행동명을 같은 줄에서 반복하지 않는다.
-27. 상태 표현은 큰 filled card보다 dot, badge, disabled, loading text 같은 저노이즈 표현을 우선한다.
-28. 설계와 구현 전에 `이 화면에 정말 필요한 컴포넌트가 몇 개인가`를 먼저 점검한다.
+13. 대시보드 필터는 compact size와 baseline alignment를 기본으로 한다.
+14. Simple Surface First: wrapper card·새 섹션·설명 박스를 늘리기 전에 기존 toolbar, table, header, action rail 안에서 해결한다.
+15. 소싱 화면의 primary surface는 table/workspace다. 카드형 summary보다 작업 표면을 먼저 둔다.
+16. legacy 또는 duplicate primitive는 남기지 않고 shared primitive로 수렴한다.
+17. 독립 메뉴가 다른 surface에 흡수되면 이전 view container는 alias만 남기거나 삭제한다.
+18. UI 변경과 검사 스크립트는 shared theme, component, primitive, design token 사용 여부를 함께 검토한다. 검토 범위는 `src/app`, `src/components/ui`, 관련 docs, hooks/scripts를 포함한다.
+19. page-level self-themed UI는 금지한다. 필요한 semantic은 shared primitive variant와 design token에 추가한다. 데이터 기반 색상 chip과 진행률 width만 예외다.
+20. 검색창, toolbar, table shell, empty state는 ad-hoc wrapper 대신 shared primitive를 재사용한다.
+21. 화면마다 component budget을 두고, 실제 작업 surface가 설명 surface보다 먼저 보이게 한다.
+22. 전역 액션은 영향을 주는 surface의 toolbar에 두며, navigation은 link, 데이터 변경은 button으로 분리한다.
+23. action naming은 짧은 동사를 우선하고, 상태는 큰 filled card보다 dot, badge, disabled, loading text 같은 저노이즈 표현을 우선한다.
 
 ## Compact Action Doctrine
 - 운영 화면의 기본 순서는 `header -> compact toolbar -> primary surface`다.
-- 새 문제를 새 wrapper card로 풀지 않고, 기존 action rail에 흡수할 수 있는지 먼저 본다.
+- 새 문제를 새 wrapper card·섹션·설명 box로 풀지 않고, 기존 action rail에 흡수할 수 있는지 먼저 본다.
 - action은 적을수록 좋다. 관련 액션은 compact group으로 묶고, 한 group 안에서 상태와 행동을 같이 해결한다.
 - action group은 같은 뜻을 반복하지 않는다. 예: provider 이름은 한 번만 보여주고, 버튼은 `갱신`, `반영`처럼 짧은 동사로 둔다.
 - 설명용 메시지보다 버튼 state, disabled state, inline status로 의미를 전달한다.
@@ -57,12 +52,10 @@
 - 새 액션이 들어오면 새 줄을 만들기 전에 폭, padding, 라벨 길이, 비핵심 텍스트를 먼저 압축한다.
 - 성공/실패/상태 메시지는 toolbar 높이를 밀어 올리면 안 된다. toolbar 폭 계산에 참여하지 않게 하거나, 별도 dense strip으로 보낸다.
 - 운영 화면에서는 multi-row 정렬보다 action row 높이 안정성을 우선한다.
-- 외부 패턴의 기준은 다음을 따른다.
-  - Carbon: table에 영향을 주는 액션은 table toolbar에 둔다.
-  - PatternFly: action은 영향을 주는 surface 가까이에 둔다.
-  - Oracle: 자동 반영 가능한 흐름에는 불필요한 refresh UI를 늘리지 않는다.
+- 외부 패턴 근거는 [ADR-024](./ADR.md#adr-024-운영-콘솔의-기본-필터는-intent-ranked-minimal-set으로-제한한다)를 참조한다.
 
 ## Component Budget Checklist
+- 아래 항목은 [Compact Action Doctrine](#compact-action-doctrine)을 기준으로 검토한다.
 - 이 화면의 primary surface는 무엇인가.
 - 이 작업에 필요한 전역 액션은 몇 개인가.
 - 기존 toolbar 안에 흡수 가능한가.
@@ -177,6 +170,8 @@ src/components/ui/
 - 같은 너비의 긴 filled 버튼을 여러 개 병렬 배치하는 패턴
 
 ## 메뉴 구조
+이 섹션은 canonical 메뉴 순서의 단일 SoT다: **대시보드 → 상품 관리 → 재고 운영 → 소싱 → 운송장 → 설정**.
+
 - `대시보드`
   - `분석 섹션`
 - `상품 관리`
@@ -201,16 +196,13 @@ src/components/ui/
 - dashboard card surface는 끊기지 않는 shared card border language를 사용해야 한다.
 
 ## Layout Rules
-- 기본 구조는 `header -> compact toolbar -> primary table`이다.
-- summary card는 예외적이어야 하며 기본 레이아웃이 아니다.
-- 같은 섹션 안에서 card nesting이 2단 이상 늘어나면 구조를 다시 접는다.
+- 기본 구조와 action-row 안정성은 [Compact Action Doctrine](#compact-action-doctrine)을 따른다.
+- summary card는 예외적이며, 같은 섹션 안의 card nesting이 2단 이상 늘어나면 구조를 다시 접는다.
 - title 위 kicker/eyebrow/tag cluster는 기본적으로 사용하지 않는다.
 - 상단 tabs는 같은 page 안의 view switch에만 사용하고, filter/action cluster는 toolbar로 둔다.
 - 탭과 버튼은 compact size를 기본으로 한다.
-- list-management screen은 `compact filter/action toolbar -> primary table` 순서를 기본으로 하고, 같은 표 위에 redundant section title/subtitle/count chrome을 덧씌우지 않는다.
 - 표 위 설명이 꼭 필요하면 page header 또는 toolbar 메타 중 하나만 사용하고 둘을 동시에 반복하지 않는다.
 - dashboard filter는 compact size와 baseline alignment를 유지한다.
-- wrapper card는 chrome을 위한 기본 장치가 아니다. surface가 필요한 경우에만 사용한다.
 
 ## Text Fitting Rules
 - `label`, `select`, `menu`, `view` 안의 텍스트는 해당 컴포넌트 폭을 먼저 따른다.
@@ -219,6 +211,7 @@ src/components/ui/
 - 오른쪽 정렬 숫자나 상태 텍스트는 같은 행에서 기준선을 유지해야 한다.
 
 ## 페이지 chrome 예산
+- 세부 layout/action 예산은 [Compact Action Doctrine](#compact-action-doctrine)과 [Layout Rules](#layout-rules)를 따른다.
 - 기본 헤더는 `title + 짧은 설명 + 액션 영역`까지만 허용한다.
 - kicker, eyebrow, duplicate subtitle, 설명용 배지 묶음은 기본적으로 금지한다.
 - 상단에서 반복 설명한 맥락을 본문 카드에서 다시 설명하지 않는다.

@@ -6,9 +6,9 @@
 **트레이드오프**: 일부 도메인은 top-level item이 아니라 local navigation으로 풀어야 한다.
 
 ## ADR-002: `재고 운영`은 하나의 first-level hub로 유지하고, 목록과 이력 중심으로 분산한다
-**결정**: `재고 운영`은 1차 메뉴 하나로 유지한다. 다만 내부는 목록, 이력, 입고, 출고 중심으로 구성하고, `CSV`와 추가 감사 화면이 과밀해지면 `/inventory/csv`, `/inventory/history`로 분리할 수 있다.  
+**결정**: `재고 운영`은 1차 메뉴 하나로 유지하고, 목록·입고·출고를 중심으로 구성한다. 이력의 현재 canonical route는 top-level `/history`이며, CSV 또는 추가 감사 surface는 실제 필요가 생길 때 재고 운영 ownership 아래에서 분리한다.
 **이유**: top-level을 다시 쪼개면 창고 담당자 흐름이 끊기지만, 모든 워크스페이스를 한 화면에 영구 고정하면 허브 자체가 과밀해진다.  
-**트레이드오프**: inventory 내부 subnav와 redirect 전략이 필요할 수 있다.
+**트레이드오프**: inventory 내부 navigation과 top-level 이력 route 사이의 맥락 연결이 필요할 수 있다.
 
 ## ADR-003: list/history는 dense table + compact filters가 canonical surface다
 **결정**: 재고 운영의 canonical surface는 summary card-first가 아니라 `compact filter toolbar + dense data table` 구조다. 목록은 현재 재고를, 이력은 변동 기록을 먼저 보여준다.  
@@ -26,7 +26,7 @@
 **트레이드오프**: 대량 입력은 CSV 경로가 더 중요해진다.
 
 ## ADR-006: 스토어 연결은 설정 소유로 수렴한다
-**결정**: 네이버/쿠팡 연결 상태와 credential 편집의 canonical owner는 `/settings`다. `/integrations`는 남더라도 redirect 또는 thin alias로 제한한다. 가능하면 provider별 상태 요약과 편집 form은 같은 surface에 둔다.
+**결정**: 네이버/쿠팡 연결 상태와 credential 편집의 canonical owner는 `/settings`다. `/integrations`는 `redirect('/settings')`로 수렴하며, thin alias는 redirect 전 과도기 조치로만 허용한다.
 **이유**: `IntegrationsView`와 `SettingsView`가 동시에 스토어 연결을 설명하면 IA가 중복되고, 사용자는 어디서 연결을 바꾸는지 헷갈린다.  
 **트레이드오프**: 기존 `/integrations` 링크는 호환 경로 또는 redirect 처리가 필요하다.
 
@@ -46,7 +46,7 @@
 **트레이드오프**: shadcn CLI를 도입하더라도 path 설정을 repo 구조에 맞춰 수동 정렬해야 할 수 있다.
 
 ## ADR-010: 외부 data-table 예제는 패턴만 적응하고 demo 도메인은 버린다
-**결정**: 제공된 `project-data-table.tsx` 류 예제는 column visibility, dropdown, row motion 패턴만 가져오고, repository/avatar/contributor 같은 demo 필드는 최종 UI에 들여오지 않는다.  
+**결정**: 외부에서 제공된 data-table 예제는 column visibility, dropdown, row motion 패턴만 가져오고, repository/avatar/contributor 같은 demo 필드는 최종 UI에 들여오지 않는다.
 **이유**: 그대로 복제하면 운영 도메인과 무관한 UI가 섞여 AI slop처럼 보인다.  
 **트레이드오프**: 적응 작업이 단순 copy-paste보다 조금 더 든다.
 
@@ -56,9 +56,11 @@
 **트레이드오프**: 기존 `기준 데이터`라는 내부 용어는 redirect와 label 정리로 흡수해야 한다.
 
 ## ADR-012: 상단 tabs는 view switch, toolbar는 filter/action, card는 border language로 분리한다
-**결정**: 상단 tabs는 같은 page 안의 view switch에만 사용한다. filter와 action은 compact toolbar로 둔다. bordered container는 shared surface/card variants를 canonical language로 사용한다.
+**결정**: tabs, toolbar, bordered surface의 역할을 각각 view switch, filter/action, shared border language로 분리한다.
 **이유**: tabs를 필터처럼 쓰거나 toolbar를 navigation처럼 쓰면 dense operational screen의 의미가 흐려진다. card/surface language를 분리하면 설명용 chrome을 줄이고 bordered surfaces를 일관되게 만들 수 있다.
 **트레이드오프**: 기존 화면에서 tabs, toolbar, card의 역할이 섞여 있으면 재배치가 필요하다.
+
+운영 규칙 세부는 UI Guide의 [Layout Rules](./UI_GUIDE.md#layout-rules)와 [Shared Primitive](./UI_GUIDE.md#shared-primitive)를 참조한다.
 
 ## ADR-013: 분석은 독립 1차 메뉴가 아니라 dashboard 내부 section으로 둔다
 **결정**: `분석`은 sidebar direct item으로 두지 않고 dashboard 내부 section으로 흡수한다. `/analytics`는 legacy redirect만 유지한다.  
@@ -96,9 +98,11 @@
 **트레이드오프**: 간단한 화면 수정도 먼저 primitive 계층을 손봐야 할 수 있지만, 전체 surface의 일관성은 유지된다.
 
 ## ADR-020: list-management screens는 toolbar 다음 primary table을 기본 surface로 둔다
-**결정**: inventory처럼 목록 관리가 주된 화면은 `compact filter/action toolbar -> primary table`을 기본 구조로 사용하고, 같은 표를 설명하는 title/subtitle/count chrome을 중복으로 올리지 않는다.  
+**결정**: 목록 관리 화면은 toolbar 뒤 primary table을 canonical 작업 surface로 둔다.
 **이유**: 운영자가 빠르게 필터를 바꾸고 표를 읽는 화면에서는 설명 chrome이 반복될수록 작업 표면이 늦게 보인다.  
 **트레이드오프**: page-level context가 필요한 경우에도 한 번만 보여주도록 헤더와 toolbar 메타를 정리해야 한다.
+
+운영 규칙 세부는 UI Guide의 [Layout Rules](./UI_GUIDE.md#layout-rules)와 [페이지 chrome 예산](./UI_GUIDE.md#페이지-chrome-예산)을 참조한다.
 
 ## ADR-021: strong card seam 문제는 shared primitive로 해결한다
 **결정**: header/body를 함께 담는 strong card는 하나의 clipped surface로 읽혀야 하며, corner gap이나 segmented seam을 page-local border patch로 땜질하지 않는다. 대신 shared card/surface primitive의 variant, padding, token을 고친다.  
@@ -106,9 +110,11 @@
 **트레이드오프**: 카드가 어색하면 개별 화면에서 고치는 대신 shared primitive까지 올라가야 하므로 수정 범위가 커질 수 있다.
 
 ## ADR-022: 운영 콘솔은 Simple Surface First와 component budget을 기본 원칙으로 삼는다
-**결정**: 모든 운영 화면은 `compact toolbar + primary surface`를 기본 구조로 하고, 새 기능은 새 카드/새 섹션을 추가하기 전에 기존 toolbar, table, header, action rail 안에서 먼저 흡수한다. 전역 액션은 영향을 주는 surface 가까이에 두고, 관련 액션은 compact group으로 묶는다.  
+**결정**: 운영 콘솔은 Simple Surface First와 component budget을 기본 판단 기준으로 삼는다.
 **이유**: 운영 콘솔에서 실제 가치가 생기는 지점은 설명 카드가 아니라 표, 필터, 액션이다. component 수와 action 수가 늘어날수록 사용자는 어디를 눌러야 하는지 다시 해석해야 한다.  
 **트레이드오프**: 화면별로 즉흥적인 wrapper나 상태 카드를 추가하는 대신, shared primitive와 existing surface를 더 엄격하게 재사용해야 한다.
+
+운영 규칙 세부는 UI Guide의 [Compact Action Doctrine](./UI_GUIDE.md#compact-action-doctrine)과 [Component Budget Checklist](./UI_GUIDE.md#component-budget-checklist)를 참조한다.
 
 ## ADR-023: 쿠팡 운송장 업로드는 기본 택배사 코드 + 일반배송 v1로 고정한다
 **결정**: 쿠팡 운송장 업로드는 설정의 `defaultDeliveryCompanyCode`를 사용하고, `shipmentBoxId + orderId + vendorItemId` 단위의 `orderSheetInvoiceApplyDtos[]` payload로 전송한다. v1 범위에서는 `splitShipping=false`, `preSplitShipped=false`, `estimatedShippingDate=""`의 일반배송만 지원한다.  
@@ -116,9 +122,11 @@
 **트레이드오프**: 분리배송과 행별 택배사 지정은 후속 범위로 남기고, 현재는 설정의 기본값과 item-level payload로 안정적으로 수렴한다.
 
 ## ADR-024: 운영 콘솔의 기본 필터는 intent-ranked minimal set으로 제한한다
-**결정**: 운영 콘솔의 기본 filter set은 field-complete가 아니라 intent-ranked minimal set이다. 기본 필터는 자주 바꾸는 핵심 조회 조건만 노출하고, row에서 이미 읽히는 감사/참조 메타는 기본 필터에 중복 추가하지 않는다. shared view가 embedded와 standalone에 모두 쓰일 때는 같은 control vocabulary를 유지하고, 탭 unmount로 상태가 사라지면 안 되는 경우 filter state는 parent workspace가 소유한다.  
+**결정**: 운영 콘솔의 기본 filter set은 field-complete가 아니라 intent-ranked minimal set이다.
 **이유**: history처럼 감사성 메타가 많은 화면은 모든 속성을 필터로 올리기 시작하면 toolbar가 빠르게 과밀해진다. 또한 embedded view에서 filterable field를 context pill로 바꾸거나 local tab state로만 들고 있으면 standalone과 interaction 문법이 갈라지고, 탭 전환 시 상태가 사라져 사용성이 떨어진다.  
-**트레이드오프**: 일부 low-frequency filter는 즉시 보이지 않을 수 있으므로 row metadata, modal, advanced disclosure, dedicated audit page로 단계적으로 승격하는 기준이 필요하다. 이 규칙은 history뿐 아니라 shipping preview, sourcing table, settings table-toolbar에도 공통 적용한다.
+**트레이드오프**: 일부 low-frequency filter는 즉시 보이지 않을 수 있으므로 별도 disclosure나 audit surface로 승격하는 기준이 필요하다.
+
+운영 규칙 세부는 UI Guide의 [Filter Budget Rules](./UI_GUIDE.md#filter-budget-rules)를 참조한다.
 
 **외부 근거**
 - Carbon: table에 영향을 주는 액션은 table toolbar에 둔다.
