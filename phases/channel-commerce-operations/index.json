@@ -30,7 +30,10 @@
     {
       "step": 3,
       "name": "product-management-workspace",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-07-15T00:57:11+0900",
+      "completed_at": "2026-07-15T01:01:56+0900",
+      "summary": "Replaced the populated product tab with one ProductVariant table containing fixed Coupang/Naver ChannelBadge slots, internal available, sync gap, and last-sync columns. Added compact fixed views, search, one sync action with inline result metadata, and a shared channel-detail modal for image, price, external IDs, raw status, reported quantity, sync errors, and link/unlink. Preserved the legacy model/size/color creation flow when no commerce variants exist and retained the warehouse tab. Added an owner-verified linkVariant server action. Verified with npm run test -- --run tests/products-page.test.ts tests/master-data-manager.test.ts tests/product-management-workspace.test.ts (3 files, 8 tests passed) and npm run lint (0 errors; 4 existing warnings)."
     },
     {
       "step": 4,
