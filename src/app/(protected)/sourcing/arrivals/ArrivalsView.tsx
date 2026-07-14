@@ -6,6 +6,7 @@ import { createFactoryArrivalBatch, receiveFactoryArrival } from '@/lib/actions'
 import { StatusBadge } from '@/components/ui/badge-1'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ProductVariantCombobox, type ProductVariantOption } from '@/components/ui/product-variant-combobox'
 import { PageHeader, cx, ui } from '@/app/components/ui'
 
 type FactoryLookup = {
@@ -192,6 +193,18 @@ export default function ArrivalsView({
       }),
     [models, rows],
   )
+
+  const productVariants = useMemo<ProductVariantOption[]>(() => models.flatMap((model) => model.colors.flatMap((color) => model.sizes.map((size) => ({
+    id: `${model.id}:${size.id}:${color.id}`,
+    modelId: model.id,
+    sizeId: size.id,
+    colorId: color.id,
+    modelName: model.name,
+    sizeName: size.name,
+    colorName: color.name,
+    sellerSku: `${model.name}-${color.name}-${size.name}`,
+    channels: { naver: 'unregistered', coupang: 'unregistered' },
+  })))), [models])
 
   const importCsvRows = () => {
     const nextRows = parseDelimitedText(csvText).map((cells) => {
@@ -435,57 +448,21 @@ export default function ArrivalsView({
                     </div>
 
                     <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_8rem]">
-                      <SelectField
-                        label={`항목 #${index + 1} 모델`}
-                        value={row.modelId === '' ? null : row.modelId}
-                        placeholder="모델 선택"
-                        options={models.map((model) => ({ value: model.id, label: model.name }))}
-                        onValueChange={(next) =>
-                          setRows((current) =>
-                            current.map((item) =>
-                              item.key === row.key
-                                ? {
-                                    ...item,
-                                    modelId: next === null ? '' : Number(next),
-                                    sizeId: '',
-                                    colorId: '',
-                                    error: null,
-                                  }
-                                : item,
-                            ),
-                          )
-                        }
-                      />
-
-                      <SelectField
-                        label={`항목 #${index + 1} 사이즈`}
-                        value={row.sizeId === '' ? null : row.sizeId}
-                        placeholder="사이즈"
-                        options={(row.model?.sizes ?? []).map((size) => ({ value: size.id, label: size.name }))}
-                        onValueChange={(next) =>
-                          setRows((current) =>
-                            current.map((item) =>
-                              item.key === row.key ? { ...item, sizeId: next === null ? '' : Number(next), error: null } : item,
-                            ),
-                          )
-                        }
-                        disabled={!row.model}
-                      />
-
-                      <SelectField
-                        label={`항목 #${index + 1} 색상`}
-                        value={row.colorId === '' ? null : row.colorId}
-                        placeholder="색상"
-                        options={(row.model?.colors ?? []).map((color) => ({ value: color.id, label: color.name }))}
-                        onValueChange={(next) =>
-                          setRows((current) =>
-                            current.map((item) =>
-                              item.key === row.key ? { ...item, colorId: next === null ? '' : Number(next), error: null } : item,
-                            ),
-                          )
-                        }
-                        disabled={!row.model}
-                      />
+                      <div className="md:col-span-3">
+                        <label className={ui.label}>항목 #{index + 1} 상품 옵션</label>
+                        <ProductVariantCombobox
+                          aria-label={`항목 #${index + 1} 상품 옵션`}
+                          variants={productVariants}
+                          value={row.modelId === '' || row.sizeId === '' || row.colorId === '' ? null : `${row.modelId}:${row.sizeId}:${row.colorId}`}
+                          onValueChange={(next) => {
+                            const variant = productVariants.find((item) => item.id === next)
+                            setRows((current) => current.map((item) => item.key === row.key ? {
+                              ...item,
+                              modelId: variant?.modelId ?? '', sizeId: variant?.sizeId ?? '', colorId: variant?.colorId ?? '', error: null,
+                            } : item))
+                          }}
+                        />
+                      </div>
 
                       <input
                         type="number"

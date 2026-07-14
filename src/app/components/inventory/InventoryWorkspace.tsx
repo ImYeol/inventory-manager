@@ -7,6 +7,11 @@ import { PageHeader, ui } from '@/app/components/ui'
 import { FixedSheet } from '@/components/ui/fixed-sheet'
 import { InventoryDataTable, type InventoryColumnKey, type InventoryDataRow } from '@/components/ui/inventory-data-table'
 import { InventoryTableToolbar } from '@/components/ui/inventory-table-toolbar'
+import { Modal } from '@/components/ui/modal'
+import { ProductVariantCombobox, type ProductVariantOption } from '@/components/ui/product-variant-combobox'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { TableSurface } from '@/components/ui/table-surface'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
@@ -72,11 +77,12 @@ type ViewMode = 'list' | 'history'
 
 const ALL_COLUMNS: Array<{ key: InventoryColumnKey; label: string }> = [
   { key: 'modelName', label: '상품' },
-  { key: 'option', label: '옵션' },
+  { key: 'skuOption', label: 'SKU / 옵션' },
   { key: 'warehouseName', label: '창고' },
-  { key: 'quantity', label: '현재 재고' },
-  { key: 'latestInbound', label: '최근 입고' },
-  { key: 'latestOutbound', label: '최근 출고' },
+  { key: 'onHand', label: 'On hand' },
+  { key: 'committed', label: 'Committed' },
+  { key: 'available', label: 'Available' },
+  { key: 'incoming', label: 'Incoming' },
   { key: 'status', label: '상태' },
 ]
 
@@ -90,16 +96,24 @@ export default function InventoryWorkspace({
   models,
   warehouses,
   transactions,
+  committedByVariant = {},
+  incomingByVariant = {},
 }: {
   models: ModelWithRelations[]
   warehouses: WarehouseLookup[]
   transactions: TransactionItem[]
+  committedByVariant?: Record<string, number>
+  incomingByVariant?: Record<string, number>
 }) {
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | 'all'>('all')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'normal' | 'warning' | 'danger'>('all')
   const [activeView, setActiveView] = useState<ViewMode>('list')
   const [overlayMode, setOverlayMode] = useState<'입고' | '출고' | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [addVariant, setAddVariant] = useState<string | null>(null)
+  const [addWarehouse, setAddWarehouse] = useState<number | null>(null)
+  const [initialQuantity, setInitialQuantity] = useState('0')
   const [historyFilters, setHistoryFilters] = useState<HistoryFilterState>({
     warehouseId: '',
     type: '',
@@ -122,19 +136,11 @@ export default function InventoryWorkspace({
     [models],
   )
 
-  const transactionLookup = useMemo(() => {
-    const map = new Map<string, { latestInbound?: string; latestOutbound?: string }>()
-
-    for (const tx of transactions) {
-      const key = `${tx.modelName}::${tx.colorName}::${tx.sizeName}::${tx.warehouseId}`
-      const current = map.get(key) ?? {}
-      if (tx.type === '입고' && !current.latestInbound) current.latestInbound = tx.date
-      if (tx.type === '출고' && !current.latestOutbound) current.latestOutbound = tx.date
-      map.set(key, current)
-    }
-
-    return map
-  }, [transactions])
+  const variants = useMemo<ProductVariantOption[]>(() => models.flatMap((model) => model.colors.flatMap((color) => model.sizes.map((size) => ({
+    id: `${model.id}:${size.id}:${color.id}`, modelId: model.id, sizeId: size.id, colorId: color.id,
+    modelName: model.name, sizeName: size.name, colorName: color.name, sellerSku: `${model.name}-${color.name}-${size.name}`,
+    channels: { naver: 'unregistered', coupang: 'unregistered' },
+  })))), [models])
 
   const overviewRows = useMemo(() => {
     return models.flatMap((model) =>
@@ -143,28 +149,32 @@ export default function InventoryWorkspace({
           return model.inventory
             .filter((item) => item.colorId === color.id && item.sizeId === size.id)
             .map((item) => {
-              const movement = transactionLookup.get(`${model.name}::${color.name}::${size.name}::${item.warehouseId}`)
-              const status = inventoryStatus(item.quantity)
+              const variantId = `${model.id}:${size.id}:${color.id}`
+              const committed = committedByVariant[variantId] ?? 0
+              const onHand = item.quantity
+              const available = onHand - committed
+              const status = inventoryStatus(available)
 
               return {
                 key: `${item.id}`,
                 modelName: model.name,
-                option: (
+                skuOption: (
                   <div className="flex items-center gap-2 text-[color:var(--muted)]">
                     <span
                       className="inline-block h-3.5 w-3.5 rounded-full border border-[color:var(--border)]"
                       style={{ backgroundColor: color.rgbCode }}
                     />
                     <span>
-                      {color.name} / {size.name}
+                      {`${model.name}-${color.name}-${size.name}`} · {color.name} / {size.name}
                     </span>
                   </div>
                 ),
                 warehouseName: item.warehouseName,
                 warehouseId: item.warehouseId,
-                quantity: item.quantity,
-                latestInbound: movement?.latestInbound ?? '없음',
-                latestOutbound: movement?.latestOutbound ?? '없음',
+                onHand,
+                committed,
+                available,
+                incoming: incomingByVariant[variantId] ?? 0,
                 status: {
                   label: status.label,
                   variant: status.tone,
@@ -175,7 +185,7 @@ export default function InventoryWorkspace({
         }),
       ),
     )
-  }, [models, transactionLookup])
+  }, [committedByVariant, incomingByVariant, models])
 
   const filteredRows = useMemo(() => {
     return overviewRows.filter((row) => {
@@ -224,6 +234,7 @@ export default function InventoryWorkspace({
                 onToggleColumn={toggleColumn}
                 onInbound={() => setOverlayMode('입고')}
                 onOutbound={() => setOverlayMode('출고')}
+                onAddInventory={() => setAddOpen(true)}
               />
             }
           >
@@ -257,6 +268,20 @@ export default function InventoryWorkspace({
           onSubmitted={() => setOverlayMode(null)}
         />
       </FixedSheet>
+
+      <Modal open={addOpen} title="재고 추가" description="상품 옵션과 창고를 고른 뒤 초기 수량을 입고로 처리합니다." onOpenChange={setAddOpen}
+        footer={<Button type="button" disabled={!addVariant || !addWarehouse || Number(initialQuantity) < 0} onClick={() => { setAddOpen(false); setOverlayMode('입고') }}>입고로 계속</Button>}
+      >
+        <div className="grid gap-3">
+          <ProductVariantCombobox aria-label="재고 추가 상품 옵션" variants={variants} value={addVariant} onValueChange={setAddVariant} />
+          <Select value={addWarehouse ? String(addWarehouse) : undefined} onValueChange={(value) => setAddWarehouse(Number(value))}>
+            <SelectTrigger aria-label="재고 추가 창고" className={ui.control}><SelectValue placeholder="창고 선택" /></SelectTrigger>
+            <SelectContent>{warehouses.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouse.name}</SelectItem>)}</SelectContent>
+          </Select>
+          <Input aria-label="초기 수량" type="number" min={0} value={initialQuantity} onChange={(event) => setInitialQuantity(event.target.value)} />
+          {addVariant && addWarehouse && overviewRows.some((row) => row.warehouseId === addWarehouse && row.key && variants.find((variant) => variant.id === addVariant)?.modelName === row.modelName) ? <p className="text-sm text-[color:var(--muted)]">기존 조합입니다. 신규 재고 행 대신 입고/조정으로 계속합니다.</p> : null}
+        </div>
+      </Modal>
     </div>
   )
 }

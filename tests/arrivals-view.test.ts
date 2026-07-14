@@ -64,12 +64,12 @@ describe('ArrivalsView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'CSV 행 가져오기' }))
 
     await openSelectAndChoose('공장', '광주 협력사')
-    await openSelectAndChoose('항목 #1 모델', 'LP01')
-    await openSelectAndChoose('항목 #1 사이즈', 'S')
-    await openSelectAndChoose('항목 #1 색상', '네이비')
+    fireEvent.click(screen.getByRole('combobox', { name: '항목 #1 상품 옵션' }))
+    fireEvent.click(await screen.findByRole('option', { name: /LP01/ }))
     expect(screen.getByText('CSV 붙여넣기').closest('section')?.className).toContain('ui-card')
     expect(screen.getByText('항목 #1').closest('section')?.className).toContain('ui-card')
     expect(screen.getByRole('combobox', { name: '공장' }).className).toContain('ui-select-trigger')
+    expect(screen.queryByRole('combobox', { name: '항목 #1 모델' })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '예정 입고 등록' }))
 

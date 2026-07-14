@@ -138,6 +138,12 @@ describe('InventoryWorkspace', () => {
     expect(screen.getByRole('button', { name: '컬럼' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '입고' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '출고' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '재고 추가' })).toBeTruthy()
+    expect(within(screen.getByRole('table')).getByText('On hand')).toBeTruthy()
+    expect(within(screen.getByRole('table')).getByText('Committed')).toBeTruthy()
+    expect(within(screen.getByRole('table')).getByText('Available')).toBeTruthy()
+    expect(within(screen.getByRole('table')).getByText('Incoming')).toBeTruthy()
+    expect(within(screen.getByRole('table')).queryByText('채널 보고')).toBeNull()
 
     fireEvent.change(screen.getByLabelText('상품명 검색'), { target: { value: 'LP01' } })
     await openComboboxAndPick('상태 필터', '정상')

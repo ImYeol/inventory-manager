@@ -47,25 +47,25 @@ export default async function Home() {
   }))
   const metrics = [
     {
-      label: '전체 재고',
+      label: '신규 주문',
       value: String(totalQuantity),
-      description: `${inventorySummary.length}개 모델 기준 현재 보유 수량입니다.`,
-      href: '/inventory',
-      ariaLabel: '전체 재고 KPI',
+      description: `현재 판매 재고 ${totalQuantity}개를 기준으로 확인합니다.`,
+      href: '/orders',
+      ariaLabel: '신규 주문 KPI',
     },
     {
-      label: '오늘 입고',
+      label: '출고 준비',
       value: String(todayInbound),
-      description: '금일 등록된 입고 수량 합계입니다.',
-      href: '/history',
-      ariaLabel: '오늘 입고 KPI',
+      description: '주문 예약과 출고 대기 건을 주문에서 처리합니다.',
+      href: '/orders',
+      ariaLabel: '출고 준비 KPI',
     },
     {
-      label: '오늘 출고',
+      label: '오늘 발송',
       value: String(todayOutbound),
-      description: '금일 등록된 출고 수량 합계입니다.',
-      href: '/history',
-      ariaLabel: '오늘 출고 KPI',
+      description: '오늘 반영된 출고 수량입니다.',
+      href: '/orders',
+      ariaLabel: '오늘 발송 KPI',
     },
   ]
 
@@ -73,7 +73,7 @@ export default async function Home() {
     <div className={ui.shell}>
       <PageHeader
         title="대시보드"
-        description="재고 현황과 최근 흐름을 바로 봅니다."
+        description="주문·재고·입고 예정의 오늘 할 일을 봅니다."
       />
       <DashboardView
         metrics={metrics}

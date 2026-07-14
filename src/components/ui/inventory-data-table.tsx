@@ -10,21 +10,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 export type InventoryStatusVariant = 'success' | 'warning' | 'danger'
 export type InventoryColumnKey =
   | 'modelName'
-  | 'option'
+  | 'skuOption'
   | 'warehouseName'
-  | 'quantity'
-  | 'latestInbound'
-  | 'latestOutbound'
+  | 'onHand'
+  | 'committed'
+  | 'available'
+  | 'incoming'
   | 'status'
 
 export type InventoryDataRow = {
   key: string
   modelName: string
-  option: React.ReactNode
+  skuOption: React.ReactNode
   warehouseName: string
-  quantity: number
-  latestInbound: string
-  latestOutbound: string
+  onHand: number
+  committed: number
+  available: number
+  incoming: number
   status: {
     label: string
     variant: InventoryStatusVariant
@@ -38,19 +40,20 @@ const rowVariants: Variants = {
     y: 0,
     transition: {
       delay: i * 0.03,
-      duration: 0.22,
-      ease: 'easeInOut',
+      duration: 0.18,
+      ease: [0.4, 0, 0.2, 1],
     },
   }),
 }
 
 const tableHeaders: Array<{ key: InventoryColumnKey; label: string; className?: string }> = [
   { key: 'modelName', label: '상품' },
-  { key: 'option', label: '옵션' },
+  { key: 'skuOption', label: 'SKU / 옵션' },
   { key: 'warehouseName', label: '창고' },
-  { key: 'quantity', label: '현재 재고', className: 'text-right' },
-  { key: 'latestInbound', label: '최근 입고' },
-  { key: 'latestOutbound', label: '최근 출고' },
+  { key: 'onHand', label: 'On hand', className: 'text-right' },
+  { key: 'committed', label: 'Committed', className: 'text-right' },
+  { key: 'available', label: 'Available', className: 'text-right' },
+  { key: 'incoming', label: 'Incoming', className: 'text-right' },
   { key: 'status', label: '상태' },
 ]
 
@@ -90,15 +93,16 @@ export function InventoryDataTable({
                       {row.modelName}
                     </TableCell>
                   )}
-                  {visibleColumns.has('option') && <TableCell>{row.option}</TableCell>}
+                  {visibleColumns.has('skuOption') && <TableCell>{row.skuOption}</TableCell>}
                   {visibleColumns.has('warehouseName') && <TableCell>{row.warehouseName}</TableCell>}
-                  {visibleColumns.has('quantity') && (
+                  {visibleColumns.has('onHand') && (
                     <TableCell className={cn(ui.tableCell, 'text-right font-semibold text-[color:var(--foreground)]')}>
-                      {row.quantity}
+                      {row.onHand}
                     </TableCell>
                   )}
-                  {visibleColumns.has('latestInbound') && <TableCell>{row.latestInbound}</TableCell>}
-                  {visibleColumns.has('latestOutbound') && <TableCell>{row.latestOutbound}</TableCell>}
+                  {visibleColumns.has('committed') && <TableCell className="text-right">{row.committed}</TableCell>}
+                  {visibleColumns.has('available') && <TableCell className="text-right">{row.available}</TableCell>}
+                  {visibleColumns.has('incoming') && <TableCell className="text-right">{row.incoming}</TableCell>}
                   {visibleColumns.has('status') && (
                     <TableCell>
                       <StatusBadge tone={row.status.variant}>
