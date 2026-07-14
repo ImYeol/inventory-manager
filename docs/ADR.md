@@ -15,10 +15,15 @@
 **이유**: 실제 작업은 창고, 상품명, 상태, 컬럼 가시성 변경과 표 읽기에서 발생한다.  
 **트레이드오프**: glanceable KPI는 secondary badge strip 정도로 축소해야 한다.
 
-## ADR-004: 빠른 입고/출고는 fixed-mode overlay로 단순화한다
-**결정**: 입고 버튼은 입고 overlay만, 출고 버튼은 출고 overlay만 연다. overlay 안에서 다시 타입을 바꾸지 않는다.  
-**이유**: 진입한 액션과 팝업 모드가 다르면 사용자가 지금 무엇을 저장하는지 다시 해석해야 한다.  
-**트레이드오프**: inbound/outbound가 하나의 form primitive를 공유하더라도 상위에서 mode lock이 필요하다.
+## ADR-004: 입고는 단일 재고 진입 action이고 빠른 입고/출고는 fixed-mode overlay로 단순화한다
+**결정**: 별도 `재고 추가` action은 제거한다. 입고 버튼은 신규 상품 옵션+창고 조합의 첫 입고와 기존 조합의 수량 증가를 모두 처리하는 유일한 수동 입고 action이며, 출고 버튼은 현재 `onHand`를 줄이는 수동 조정 overlay만 연다. 주문 발송 출고는 별도 자동 흐름으로 유지한다. overlay 안에서 다시 타입을 바꾸지 않는다.
+**이유**: 선택값과 초기 수량을 저장하지 않고 입고 화면만 다시 여는 중복 경로는 action의 결과를 보장하지 못한다. 진입한 액션과 팝업 모드가 다르면 사용자가 지금 무엇을 저장하는지 다시 해석해야 한다.
+**트레이드오프**: inbound/outbound가 하나의 form primitive를 공유하더라도 상위에서 mode lock과 간결한 도움말이 필요하다.
+
+## ADR-004A: FixedSheet는 portal과 명시적 overlay/content layering을 소유한다
+**결정**: `FixedSheet`는 `Modal`과 같이 portal, body scroll lock, Escape close, 고유 title id를 소유한다. overlay는 content보다 낮은 stacking context를, sheet content는 더 높은 stacking context를 가져야 한다.
+**이유**: overlay가 content보다 높으면 backdrop blur가 sheet 전체에 적용되어 입력 surface가 읽히지 않는다.
+**트레이드오프**: primitive가 DOM lifecycle과 접근성 속성을 직접 관리한다.
 
 ## ADR-005: 빠른 입력 overlay에서는 `표 붙여넣기`를 제거하고 editable table만 남긴다
 **결정**: 수동 입출고 overlay는 compact editable table을 중심으로 하고 `표 붙여넣기`/bulk import panel은 CSV 경로로 이동시킨다.  

@@ -265,6 +265,7 @@ src/components/ui/
   - `입고`
   - `출고`
   - 필요 시 `CSV`, `이력`
+- `재고 추가`는 목록 toolbar에 두지 않는다. 신규 상품 옵션+창고 조합도 `입고`로 첫 수량을 등록한다.
 - summary 숫자는 큰 카드 대신 compact badge strip 또는 표 상단 메타로 축소한다.
 - `입고`, `출고` action rail은 `목록` 탭 전용이다. `이력` 탭에 같은 action rail을 복제하지 않는다.
 
@@ -284,8 +285,10 @@ src/components/ui/
 
 ### 입고/출고 팝업
 - 버튼을 누른 타입에 맞는 고정 모드로 열린다.
+- 입고 도움말은 첫 입고와 기존 수량 증가를, 출고 도움말은 수동 `onHand` 차감과 주문 발송 자동 출고의 구분을 짧게 설명한다.
 - 팝업 안에서 `입고/출고` 전환 버튼을 다시 두지 않는다.
 - 본문은 compact editable table 하나가 중심이다.
+- 표 헤더와 선택 control은 `모델` 대신 `상품` 또는 `상품 옵션`을 사용한다.
 - 유지:
   - 행 추가
   - 행 삭제
@@ -295,6 +298,10 @@ src/components/ui/
   - `표 붙여넣기`
   - 타입 선택 토글
   - 설명만 하는 카드
+
+### FixedSheet
+- 긴 입력 overlay는 `FixedSheet`를 사용한다. portal, body scroll lock, Escape close, overlay click close, 고유한 dialog title id를 기본 계약으로 가진다.
+- overlay는 content보다 낮은 z-index, sheet content는 그보다 높은 z-index를 가져 backdrop blur가 입력 표면에 적용되지 않게 한다.
 
 ### CSV / 이력
 - 목록/입고/출고와 한 화면에 둘 때 UX가 무너지면 재고 운영 하위 페이지로 올린다.

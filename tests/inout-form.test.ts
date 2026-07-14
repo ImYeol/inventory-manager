@@ -112,7 +112,7 @@ describe('InOutForm', () => {
       }),
     )
 
-    await openComboboxAndPick('모델', 'LP01')
+    await openComboboxAndPick('상품', 'LP01')
 
     expect(screen.getByRole('alert').textContent).toContain('사이즈, 색상, 수량 필요')
   })
@@ -131,5 +131,18 @@ describe('InOutForm', () => {
     expect(screen.getByRole('button', { name: '출고 등록 (0건)' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '입고/출고 전환' })).toBeNull()
     expect(screen.queryByText('표 붙여넣기')).toBeNull()
+  })
+
+  it('uses product language rather than the legacy model label in the editor', () => {
+    render(
+      React.createElement(InOutForm, {
+        warehouses: [{ id: 7, name: '본사 창고' }],
+        models: [],
+      }),
+    )
+
+    expect(screen.getByRole('columnheader', { name: '상품' })).toBeTruthy()
+    expect(screen.queryByRole('columnheader', { name: '모델' })).toBeNull()
+    expect(screen.getAllByRole('combobox', { name: '상품' }).length).toBeGreaterThan(0)
   })
 })

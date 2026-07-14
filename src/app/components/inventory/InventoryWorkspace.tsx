@@ -7,11 +7,6 @@ import { PageHeader, ui } from '@/app/components/ui'
 import { FixedSheet } from '@/components/ui/fixed-sheet'
 import { InventoryDataTable, type InventoryColumnKey, type InventoryDataRow } from '@/components/ui/inventory-data-table'
 import { InventoryTableToolbar } from '@/components/ui/inventory-table-toolbar'
-import { Modal } from '@/components/ui/modal'
-import { ProductVariantCombobox, type ProductVariantOption } from '@/components/ui/product-variant-combobox'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import { TableSurface } from '@/components/ui/table-surface'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
@@ -110,10 +105,6 @@ export default function InventoryWorkspace({
   const [statusFilter, setStatusFilter] = useState<'all' | 'normal' | 'warning' | 'danger'>('all')
   const [activeView, setActiveView] = useState<ViewMode>('list')
   const [overlayMode, setOverlayMode] = useState<'입고' | '출고' | null>(null)
-  const [addOpen, setAddOpen] = useState(false)
-  const [addVariant, setAddVariant] = useState<string | null>(null)
-  const [addWarehouse, setAddWarehouse] = useState<number | null>(null)
-  const [initialQuantity, setInitialQuantity] = useState('0')
   const [historyFilters, setHistoryFilters] = useState<HistoryFilterState>({
     warehouseId: '',
     type: '',
@@ -135,12 +126,6 @@ export default function InventoryWorkspace({
       })),
     [models],
   )
-
-  const variants = useMemo<ProductVariantOption[]>(() => models.flatMap((model) => model.colors.flatMap((color) => model.sizes.map((size) => ({
-    id: `${model.id}:${size.id}:${color.id}`, modelId: model.id, sizeId: size.id, colorId: color.id,
-    modelName: model.name, sizeName: size.name, colorName: color.name, sellerSku: `${model.name}-${color.name}-${size.name}`,
-    channels: { naver: 'unregistered', coupang: 'unregistered' },
-  })))), [models])
 
   const overviewRows = useMemo(() => {
     return models.flatMap((model) =>
@@ -234,7 +219,6 @@ export default function InventoryWorkspace({
                 onToggleColumn={toggleColumn}
                 onInbound={() => setOverlayMode('입고')}
                 onOutbound={() => setOverlayMode('출고')}
-                onAddInventory={() => setAddOpen(true)}
               />
             }
           >
@@ -257,6 +241,11 @@ export default function InventoryWorkspace({
       <FixedSheet
         open={overlayMode !== null}
         title={overlayMode === '입고' ? '빠른 입고' : '빠른 출고'}
+        description={
+          overlayMode === '입고'
+            ? '신규 상품 옵션·창고 조합의 첫 입고와 기존 재고 증가를 처리합니다.'
+            : '현재 보유 재고를 수동으로 차감합니다. 주문 발송 출고는 자동으로 처리됩니다.'
+        }
         onClose={() => setOverlayMode(null)}
       >
         <InOutForm
@@ -268,20 +257,6 @@ export default function InventoryWorkspace({
           onSubmitted={() => setOverlayMode(null)}
         />
       </FixedSheet>
-
-      <Modal open={addOpen} title="재고 추가" description="상품 옵션과 창고를 고른 뒤 초기 수량을 입고로 처리합니다." onOpenChange={setAddOpen}
-        footer={<Button type="button" disabled={!addVariant || !addWarehouse || Number(initialQuantity) < 0} onClick={() => { setAddOpen(false); setOverlayMode('입고') }}>입고로 계속</Button>}
-      >
-        <div className="grid gap-3">
-          <ProductVariantCombobox aria-label="재고 추가 상품 옵션" variants={variants} value={addVariant} onValueChange={setAddVariant} />
-          <Select value={addWarehouse ? String(addWarehouse) : undefined} onValueChange={(value) => setAddWarehouse(Number(value))}>
-            <SelectTrigger aria-label="재고 추가 창고" className={ui.control}><SelectValue placeholder="창고 선택" /></SelectTrigger>
-            <SelectContent>{warehouses.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouse.name}</SelectItem>)}</SelectContent>
-          </Select>
-          <Input aria-label="초기 수량" type="number" min={0} value={initialQuantity} onChange={(event) => setInitialQuantity(event.target.value)} />
-          {addVariant && addWarehouse && overviewRows.some((row) => row.warehouseId === addWarehouse && row.key && variants.find((variant) => variant.id === addVariant)?.modelName === row.modelName) ? <p className="text-sm text-[color:var(--muted)]">기존 조합입니다. 신규 재고 행 대신 입고/조정으로 계속합니다.</p> : null}
-        </div>
-      </Modal>
     </div>
   )
 }

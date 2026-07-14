@@ -138,7 +138,7 @@ describe('InventoryWorkspace', () => {
     expect(screen.getByRole('button', { name: '컬럼' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '입고' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '출고' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '재고 추가' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '재고 추가' })).toBeNull()
     expect(within(screen.getByRole('table')).getByText('On hand')).toBeTruthy()
     expect(within(screen.getByRole('table')).getByText('Committed')).toBeTruthy()
     expect(within(screen.getByRole('table')).getByText('Available')).toBeTruthy()

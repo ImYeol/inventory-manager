@@ -272,7 +272,7 @@ export default function InOutForm({
         if (!hasAnyInput) return []
 
         const errors: string[] = []
-        if (!row.modelId) errors.push('모델')
+        if (!row.modelId) errors.push('상품')
         if (!row.sizeId) errors.push('사이즈')
         if (!row.colorId) errors.push('색상')
         if (!row.quantity || Number(row.quantity) <= 0) errors.push('수량')
@@ -358,7 +358,7 @@ export default function InOutForm({
 
       <EditableTable
         columns={[
-          { key: 'model', header: '모델' },
+          { key: 'model', header: '상품' },
           { key: 'size', header: '사이즈' },
           { key: 'color', header: '색상' },
           { key: 'quantity', header: '수량', align: 'right' },
@@ -377,11 +377,11 @@ export default function InOutForm({
                   value={row.modelId === '' ? '' : String(row.modelId)}
                   onValueChange={(value) => handleModelChange(row.key, value ?? '')}
                   options={[
-                    { value: '', label: '모델 선택' },
+                    { value: '', label: '상품 선택' },
                     ...models.map((entry) => ({ value: String(entry.id), label: entry.name })),
                   ]}
-                  placeholder="모델 선택"
-                  ariaLabel="모델"
+                  placeholder="상품 선택"
+                  ariaLabel="상품"
                 />
               )
             case 'size':

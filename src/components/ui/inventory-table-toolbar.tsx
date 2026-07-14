@@ -25,7 +25,6 @@ type InventoryTableToolbarProps<T extends string> = {
   onToggleColumn: (column: T) => void
   onInbound: () => void
   onOutbound: () => void
-  onAddInventory: () => void
 }
 
 export function InventoryTableToolbar<T extends string>({
@@ -41,7 +40,6 @@ export function InventoryTableToolbar<T extends string>({
   onToggleColumn,
   onInbound,
   onOutbound,
-  onAddInventory,
 }: InventoryTableToolbarProps<T>) {
   return (
     <FilterToolbar>
@@ -105,7 +103,6 @@ export function InventoryTableToolbar<T extends string>({
 
       <div className="flex flex-wrap items-center gap-2">
         <ColumnVisibilityMenu columns={columns} visibleColumns={visibleColumns} onToggle={onToggleColumn} />
-        <Button type="button" onClick={onAddInventory} variant="default" size="sm">재고 추가</Button>
         <Button type="button" onClick={onInbound} variant="success" size="sm" className="h-9 gap-2 rounded-lg px-3">
           입고
         </Button>

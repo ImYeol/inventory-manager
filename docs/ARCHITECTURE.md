@@ -187,6 +187,8 @@ src/
 
 ### 2. Quick entry overlay
 - 입고와 출고는 같은 editor primitive를 재사용하되, 상위 route에서 mode를 고정해 전달한다.
+- 입고는 상품 옵션+창고 조합의 존재 여부와 관계없이 `bulk_apply_inventory_transactions` 원장을 통해 처리한다. 조합이 없으면 첫 재고 행과 입고 원장을 만들고, 있으면 수량을 증가시킨다. 별도의 `재고 추가` action은 두지 않는다.
+- 출고는 현재 `onHand`를 차감하는 수동 재고 조정이다. 주문 발송에 따른 자동 차감은 주문 처리 transaction 경계에 둔다.
 - overlay 내부에서 mode를 다시 고르지 않는다.
 - overlay는 다음 구조만 가진다.
   - title
@@ -194,6 +196,13 @@ src/
   - editable rows table
   - validation + footer CTA
 - `표 붙여넣기`와 별도 bulk import panel은 `CSV` route로 이동시킨다.
+- 편집 표의 표시 용어는 `상품`이며, data access의 legacy `models` 이름은 UI에 노출하지 않는다.
+
+### 2.1 FixedSheet primitive contract
+- `FixedSheet`는 긴 입력 workspace를 위한 portal 기반 overlay다.
+- open 상태에서는 body scroll을 lock하고 Escape 및 overlay click으로 닫는다.
+- `useId`로 고유한 title/description id를 만들고 dialog의 `aria-labelledby`/선택적 `aria-describedby`에 연결한다.
+- overlay는 sheet content보다 낮은 stacking context, sheet content는 overlay보다 높은 stacking context를 명시한다. 이 계약은 `globals.css` 변경이 아니라 primitive 구조와 기존 semantic token으로 유지한다.
 
 ### 3. Child route graduation
 - `CSV`와 `이력`이 list/inbound/outbound와 같은 화면에 있을 때 헤더/CTA/필터가 반복되면 child route로 승격한다.

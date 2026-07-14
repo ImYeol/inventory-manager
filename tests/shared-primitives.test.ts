@@ -22,6 +22,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Modal } from '@/components/ui/modal'
+import { FixedSheet } from '@/components/ui/fixed-sheet'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { StoreConnectionStatus } from '@/components/ui/store-connection-status'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -308,6 +309,32 @@ describe('shared action and status primitives', () => {
     fireEvent.click(screen.getByRole('button', { name: '닫기' }))
 
     expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  it('keeps fixed sheet content above its portal overlay and supports escape close', () => {
+    const onClose = vi.fn()
+
+    render(
+      React.createElement(
+        FixedSheet,
+        { open: true, title: '빠른 입고', description: '첫 입고와 기존 재고 증가를 처리합니다.', onClose },
+        '입고 편집 표',
+      ),
+    )
+
+    const dialog = screen.getByRole('dialog', { name: '빠른 입고' })
+    const overlay = dialog.querySelector('[aria-hidden="true"]')
+    const sheet = screen.getByText('입고 편집 표').parentElement?.parentElement
+
+    expect(dialog.parentElement).toBe(document.body)
+    expect(dialog.getAttribute('aria-describedby')).toBeTruthy()
+    expect(overlay?.className).toContain('z-0')
+    expect(sheet?.className).toContain('z-10')
+    expect(document.body.style.overflow).toBe('hidden')
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('renders status badges with visible text for each semantic tone', () => {
