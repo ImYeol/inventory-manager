@@ -25,7 +25,7 @@ export function MenuLink({ href, label, icon, active, compact = false, onClick }
         active && ui.navItemActive,
       )}
     >
-      {icon ? <span aria-hidden="true" className="shrink-0 text-slate-500 transition-colors group-hover:text-slate-700">{icon}</span> : null}
+      {icon ? <span aria-hidden="true" className="shrink-0 text-[color:var(--muted-foreground)] transition-colors group-hover:text-[color:var(--muted)]">{icon}</span> : null}
       <span className="truncate">{label}</span>
     </Link>
   )
@@ -52,12 +52,12 @@ export function MenuSection({ title, icon, open, onToggle, children }: MenuSecti
         )}
       >
         <span className="flex items-center gap-2">
-          {icon ? <span aria-hidden="true" className="shrink-0 text-slate-500 transition-colors group-hover:text-slate-700">{icon}</span> : null}
+          {icon ? <span aria-hidden="true" className="shrink-0 text-[color:var(--muted-foreground)] transition-colors group-hover:text-[color:var(--muted)]">{icon}</span> : null}
           <span>{title}</span>
         </span>
         <ChevronDown aria-hidden="true" className={cn('h-4 w-4 shrink-0 transition-transform', open && 'rotate-180')} />
       </button>
-      {open ? <div className="space-y-1 border-l border-slate-200 pl-3">{children}</div> : null}
+      {open ? <div className="space-y-1 border-l border-[color:var(--border)] pl-3">{children}</div> : null}
     </div>
   )
 }

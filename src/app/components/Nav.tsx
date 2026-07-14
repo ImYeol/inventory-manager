@@ -32,8 +32,8 @@ type NavItem = {
 
 const directItems: NavItem[] = [
   { href: '/', label: '대시보드', icon: <LayoutDashboard className="h-4 w-4" /> },
-  { href: '/inventory', label: '재고 운영', icon: <Boxes className="h-4 w-4" /> },
   { href: '/products', label: '상품 관리', icon: <Database className="h-4 w-4" /> },
+  { href: '/inventory', label: '재고 운영', icon: <Boxes className="h-4 w-4" /> },
   { href: '/sourcing', label: '소싱', icon: <PackageSearch className="h-4 w-4" /> },
   { href: '/shipping', label: '운송장', icon: <Truck className="h-4 w-4" /> },
   { href: '/settings', label: '설정', icon: <Settings2 className="h-4 w-4" /> },
@@ -76,9 +76,9 @@ function NavigationContent({
 
   return (
     <>
-      <div className="border-b border-slate-200 px-4 py-4">
-        <h1 className="text-sm font-semibold tracking-tight text-slate-950">Seleccase Inventory</h1>
-        <p className="mt-0.5 text-xs text-slate-500">운영 콘솔</p>
+      <div className="border-b border-[color:var(--border)] px-4 py-4">
+        <h1 className="text-sm font-semibold tracking-tight text-[color:var(--foreground)]">Seleccase Inventory</h1>
+        <p className="mt-0.5 text-xs text-[color:var(--muted-foreground)]">운영 콘솔</p>
       </div>
 
       <nav className="flex-1 space-y-1.5 overflow-y-auto px-3 py-3.5" aria-label="주요 메뉴">
@@ -87,13 +87,13 @@ function NavigationContent({
         ))}
       </nav>
 
-      <div className="mt-auto border-t border-slate-200 px-4 py-3.5">
+      <div className="mt-auto border-t border-[color:var(--border)] px-4 py-3.5">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-slate-950">{user?.name ?? '사용자'}</p>
-            <p className="truncate text-xs text-slate-500">{user?.email ?? '로그인 정보 없음'}</p>
+            <p className="truncate text-sm font-medium text-[color:var(--foreground)]">{user?.name ?? '사용자'}</p>
+            <p className="truncate text-xs text-[color:var(--muted-foreground)]">{user?.email ?? '로그인 정보 없음'}</p>
           </div>
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--surface-muted)] text-sm font-semibold text-[color:var(--muted)]">
             {userInitial}
           </div>
         </div>
@@ -133,7 +133,7 @@ export default function Nav({ user }: NavProps) {
           메뉴
         </button>
         <div className="min-w-0 px-3 text-center">
-          <p className="truncate text-sm font-semibold text-slate-950">Seleccase Inventory</p>
+          <p className="truncate text-sm font-semibold text-[color:var(--foreground)]">Seleccase Inventory</p>
         </div>
         <Link href="/settings" aria-label="설정" className={cx(ui.buttonSecondary, 'h-11 min-w-11 gap-2 px-3')}>
           <Settings2 className="h-4 w-4" />
@@ -150,8 +150,8 @@ export default function Nav({ user }: NavProps) {
             className={ui.mobileDrawerScrim}
           />
           <div role="dialog" aria-modal="true" aria-label="모바일 메뉴" className={ui.mobileDrawer}>
-            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4">
-              <p className="text-sm font-semibold text-slate-950">메뉴</p>
+            <div className="flex items-center justify-between border-b border-[color:var(--border)] px-4 py-4">
+              <p className="text-sm font-semibold text-[color:var(--foreground)]">메뉴</p>
               <button
                 type="button"
                 aria-label="메뉴 닫기"
