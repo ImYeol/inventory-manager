@@ -20,8 +20,8 @@ beforeEach(() => {
 })
 
 describe('IntegrationsPage', () => {
-  it('redirects integrations to the settings store-connection deep link', async () => {
+  it('redirects integrations to the canonical settings route', async () => {
     expect(() => IntegrationsPage()).toThrow('redirect-called')
-    expect(mocks.redirect).toHaveBeenCalledWith('/settings?section=store-connections')
+    expect(mocks.redirect).toHaveBeenCalledWith('/settings')
   })
 })

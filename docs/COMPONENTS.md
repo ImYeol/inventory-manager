@@ -16,7 +16,7 @@
 | `BasicDataTable` | `basic-data-table.tsx` | generic 조회·preview table | `columns`, `rows`, `rowKey`, `renderCell`, `emptyState`; 선택적으로 `onRowClick`, `rowAriaLabel`, `getRowClassName` | 열과 셀 렌더러를 화면이 제공하는 조회 table | 편집 input table이나 화면별 `<table>`을 만들지 않는다. |
 | `Button`, `buttonVariants`, `ButtonProps` | `button.tsx` | tokenized action/button | `variant`: `default`, `success`, `warning`, `destructive`, `outline`, `secondary`, `ghost`, `link`; `size`: `default`, `sm`, `lg`, `icon`; `asChild` | 링크/행동을 구분한 모든 공용 버튼 | page-local 색상·border 버튼을 만들지 않는다. |
 | `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter` | `card.tsx` | bordered surface 구조 | `Card.variant`: `default`, `muted`, `strong` | 필요한 card/surface와 header-body-footer 구조 | 설명용 wrapper card를 기본 레이아웃으로 쓰지 않는다. |
-| `ColumnVisibilityMenu`, `ColumnOption` | `column-visibility-menu.tsx` | 컬럼 토글 dropdown | `columns`, `visibleColumns`, `onToggle` | 현재는 사용처가 없는 legacy primitive | 새 사용처를 추가하지 않는다; Step 4에서 제거/통합한다. |
+| `ColumnVisibilityMenu`, `ColumnOption` | `column-visibility-menu.tsx` | 컬럼 토글 dropdown | `columns`, `visibleColumns`, `onToggle` | `InventoryTableToolbar`의 재고 조회 컬럼 표시 control | 화면별 컬럼 토글 dropdown을 새로 만들지 않는다. |
 | `DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuCheckboxItem`, `DropdownMenuRadioItem`, `DropdownMenuLabel`, `DropdownMenuSeparator`, `DropdownMenuGroup`, `DropdownMenuPortal`, `DropdownMenuSub`, `DropdownMenuSubTrigger`, `DropdownMenuSubContent`, `DropdownMenuRadioGroup`, `DropdownMenuShortcut` | `dropdown-menu.tsx` | Radix 기반 action/selection menu | Radix props; 일부 item/label/sub-trigger는 `inset`; content는 `sideOffset` | menu, checkbox/radio 선택, sub-menu | native menu 또는 페이지별 popup menu를 만들지 않는다. |
 | `EditableTable`, `EditableTableColumn`, `EditableTableProps` | `editable-table.tsx` | compact editable input table chrome | `columns`, `rows`, `getRowKey`, `renderCell`; 선택적으로 add/duplicate/delete, `rowError`, `minRows`, `disabled` | 소비자가 도메인 셀을 렌더하는 다건 입력 table | 조회 table의 정렬·컬럼 가시성·empty-state 역할을 중복하지 않는다. |
 | `FilterToolbar` | `filter-toolbar.tsx` | compact filter/action container | `children`, `className` | 조회 조건과 action cluster의 toolbar | 독립 설명 card로 대체하거나 업무 상태를 과도하게 쌓지 않는다. |
@@ -58,7 +58,7 @@
 | --- | --- | --- | --- |
 | canonical | `BasicDataTable` | generic 조회/preview table의 shared primitive | 해당 없음 |
 | canonical, 저활용 | `InventoryDataTable` | 재고 조회형 canonical이나 현재 사용처는 1곳 | Step 5–11에서 hand-roll 조회 table 흡수 |
-| dead | `ColumnVisibilityMenu` | 실사용 0곳 | Step 4에서 제거/통합 |
+| resolved | `ColumnVisibilityMenu` dead 표기 | `InventoryTableToolbar`의 실제 소비처를 확인해 dead 오탐을 정정; primitive는 canonical 유지 | Step 4 |
 | resolved | 편집형 입력 table | `EditableTable`이 tokenized chrome, 행 action, 행 추가, inline validation을 소유하며 소비자가 셀을 렌더 | Step 3 |
 
 | 현재 hand-roll `<table>` | 현재 역할 | 흡수 대상 primitive | 해소 예정 step |
