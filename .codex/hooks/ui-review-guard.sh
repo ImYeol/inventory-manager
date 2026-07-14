@@ -37,6 +37,7 @@ DOC_ROOTS = (
     "docs/ADR.md",
     "docs/DESIGN.md",
     "docs/MOTION.md",
+    "docs/COMPONENTS.md",
 )
 
 
