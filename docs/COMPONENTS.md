@@ -13,6 +13,7 @@
 | 컴포넌트 | 파일 | 용도 | 주요 variant/props | 언제 쓰는가 | 하지 말 것 |
 | --- | --- | --- | --- | --- | --- |
 | `Badge`, `StatusBadge`, `BadgeTone` | `badge-1.tsx` | 짧은 상태/분류 표시 | `tone`: `neutral`, `info`, `success`, `warning`, `danger`; `icon` | 표 셀 또는 compact 상태 | 화면별 상태 chip을 새로 조립하지 않는다. |
+| `ChannelBadge`, `Channel`, `ChannelListingStatus` | `channel-badge.tsx` | 채널명과 판매/동기화 상태를 함께 노출하는 canonical badge | `channel`: `naver` \| `coupang`; `listingStatus`: `active` \| `unregistered` \| `paused` \| `sync-error`; 선택 `compact` | 주문, 상품 관리, 채널 동기화의 channel/listing 상태 | page-local channel chip 또는 채널 색만으로 상태를 만들지 않는다. |
 | `BasicDataTable` | `basic-data-table.tsx` | generic 조회·preview table | `columns`, `rows`, `rowKey`, `renderCell`, `emptyState`; 선택적으로 `onRowClick`, `rowAriaLabel`, `getRowClassName`, `bare` | 열과 셀 렌더러를 화면이 제공하는 조회 table. `bare`는 자체 border를 빼고 `TableSurface` 안에서 seamless하게 쓴다 | 편집 input table이나 화면별 `<table>`을 만들지 않는다. |
 | `Button`, `buttonVariants`, `ButtonProps` | `button.tsx` | tokenized action/button | `variant`: `default`, `success`, `warning`, `destructive`, `outline`, `secondary`, `ghost`, `link`; `size`: `default`, `sm`, `lg`, `icon`; `asChild` | 링크/행동을 구분한 모든 공용 버튼 | page-local 색상·border 버튼을 만들지 않는다. |
 | `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter` | `card.tsx` | bordered surface 구조 | `Card.variant`: `default`, `muted`, `strong` | 필요한 card/surface와 header-body-footer 구조 | 설명용 wrapper card를 기본 레이아웃으로 쓰지 않는다. |

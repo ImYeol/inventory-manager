@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
+import fs from 'node:fs'
+import path from 'node:path'
 import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { PageHeader } from '@/app/components/ui'
 import { StatusBadge } from '@/components/ui/badge-1'
+import { ChannelBadge } from '@/components/ui/channel-badge'
 import { Button } from '@/components/ui/button'
 import { BasicDataTable } from '@/components/ui/basic-data-table'
 import { FilterToolbar } from '@/components/ui/filter-toolbar'
@@ -47,6 +50,30 @@ afterEach(() => {
 })
 
 describe('shared action and status primitives', () => {
+  it('keeps the approved commerce IA and inventory invariants in the document contract', () => {
+    const readDocument = (relativePath: string) => fs.readFileSync(path.resolve(process.cwd(), relativePath), 'utf8')
+    const prd = readDocument('docs/PRD.md')
+    const architecture = readDocument('docs/ARCHITECTURE.md')
+    const adr = readDocument('docs/ADR.md')
+
+    for (const document of [prd, architecture, adr]) {
+      expect(document).toContain('ProductVariant')
+      expect(document).toContain('ChannelProductRef')
+      expect(document).toContain('onHand')
+      expect(document).toContain('committed')
+      expect(document).toContain('available')
+      expect(document).toContain('incoming')
+      expect(document).toContain('channelReported')
+      expect(document).toContain('/orders/tracking-import')
+      expect(document).toContain('절대 수량')
+    }
+
+    expect(prd).toContain('대시보드 / 주문 / 상품 관리 / 재고 운영 / 소싱 / 설정')
+    expect(architecture).toContain('available = onHand - committed')
+    expect(architecture).toContain('외부 발송 성공')
+    expect(adr).toContain("`/shipping`은 `/orders/tracking-import`로 redirect")
+  })
+
   it('maps button variants onto the repo token system', () => {
     render(
         React.createElement(
@@ -293,6 +320,26 @@ describe('shared action and status primitives', () => {
       expect((badge.parentElement as HTMLElement).className).toContain(`ui-badge-${tone}`)
       unmount()
     }
+  })
+
+  it('renders channel and listing status text with channel and exception semantics', () => {
+    render(
+      React.createElement(
+        'div',
+        null,
+        React.createElement(ChannelBadge, { channel: 'naver', listingStatus: 'active' }),
+        React.createElement(ChannelBadge, { channel: 'coupang', listingStatus: 'active', compact: true }),
+        React.createElement(ChannelBadge, { channel: 'naver', listingStatus: 'unregistered' }),
+        React.createElement(ChannelBadge, { channel: 'coupang', listingStatus: 'paused' }),
+        React.createElement(ChannelBadge, { channel: 'naver', listingStatus: 'sync-error' }),
+      ),
+    )
+
+    expect(screen.getByText('네이버 · 판매 중').parentElement?.className).toContain('ui-badge-success')
+    expect(screen.getByText('쿠팡 판매 중').parentElement?.className).toContain('ui-badge-info')
+    expect(screen.getByText('네이버 · 미등록').parentElement?.className).toContain('ui-badge-neutral')
+    expect(screen.getByText('쿠팡 · 판매 중지').parentElement?.className).toContain('ui-badge-warning')
+    expect(screen.getByText('네이버 · 동기화 오류').parentElement?.className).toContain('ui-badge-danger')
   })
 
   it('exposes an accessible label on icon buttons and keeps icon plus text actions visible', () => {

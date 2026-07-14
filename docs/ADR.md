@@ -30,8 +30,8 @@
 **이유**: `IntegrationsView`와 `SettingsView`가 동시에 스토어 연결을 설명하면 IA가 중복되고, 사용자는 어디서 연결을 바꾸는지 헷갈린다.  
 **트레이드오프**: 기존 `/integrations` 링크는 호환 경로 또는 redirect 처리가 필요하다.
 
-## ADR-007: `운송장`은 연결 설명 페이지가 아니라 분류와 발송 실행 화면이다
-**결정**: `/shipping`은 `업로드 → 미리보기 → 분류 → 매칭/발송`만 소유한다. 별도 `연동 준비 상태` 섹션은 두지 않는다. 채널별 발송 액션은 preview surface와 붙여서 다룬다.
+## ADR-007: 송장 작업은 연결 설명이 아니라 주문 owner의 분류·발송 실행 surface다
+**결정**: `/orders/tracking-import`는 `업로드 → 미리보기 → 분류 → 매칭/발송`만 소유한다. `/shipping`은 이 route로 redirect한다. 별도 `연동 준비 상태` 섹션은 두지 않는다. 채널별 발송 액션은 preview surface와 붙여서 다룬다.
 **이유**: 연결 준비와 실행 흐름을 한 화면에서 반복 설명하면 작업 표면보다 안내 카드가 더 커진다.  
 **트레이드오프**: 연결 부족 상태는 짧은 badge와 deep link로만 전달해야 한다.
 
@@ -152,3 +152,12 @@
 **결정**: `docs/COMPONENTS.md`를 preset과 shared primitive 재사용의 canonical source of truth로 둔다. hand-roll 또는 새 primitive를 도입하기 전에는 이 카탈로그를 확인하고, 기존 variant 확장 가능성을 먼저 검토한다.
 **이유**: preset, primitive, 화면별 조립물이 함께 존재하는 상태에서 canonical·dead·gap을 한곳에 기록하지 않으면 같은 역할의 UI가 다시 분기된다.
 **트레이드오프**: 새 UI 작업 전에 카탈로그 검토가 추가되지만, component ownership과 후속 통합 대상이 명확해진다.
+
+## ADR-029: 주문과 송장 작업은 `/orders`로 수렴하고 재고는 예약과 절대 수량 동기화로 관리한다
+**결정**: sidebar의 canonical IA는 `대시보드 / 주문 / 상품 관리 / 재고 운영 / 소싱 / 설정`이다. `/orders`는 주문과 송장 작업의 owner이고, `/shipping`은 `/orders/tracking-import`로 redirect한다. `ProductVariant`는 판매·재고 단위, `ChannelProductRef`는 채널 상품/옵션 참조다. 재고는 `onHand`, `committed`, `available`, `incoming`, `channelReported`로 분리한다.
+
+`available = onHand - committed`이며 `incoming`은 보유 수량에 더하지 않는다. 주문 확정은 예약(`committed` 증가)만 원자적으로 반영한다. 외부 발송 성공 후에만 예약 해제와 `onHand` 차감을 같은 원자적 작업으로 수행한다. 채널 동기화는 delta가 아닌 `available`의 절대 수량을 전송하고, 성공 후에만 `channelReported`를 갱신한다.
+
+**이유**: 주문·송장 실행 위치를 하나로 정하고, 외부 실패/재시도에서 재고가 이중 차감되는 일을 막으며, 채널의 절대 수량을 내부 판매 가능 수량과 일관되게 맞춘다.
+
+**트레이드오프**: 예약, 발송 성공, 채널 성공 응답을 각기 독립된 상태 전이로 구현해야 하므로 이후 schema와 action의 트랜잭션 경계가 명확해야 한다.

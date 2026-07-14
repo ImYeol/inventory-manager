@@ -107,6 +107,7 @@
 src/components/ui/
 ├── badge-1.tsx
 ├── basic-data-table.tsx
+├── channel-badge.tsx
 ├── button.tsx
 ├── card.tsx
 ├── column-visibility-menu.tsx
@@ -167,6 +168,11 @@ src/components/ui/
   - `coupang`
   - `unclassified`
   - `ambiguous`
+- `channel-badge`
+  - canonical channel/listing status primitive
+  - `channel`: `naver` | `coupang`
+  - `listingStatus`: `active` | `unregistered` | `paused` | `sync-error`
+  - channel name and status text are always visible; `compact` only removes the separator
 - `store-connection-row`
   - provider label
   - bordered status badge
@@ -189,10 +195,12 @@ src/components/ui/
 - 같은 너비의 긴 filled 버튼을 여러 개 병렬 배치하는 패턴
 
 ## 메뉴 구조
-이 섹션은 canonical 메뉴 순서의 단일 SoT다: **대시보드 → 상품 관리 → 재고 운영 → 소싱 → 운송장 → 설정**.
+이 섹션은 canonical 메뉴 순서의 단일 SoT다: **대시보드 → 주문 → 상품 관리 → 재고 운영 → 소싱 → 설정**.
 
 - `대시보드`
   - `분석 섹션`
+- `주문`
+  - `송장 업로드/반영`
 - `상품 관리`
   - `상품`
   - `창고`
@@ -200,9 +208,10 @@ src/components/ui/
 - `소싱`
   - `외부 공장`
   - `입고 예정`
-- `운송장`
 - `설정`
   - `스토어 연결`
+
+`/orders`가 주문과 송장 작업의 owner이며, `/shipping`은 `/orders/tracking-import` redirect다. 채널 상태는 `ChannelBadge`로 채널명과 상태 텍스트를 함께 보여 주며, 색만으로 의미를 전달하지 않는다.
 
 ## Dashboard Pattern
 - dashboard는 quick-start 버튼 행 대신 `KPI strip + analytics cards + operational tables`로 구성한다.
@@ -300,7 +309,7 @@ src/components/ui/
 - filter toolbar와 table은 `TableSurface` 하나로 묶어 이음새 없는 단일 surface로 읽히게 한다. filter 박스와 table shell을 별도 카드 2개로 쌓지 않는다.
 - table/list를 설명용 wrapper card로 한 번 더 감싸지 않는다. shell이 필요하면 `TableSurface` 하나만 둔다.
 
-## 운송장 패턴
+## 주문 / 송장 패턴
 
 ### 업로드
 - 상단은 업로드 CTA와 최소 안내만 둔다.

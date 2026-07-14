@@ -1,7 +1,7 @@
 # PRD: Console IA Consolidation And Table-First Reset
 
 ## 한 줄 목표
-Seleccase Inventory를 `dashboard 내부 분석 + 상품 관리 table-first + 테이블 중심 재고 운영 + 설정 내부 스토어 연결 + 업로드 직후 분류 가능한 운송장 미리보기 + sourcing table/modal` 흐름으로 재정리한다.
+Seleccase Inventory를 `dashboard 내부 분석 + 주문·송장 작업 + 상품 관리 table-first + 테이블 중심 재고 운영 + 설정 내부 스토어 연결 + sourcing table/modal` 흐름으로 재정리한다.
 
 ## 현재 문제
 - `상품 관리`와 `기준 데이터`라는 표현이 섞여 있어 상품/창고 기준정보의 주인이 무엇인지 한눈에 읽히지 않는다.
@@ -43,10 +43,13 @@ Seleccase Inventory를 `dashboard 내부 분석 + 상품 관리 table-first + �
 소싱
 ├── 외부 공장
 └── 입고 예정
-운송장
+주문
+└── 송장 업로드/반영
 설정
 └── 스토어 연결
 ```
+
+승인된 sidebar 순서는 `대시보드 / 주문 / 상품 관리 / 재고 운영 / 소싱 / 설정`이다. `/orders`가 주문 조회, 주문 예약, 송장 업로드/반영의 canonical owner이며, 기존 `/shipping`은 `/orders/tracking-import`로 redirect하는 호환 경로다.
 
 ## 메뉴 원칙
 - 1차 메뉴는 직접 가치가 있는 목적지여야 한다.
@@ -54,7 +57,7 @@ Seleccase Inventory를 `dashboard 내부 분석 + 상품 관리 table-first + �
 - `대시보드`는 KPI와 분석 차트를 함께 가진다.
 - `상품 관리`는 top-level direct item으로 두고, 내부에서 `상품`과 `창고`를 구분한다.
 - `소싱`은 확장형을 유지한다.
-- `재고 운영`, `운송장`, `설정`은 direct item으로 유지한다.
+- `주문`, `재고 운영`, `설정`은 direct item으로 유지한다.
 - `스토어 연결`은 도메인 이름으로 유지하되 `설정` 안의 canonical section 또는 child screen으로 둔다.
 
 ## UI Complexity Budget
@@ -71,7 +74,7 @@ Seleccase Inventory를 `dashboard 내부 분석 + 상품 관리 table-first + �
 5. `입고` 또는 `출고`를 누르면 고정 타입의 빠른 입력 팝업이 열리고, 최소 필드만 포함된 편집 테이블에서 다건 입력한다.
 6. 복잡도가 높아지면 `CSV`와 `이력`은 `재고 운영` 하위 페이지에서 별도로 다룬다.
 7. 사용자는 `설정`에서 네이버/쿠팡 연결 상태를 보고 연결하거나 값을 변경한다.
-8. 사용자는 `운송장`에서 엑셀을 업로드한다.
+8. 사용자는 `주문`에서 송장 엑셀을 업로드한다.
 9. 시스템은 연결된 스토어에서 주문을 조회하고 이름/주소를 비교해 업로드 행을 `네이버`, `쿠팡`, `미분류`, 필요 시 `중복 후보`로 분류한다.
 10. 사용자는 분류 배지와 필터를 이용해 미분류 행만 확인하거나 채널별로 발송 대상을 정리한다.
 11. 사용자는 `소싱 > 외부 공장`에서 공장 목록을 표로 보고, 행 상세 modal과 등록 modal로 작업한다.
@@ -174,7 +177,8 @@ Seleccase Inventory를 `dashboard 내부 분석 + 상품 관리 table-first + �
 - `/integrations`는 새 owner가 아니라 `설정 > 스토어 연결`로 보내는 alias/redirect 후보로 간주한다.
 - 상태 표현은 `초록/빨강 원형 dot + label` 조합으로 통일한다.
 
-### 7. 운송장 업로드와 분류
+### 7. 주문과 송장 업로드
+- `/orders`는 주문 조회, 주문 예약, 송장 업로드/반영을 소유한다. `/shipping`은 독립 작업 surface가 아니라 `/orders/tracking-import` redirect다.
 - `운송장` 화면에서 `연동 준비 상태` 같은 별도 설명 섹션은 제거한다.
 - 업로드 섹션 아래의 첫 번째 표는 원본 엑셀 행이 아니라 `분류된 업로드 미리보기`가 되어야 한다.
 - 네이버가 연결되어 있으면 네이버 주문을 조회해 이름/주소 비교로 해당 row를 분류한다.
@@ -193,7 +197,7 @@ Seleccase Inventory를 `dashboard 내부 분석 + 상품 관리 table-first + �
 - 연결되지 않은 provider는 비활성 상태 설명 대신 활성 버튼으로 노출하고, 클릭 시 해당 provider 설정 section으로 이동시킨다.
 - 운송장 헤더는 `네이버 연결`, `쿠팡 연결` 버튼과 compact 상태 rail만 남긴다.
 
-### 8. 운송장 핵심 흐름 유지
+### 8. 송장 핵심 흐름 유지
 - 기존 `업로드 → 미리보기 → 매칭/발송` 흐름은 유지한다.
 - 분류 표는 발송 대상 정리에 필요한 1차 surface가 된다.
 - 채널별 발송 액션은 분류 결과를 기반으로 계산한다.
@@ -202,6 +206,18 @@ Seleccase Inventory를 `dashboard 내부 분석 + 상품 관리 table-first + �
 - 쿠팡 송장 업로드는 `shipmentBoxId + orderId + vendorItemId` 기준 item payload로 전송한다.
 - 쿠팡 송장 업로드는 설정의 `기본 택배사 코드`를 사용하고, v1 범위에서는 일반배송만 지원한다.
 - 운송장 번호가 없는 행도 분류 미리보기에는 남기되, 채널 반영 대상에서는 제외한다.
+
+### 9. 채널 상품과 재고 상태 모델
+- `ProductVariant`는 실제 판매·재고 단위이며, 옵션 조합마다 하나의 재고 상태를 가진다.
+- `ChannelProductRef`는 채널 판매상품/옵션 식별자와 `ProductVariant`를 연결하는 참조다. 채널별 등록 상태와 동기화 오류도 이 참조에 귀속한다.
+- 재고 상태는 다음 값을 분리한다.
+  - `onHand`: 실제 보유 수량
+  - `committed`: 접수된 주문으로 예약된 수량
+  - `available`: 판매 가능한 수량(`onHand - committed`)
+  - `incoming`: 입고 예정이지만 아직 보유되지 않은 수량
+  - `channelReported`: 가장 최근 채널에 절대 수량으로 보고한 값
+- 주문이 확정되면 `committed`를 증가시켜 예약하고, 외부 발송 성공 후에만 같은 트랜잭션에서 `onHand`를 차감하고 예약을 해제한다. 실패·재시도는 재고를 중복 차감하지 않는다.
+- 채널 동기화는 증감값이 아닌 현재 `available`의 절대 수량을 전송한다. 성공 응답 뒤에만 `channelReported`를 그 절대 수량으로 갱신한다.
 
 ### 9. 소싱 > 외부 공장 / 입고 예정
 - `외부 공장`은 카드형 목록이 아니라 `검색 + 상태 필터 + 등록 버튼 + table` 구조를 쓴다.

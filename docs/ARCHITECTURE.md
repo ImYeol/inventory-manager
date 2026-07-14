@@ -40,7 +40,7 @@ src/
 - `src/lib/api/naver.ts`
 - `src/lib/api/coupang.ts`
 
-이번 패스의 본질은 원장 재작성보다 `route ownership`, `product management ownership`, `inventory table UX`, `settings/store-connection consolidation`, `shipping preview classification`을 다시 정리하는 것이다.
+이번 패스의 본질은 원장 재작성보다 `route ownership`, `order/tracking ownership`, `product management ownership`, `inventory invariants`, `settings/store-connection consolidation`을 다시 정리하는 것이다.
 
 ## Global Action Ownership
 - 운영 화면의 canonical 구조는 `compact toolbar + primary surface`다.
@@ -86,7 +86,8 @@ src/
 소싱
 ├── 외부 공장 (/sourcing/factories)
 └── 입고 예정 (/sourcing/arrivals)
-운송장 (/shipping)
+주문 (/orders)
+└── 송장 업로드 (/orders/tracking-import)
 설정 (/settings)
 └── 스토어 연결
 ```
@@ -95,12 +96,14 @@ src/
 
 ### Canonical routes
 - `/`: KPI, 최근 활동, dashboard-owned analytics section
+- `/orders`: 주문 조회, 예약 상태, 송장 작업의 canonical owner
+- `/orders/tracking-import`: 송장 업로드, 분류 미리보기, 매칭/발송
 - `/products`: 상품과 창고 기준정보 canonical owner
 - `/inventory`: 재고 운영 landing
 - `/inventory?tab=list|history|inbound|outbound`: 목록, 이력, 빠른 입력 중심 워크스페이스
 - `/history`: 이력 canonical standalone route (재고 운영 ownership; `/inventory?tab=history`는 embedded view)
 - `/inventory/csv`: 필요 시 분리되는 대량 반영 workspace (조건부)
-- `/shipping`: 엑셀 업로드, 분류 미리보기, 매칭/발송
+- `/shipping`: `/orders/tracking-import` redirect only
 - `/settings`: 스토어 연결
 - `/analytics`: 독립 화면이 아니라 `/`로 보내는 legacy redirect
 - `/integrations`: legacy alias 또는 redirect 후보
@@ -126,7 +129,10 @@ src/
   - 감사성 조회와 상세 이력 (standalone)
 - `/inventory/csv`
   - 대량 파일 반영과 preview (조건부)
-- `/shipping`
+- `/orders`
+  - 주문 조회와 예약 상태
+  - 송장 업로드/반영 진입
+- `/orders/tracking-import`
   - 업로드
   - 분류 미리보기
   - 채널별 매칭/발송
@@ -139,6 +145,19 @@ src/
   - 별도 owner가 아니라 `/settings`로 보내는 호환 경로
 
 같은 provider summary나 credential form이 두 route 이상에 존재하면 component reuse 문제가 아니라 ownership 오류로 본다.
+
+## Commerce Inventory Invariants
+
+- `ProductVariant`는 SKU와 옵션 조합의 판매·재고 단위다.
+- `ChannelProductRef`는 각 채널의 판매상품/옵션 ID를 `ProductVariant`에 연결하고, 채널 listing 상태와 마지막 동기화 결과를 소유한다.
+- 수량 원장은 다음 다섯 상태를 구분한다.
+  - `onHand`: 실제 보유 수량
+  - `committed`: 확정 주문이 점유한 예약 수량
+  - `available = onHand - committed`: 신규 판매에 노출할 수량
+  - `incoming`: 입고 예정 수량이며 `onHand`에 포함하지 않는다
+  - `channelReported`: 마지막으로 채널에 성공 보고한 절대 수량
+- 주문 확정은 `committed`를 원자적으로 증가시킨다. 외부 발송 성공은 같은 원자적 작업에서 예약을 해제하고 `onHand`를 차감한다. 외부 요청 실패 또는 재시도는 이 차감을 실행하지 않는다.
+- 채널 재고 동기화는 delta가 아니라 현재 `available`의 절대 수량을 보낸다. 채널 성공 응답 뒤에만 `channelReported`를 해당 절대 수량으로 저장한다.
 
 ## Dashboard-Owned Analytics Architecture
 
@@ -206,7 +225,7 @@ src/
 - `/integrations`가 유지된다면 독립된 form을 렌더링하지 않는다.
 - 최소 구현은 redirect 또는 thin wrapper다.
 
-## Shipping Classification Flow
+## Order Tracking Classification Flow
 
 ### Data flow
 1. 사용자가 엑셀 업로드
@@ -239,12 +258,12 @@ shipping_preview_rows
 - 두 provider가 동시에 매칭되면 `ambiguous`로 표시하고 자동 발송 대상에서 제외한다.
 - 어떤 provider도 매칭되지 않으면 `unclassified`로 남긴다.
 
-### Shipping UI contract
+### Tracking import UI contract
 - 별도 `연동 준비 상태` 섹션은 두지 않는다.
 - 업로드 직후 표 아래 첫 surface가 분류 미리보기가 되어야 한다.
 - 미연결 provider는 비활성 안내가 아니라 활성 `연결` 버튼으로 노출한다.
 - 버튼은 canonical settings section으로 이동해야 한다.
-- `/shipping`에서 provider action의 canonical owner는 preview toolbar다.
+- `/orders/tracking-import`에서 provider action의 canonical owner는 preview toolbar다.
 - preview toolbar는 `분류 필터 + provider action group` 구조를 기본으로 한다.
 - provider action group은 `상태 chip + 갱신 + 반영`을 한 묶음으로 둔다.
 - `중복 후보`는 row badge와 summary count에는 남길 수 있지만, 기본 filter set의 canonical 대상은 아니다.
@@ -282,6 +301,7 @@ src/components/ui/
 ├── basic-data-table.tsx
 ├── table.tsx
 ├── badge-1.tsx
+├── channel-badge.tsx
 ├── inventory-data-table.tsx
 ├── filter-toolbar.tsx
 ├── column-visibility-menu.tsx

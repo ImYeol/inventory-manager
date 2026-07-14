@@ -93,8 +93,7 @@ function NavigationContent({
             S
           </span>
           <div className="min-w-0 leading-tight">
-            <h1 className="truncate text-base font-semibold tracking-tight text-[color:var(--foreground)]">Seleccase</h1>
-            <p className="truncate text-xs text-[color:var(--muted-foreground)]">Inventory</p>
+            <h1 className="truncate text-base font-semibold tracking-tight text-[color:var(--foreground)]">Seleccase Inventory</h1>
           </div>
         </div>
       </div>
