@@ -337,12 +337,18 @@ export async function confirmCoupangShipments(
     const res = await fetch(`${BASE_URL}${detailPath}`, { method: 'GET', headers: getCoupangHeaders('GET', detailPath, credentials) })
     if (!res.ok) return [orderId, null] as const
     const response = asRecord(await res.json())
-    return [orderId, mapOrderSheet(asRecord(response.data) as Parameters<typeof mapOrderSheet>[0])] as const
+    const orderSheets = Array.isArray(response.data)
+      ? response.data.map((orderSheet) => mapOrderSheet(asRecord(orderSheet) as Parameters<typeof mapOrderSheet>[0]))
+      : []
+    return [orderId, orderSheets] as const
   })
   const refreshedByOrderId = new Map(refreshedOrders)
   const invalidBoxes = new Set<number>()
   const validShipments = shipments.flatMap((shipment) => {
-    const refreshed = refreshedByOrderId.get(shipment.orderId)
+    const refreshed = refreshedByOrderId.get(shipment.orderId)?.find((orderSheet) =>
+      orderSheet.orderId === shipment.orderId
+      && shipment.vendorItemIds.every((vendorItemId) => orderSheet.orderItems.some((item) => item.vendorItemId === vendorItemId)),
+    )
     if (!refreshed || isCancelledOrder(refreshed.status)) {
       invalidBoxes.add(shipment.shipmentBoxId)
       return []

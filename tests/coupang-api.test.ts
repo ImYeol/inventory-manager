@@ -207,8 +207,8 @@ describe('coupang api helpers', () => {
 
   it('posts invoice uploads to orders/invoices with item-level payloads', async () => {
     fetchMock
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { shipmentBoxId: 111, orderId: 101, status: 'INSTRUCT', orderItems: [{ vendorItemId: 301, shippingCount: 1 }, { vendorItemId: 302, shippingCount: 1 }] } }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { shipmentBoxId: 12, orderId: 102, status: 'INSTRUCT', orderItems: [{ vendorItemId: 303, shippingCount: 1 }] } }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: 'SUCCESS', message: '성공', data: [{ shipmentBoxId: 111, orderId: 101, status: 'INSTRUCT', orderItems: [{ vendorItemId: 301, shippingCount: 1 }, { vendorItemId: 302, shippingCount: 1 }] }] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: 'SUCCESS', message: '성공', data: [{ shipmentBoxId: 12, orderId: 102, status: 'INSTRUCT', orderItems: [{ vendorItemId: 303, shippingCount: 1 }] }] }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { responseCode: 1, responseMessage: 'PARTIAL_ERROR', responseList: [{ shipmentBoxId: 111, succeed: true }, { shipmentBoxId: 12, succeed: false }] } }) })
 
     const result = await confirmCoupangShipments(
@@ -282,13 +282,37 @@ describe('coupang api helpers', () => {
     })
   })
 
-  it('does not upload invoices when refreshed order items are cancelled or not fulfillable', async () => {
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: { shipmentBoxId: 11, orderId: 101, status: 'CANCELLED', orderItems: [{ vendorItemId: 301, shippingCount: 1, cancelCount: 1 }] } }) })
+  it('does not upload invoices when the refreshed order detail array is empty', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ code: 'SUCCESS', message: '성공', data: [] }) })
 
     await expect(confirmCoupangShipments([{ shipmentBoxId: 11, orderId: 101, vendorItemIds: [301], trackingNumber: '1234567890' }], {
       accessKey: 'access-key', secretKey: 'secret-key', vendorId: 'A00012345', defaultDeliveryCompanyCode: 'CJGLS',
     })).resolves.toEqual({ success: false, failedBoxes: [11], error: '쿠팡 주문 상태를 다시 확인해 주세요.' })
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('selects the matching refreshed order sheet from multiple detail rows', async () => {
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({
+        code: 'SUCCESS',
+        message: '성공',
+        data: [
+          { shipmentBoxId: 10, orderId: 100, status: 'INSTRUCT', orderItems: [{ vendorItemId: 301, shippingCount: 1 }] },
+          { shipmentBoxId: 111, orderId: 101, status: 'INSTRUCT', orderItems: [{ vendorItemId: 301, shippingCount: 1 }, { vendorItemId: 302, shippingCount: 1 }] },
+        ],
+      }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { responseCode: 0, responseList: [] } }) })
+
+    await expect(confirmCoupangShipments([{ shipmentBoxId: 11, orderId: 101, vendorItemIds: [301, 302], trackingNumber: '1234567890' }], {
+      accessKey: 'access-key', secretKey: 'secret-key', vendorId: 'A00012345', defaultDeliveryCompanyCode: 'CJGLS',
+    })).resolves.toEqual({ success: true, failedBoxes: [] })
+
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1].body))).toMatchObject({
+      orderSheetInvoiceApplyDtos: [
+        { shipmentBoxId: 111, orderId: 101, vendorItemId: 301 },
+        { shipmentBoxId: 111, orderId: 101, vendorItemId: 302 },
+      ],
+    })
   })
 })
