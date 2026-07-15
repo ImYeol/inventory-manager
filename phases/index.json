@@ -65,6 +65,10 @@
       "dir": "configured-credential-summary-only",
       "status": "completed",
       "completed_at": "2026-07-15T22:38:07+0900"
+    },
+    {
+      "dir": "connection-summary-density",
+      "status": "completed"
     }
   ]
 }
