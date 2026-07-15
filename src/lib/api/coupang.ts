@@ -91,6 +91,19 @@ function normalizeCoupangProduct(product: unknown): ChannelProductSnapshot[] {
   })
 }
 
+function getCoupangHeaders(
+  method: string,
+  path: string,
+  credentials: CoupangCredentials,
+) {
+  return {
+    Authorization: getAuthHeader(method, path, credentials),
+    'Content-Type': 'application/json',
+    'X-Requested-By': credentials.vendorId,
+    'X-MARKET': 'KR',
+  }
+}
+
 export async function fetchCoupangProductSnapshots(
   credentials: CoupangCredentials,
 ): Promise<ChannelProductSnapshot[]> {
@@ -106,7 +119,7 @@ export async function fetchCoupangProductSnapshots(
     const path = `/v2/providers/seller_api/apis/api/v1/marketplace/seller-products?${params.toString()}`
     const res = await fetch(`${BASE_URL}${path}`, {
       method: 'GET',
-      headers: { Authorization: getAuthHeader('GET', path, credentials), 'Content-Type': 'application/json' },
+      headers: getCoupangHeaders('GET', path, credentials),
     })
     if (!res.ok) throw new Error(`쿠팡 상품 목록 조회 실패: ${res.status}`)
     const response = asRecord(await res.json())
@@ -122,7 +135,7 @@ export async function fetchCoupangProductSnapshots(
     const path = `/v2/providers/seller_api/apis/api/v1/marketplace/seller-products/${sellerProductId}`
     const res = await fetch(`${BASE_URL}${path}`, {
       method: 'GET',
-      headers: { Authorization: getAuthHeader('GET', path, credentials), 'Content-Type': 'application/json' },
+      headers: getCoupangHeaders('GET', path, credentials),
     })
     if (!res.ok) throw new Error(`쿠팡 상품 상세 조회 실패: ${res.status}`)
     const response = asRecord(await res.json())

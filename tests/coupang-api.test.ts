@@ -61,6 +61,8 @@ describe('coupang api helpers', () => {
     const firstListRequest = new URL(String(fetchMock.mock.calls[0][0]))
     const secondListRequest = new URL(String(fetchMock.mock.calls[1][0]))
     const firstDetailRequest = new URL(String(fetchMock.mock.calls[2][0]))
+    const [, firstListInit] = fetchMock.mock.calls[0]
+    const [, firstDetailInit] = fetchMock.mock.calls[2]
 
     expect(firstListRequest.pathname).toBe('/v2/providers/seller_api/apis/api/v1/marketplace/seller-products')
     expect(firstListRequest.searchParams.get('maxPerPage')).toBe('100')
@@ -68,6 +70,19 @@ describe('coupang api helpers', () => {
     expect(secondListRequest.searchParams.get('nextToken')).toBe('NEXT')
     expect(firstDetailRequest.pathname).toBe('/v2/providers/seller_api/apis/api/v1/marketplace/seller-products/1001')
     expect(firstDetailRequest.searchParams.has('vendorId')).toBe(false)
+    const requestedBy = firstListRequest.searchParams.get('vendorId')
+    expect(firstListInit.headers).toEqual(expect.objectContaining({
+      Authorization: expect.any(String),
+      'Content-Type': 'application/json',
+      'X-Requested-By': requestedBy,
+      'X-MARKET': 'KR',
+    }))
+    expect(firstDetailInit.headers).toEqual(expect.objectContaining({
+      Authorization: expect.any(String),
+      'Content-Type': 'application/json',
+      'X-Requested-By': requestedBy,
+      'X-MARKET': 'KR',
+    }))
   })
 
   it('fetches v5 order sheets with nextToken pagination and maps shipment data', async () => {
