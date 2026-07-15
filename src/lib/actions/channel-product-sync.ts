@@ -9,7 +9,7 @@ import { getRequiredShippingCredentials } from '../shipping-credentials'
 export type ProductSyncResult = { added: number; updated: number; mappingRequired: number; failed: number }
 
 type VariantRow = { id: number; seller_sku: string }
-type RefRow = { channel: ChannelName; external_product_id: string; external_variant_id: string }
+type RefRow = { channel: ChannelName; external_product_id: string; external_variant_id: string; variant_id: number | null }
 
 async function fetchSnapshots(channel: ChannelName): Promise<ChannelProductSnapshot[]> {
   if (channel === 'naver') {
@@ -23,7 +23,7 @@ export async function syncProducts(channel?: ChannelName): Promise<ProductSyncRe
   const { supabase, user } = await getSupabaseWithUser()
   const [{ data: variants, error: variantError }, { data: refs, error: refError }] = await Promise.all([
     supabase.from('product_variants').select('id, seller_sku'),
-    supabase.from('channel_product_refs').select('channel, external_product_id, external_variant_id'),
+    supabase.from('channel_product_refs').select('channel, external_product_id, external_variant_id, variant_id'),
   ])
   if (variantError || refError) throw new Error('상품 동기화 준비 정보를 불러오지 못했습니다.')
 
@@ -31,17 +31,20 @@ export async function syncProducts(channel?: ChannelName): Promise<ProductSyncRe
   for (const variant of (variants ?? []) as VariantRow[]) {
     variantsBySku.set(variant.seller_sku, [...(variantsBySku.get(variant.seller_sku) ?? []), variant])
   }
-  const existingKeys = new Set((refs ?? []).map((ref: RefRow) => `${ref.channel}:${ref.external_product_id}:${ref.external_variant_id}`))
+  const existingRefsByKey = new Map(
+    (refs ?? []).map((ref: RefRow) => [`${ref.channel}:${ref.external_product_id}:${ref.external_variant_id}`, ref]),
+  )
   const result: ProductSyncResult = { added: 0, updated: 0, mappingRequired: 0, failed: 0 }
 
   const settled = await Promise.allSettled(channels.map(async (currentChannel) => {
     const snapshots = await fetchSnapshots(currentChannel)
     const payload = snapshots.map((snapshot) => {
-      const matches = snapshot.sellerSku ? variantsBySku.get(snapshot.sellerSku) ?? [] : []
-      const variantId = matches.length === 1 ? matches[0].id : null
-      if (variantId === null) result.mappingRequired += 1
       const key = `${snapshot.channel}:${snapshot.externalProductId}:${snapshot.externalVariantId}`
-      if (existingKeys.has(key)) result.updated += 1
+      const existingRef = existingRefsByKey.get(key)
+      const matches = snapshot.sellerSku ? variantsBySku.get(snapshot.sellerSku) ?? [] : []
+      const variantId = existingRef?.variant_id ?? (matches.length === 1 ? matches[0].id : null)
+      if (variantId === null) result.mappingRequired += 1
+      if (existingRef) result.updated += 1
       else result.added += 1
       return {
         user_id: user.id,

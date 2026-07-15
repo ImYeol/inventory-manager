@@ -30,9 +30,12 @@ const naverSnapshot = {
   rawAttributes: { source: 'naver' },
 }
 
-function createSupabaseMock(variants: Array<{ id: number; seller_sku: string }>) {
+function createSupabaseMock(
+  variants: Array<{ id: number; seller_sku: string }>,
+  existingRefs: Array<{ channel: 'naver' | 'coupang'; external_product_id: string; external_variant_id: string; variant_id: number | null }> = [],
+) {
   const refs = {
-    select: vi.fn(async () => ({ data: [], error: null })),
+    select: vi.fn(async () => ({ data: existingRefs, error: null })),
     upsert: vi.fn(async () => ({ error: null })),
   }
   const variantQuery = { select: vi.fn(async () => ({ data: variants, error: null })) }
@@ -52,6 +55,31 @@ beforeEach(() => {
 })
 
 describe('channel product sync', () => {
+  it('preserves an existing manual variant mapping when the synced seller SKU matches another variant', async () => {
+    const supabase = createSupabaseMock(
+      [
+        { id: 42, seller_sku: 'SKU-1' },
+        { id: 99, seller_sku: 'MANUAL-SKU' },
+      ],
+      [{ channel: 'naver', external_product_id: 'origin-1', external_variant_id: 'channel-1', variant_id: 99 }],
+    )
+    mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
+    mocks.getRequiredShippingCredentials.mockResolvedValue({ clientId: 'id', clientSecret: 'secret' })
+    mocks.fetchNaverProductSnapshots.mockResolvedValue([naverSnapshot])
+
+    await expect(syncProducts('naver')).resolves.toEqual({
+      added: 0,
+      updated: 1,
+      mappingRequired: 0,
+      failed: 0,
+    })
+
+    expect(supabase.refs.upsert).toHaveBeenCalledWith(
+      [expect.objectContaining({ external_variant_id: 'channel-1', variant_id: 99 })],
+      { onConflict: 'user_id,channel,external_product_id,external_variant_id' },
+    )
+  })
+
   it('links only an exactly-one SKU match and saves the channel snapshot without changing inventory', async () => {
     const supabase = createSupabaseMock([{ id: 42, seller_sku: 'SKU-1' }])
     mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
