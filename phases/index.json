@@ -72,7 +72,8 @@
     },
     {
       "dir": "card-divider-rhythm-guardrail",
-      "status": "blocked"
+      "status": "completed",
+      "completed_at": "2026-07-15T22:51:14+0900"
     }
   ]
 }

@@ -61,6 +61,7 @@ class CodexHookTests(unittest.TestCase):
 
         self.assertIn("systemMessage", output)
         self.assertIn("UI 변경", output["systemMessage"])
+        self.assertIn("vertical rhythm", output["systemMessage"])
 
     def test_non_matching_command_is_silent(self) -> None:
         output = run_hook(

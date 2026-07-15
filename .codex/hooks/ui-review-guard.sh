@@ -92,7 +92,8 @@ print(
         {
             "systemMessage": (
                 "UI 변경은 shared theme/component/primitive/design token 기준을 "
-                "docs/UI_GUIDE.md, docs/ARCHITECTURE.md, docs/ADR.md와 함께 검토하세요."
+                "docs/UI_GUIDE.md, docs/ARCHITECTURE.md, docs/ADR.md와 함께 검토하고, "
+                "divider 뒤 첫 content의 vertical rhythm이 기존 spacing token을 유지하는지 확인하세요."
             ),
         }
     )
