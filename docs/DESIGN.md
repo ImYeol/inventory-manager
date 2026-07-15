@@ -72,9 +72,9 @@ purple SaaS gradient, glassmorphism, decorative glow는 금지한다.
 | `--space-12` | `3rem` | 48 |
 | `--space-16` | `4rem` | 64 |
 
-### Card divider rhythm
+### Card composition contract
 
-공유 card header에 bottom divider가 있으면 첫 body content는 최소 `--space-4`로 시작한다. 의도적으로 연속된 data surface만 zero gap을 사용할 수 있다.
+Card의 구성과 token 참조는 [card.composition.json](../design-system/contracts/card.composition.json)이 정의한다. 이 문서는 의도를 설명하고, contract는 Figma와 React가 공유하는 component/property 이름 및 조합을 정의하며, 코드와 harness가 이를 검증한다.
 
 ## Radius
 

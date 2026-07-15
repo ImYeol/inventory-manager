@@ -93,7 +93,7 @@ export default function DashboardView({ metrics, flow, warehouses, exceptions, u
             <div><CardTitle>창고별 재고</CardTitle><CardDescription>예약을 제외한 실제 출고 가능 수량입니다.</CardDescription></div>
             <Link href="/inventory" className={cx(ui.buttonSecondary, 'h-8 px-3 text-xs')}>재고 보기</Link>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent contentLayout="continuous">
             <Table aria-label="창고별 재고 상태">
               <TableHeader><TableRow><TableHead>창고</TableHead><TableHead className="text-right">실재고</TableHead><TableHead className="text-right">예약</TableHead><TableHead className="text-right">가용</TableHead></TableRow></TableHeader>
               <TableBody>
@@ -110,7 +110,7 @@ export default function DashboardView({ metrics, flow, warehouses, exceptions, u
             <div><CardTitle>처리해야 할 주문 예외</CardTitle><CardDescription>자동 예약하지 못한 주문만 표시합니다.</CardDescription></div>
             <Link href="/orders?view=exception" className={cx(ui.buttonSecondary, 'h-8 px-3 text-xs')}>주문 보기</Link>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent contentLayout="continuous">
             <Table aria-label="처리해야 할 주문 예외">
               <TableHeader><TableRow><TableHead>채널</TableHead><TableHead>주문번호</TableHead><TableHead>수취인</TableHead><TableHead>사유</TableHead></TableRow></TableHeader>
               <TableBody>
@@ -128,7 +128,7 @@ export default function DashboardView({ metrics, flow, warehouses, exceptions, u
           <div><CardTitle>곧 도착할 소싱</CardTitle><CardDescription>도착 예정일이 가까운 미입고 수량입니다.</CardDescription></div>
           <Link href="/sourcing/arrivals" className={cx(ui.buttonSecondary, 'h-8 px-3 text-xs')}>소싱 보기</Link>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent contentLayout="continuous">
           <Table aria-label="곧 도착할 소싱">
             <TableHeader><TableRow><TableHead>도착 예정</TableHead><TableHead>공장</TableHead><TableHead>발주 참조</TableHead><TableHead className="text-right">미입고</TableHead></TableRow></TableHeader>
             <TableBody>

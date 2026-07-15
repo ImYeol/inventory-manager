@@ -3,21 +3,38 @@ import * as React from 'react'
 import { cn } from '@/lib/utils'
 import { ui } from '@/app/components/ui'
 
-type CardVariant = 'default' | 'muted' | 'strong'
+type CardSurface = 'default' | 'muted' | 'strong'
+type CardContentLayout = 'inset' | 'continuous'
 
 type CardProps = React.HTMLAttributes<HTMLElement> & {
-  variant?: CardVariant
+  /** Figma-aligned Card surface property. */
+  surface?: CardSurface
+  /** @deprecated Use surface so code and the design contract share one name. */
+  variant?: CardSurface
 }
 
-const cardVariantClasses: Record<CardVariant, string> = {
+type CardContentProps = React.HTMLAttributes<HTMLDivElement> & {
+  /** Inset is the divided-card default; continuous is for deliberate data surfaces. */
+  contentLayout?: CardContentLayout
+}
+
+const cardSurfaceClasses: Record<CardSurface, string> = {
   default: ui.card,
   muted: ui.cardMuted,
   strong: ui.cardStrong,
 }
 
-const Card = React.forwardRef<HTMLElement, CardProps>(({ className, variant = 'default', ...props }, ref) => (
-  <section ref={ref} className={cn(cardVariantClasses[variant], className, variant === 'strong' && 'overflow-hidden')} {...props} />
-))
+const Card = React.forwardRef<HTMLElement, CardProps>(({ className, surface, variant, ...props }, ref) => {
+  const resolvedSurface = surface ?? variant ?? 'default'
+
+  return (
+    <section
+      ref={ref}
+      className={cn(cardSurfaceClasses[resolvedSurface], className, resolvedSurface === 'strong' && 'overflow-hidden')}
+      {...props}
+    />
+  )
+})
 Card.displayName = 'Card'
 
 const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
@@ -43,8 +60,18 @@ const CardDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttribu
 )
 CardDescription.displayName = 'CardDescription'
 
-const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => <div ref={ref} className={cn(ui.cardBody, className)} {...props} />,
+const CardContent = React.forwardRef<HTMLDivElement, CardContentProps>(
+  ({ className, contentLayout = 'inset', ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        ui.cardBody,
+        contentLayout === 'inset' ? 'ui-card-content-inset' : 'ui-card-content-continuous p-0',
+        className,
+      )}
+      {...props}
+    />
+  ),
 )
 CardContent.displayName = 'CardContent'
 
@@ -54,3 +81,4 @@ const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
 CardFooter.displayName = 'CardFooter'
 
 export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
+export type { CardContentLayout, CardSurface }

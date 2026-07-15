@@ -1,5 +1,9 @@
 # Architecture
 
+## Design composition contracts
+
+공유 component composition은 vendor-neutral artifact로 관리한다. [Card contract](../design-system/contracts/card.composition.json)는 React primitive와 Figma library가 같은 `Card`, `surface`, `contentLayout` 이름을 쓰게 하는 source of truth이며, 문서는 의도를 설명하고 code와 harness가 alignment를 검증한다.
+
 ## Channel-first product catalog
 
 `/products` owns the channel-first product workspace. `ChannelProductRef` retains provider identifiers and raw option data, including unlinked refs; it is never cloned into `ProductVariant`. Sync runs only in the authenticated `syncProducts` server action. A manually selected internal variant may be linked through `linkVariant`; sync preserves an existing non-null manual mapping, while only new or unlinked refs may use an exact single seller SKU match. Seller SKU is never a product-name fallback.

@@ -390,7 +390,7 @@ src/components/ui/
 - strong card는 header와 body가 나뉘어도 하나의 clipped surface로 읽혀야 한다.
 - hollow corner, segmented seam, 이질적인 border split이 보이면 card variant가 아니라 shared primitive 구조를 다시 봐야 한다.
 - page-local border patch로 임시 봉합하지 말고 shared card/surface primitive의 variant와 padding/token을 고쳐서 해결한다.
-- **Card divider rhythm**: shared card header에 bottom divider가 있으면 첫 body content는 최소 `--space-4`로 시작한다. 의도적으로 continuous data surface만 zero gap을 사용한다.
+- Card의 divider/body 관계는 [card composition contract](../design-system/contracts/card.composition.json)가 정의한다. 이 문서는 의도를 설명하고, contract는 component composition을 정의하며, code와 harness가 이를 검증한다.
 
 ## 모션
 - duration, easing, reduced-motion의 SoT는 [MOTION.md](./MOTION.md)다.

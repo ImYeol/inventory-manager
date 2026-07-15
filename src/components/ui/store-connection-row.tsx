@@ -27,7 +27,7 @@ export function StoreConnectionRow({
   children?: ReactNode
 }) {
   return (
-    <Card variant="strong">
+    <Card surface="strong">
       <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
         <div className="flex items-center gap-2">
           <h2 className="text-base font-semibold text-[color:var(--foreground)]">{provider}</h2>

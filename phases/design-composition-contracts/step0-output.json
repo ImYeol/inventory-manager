@@ -1,0 +1,14 @@
+{
+  "phase": "design-composition-contracts",
+  "step": 0,
+  "name": "formalize-card-composition-contract",
+  "status": "completed",
+  "finished_at": "2026-07-15T23:03:17+0900",
+  "summary": "Headless implementation produced the contract and primitive changes; completion was recorded after direct acceptance validation because the headless process did not return a completion signal.",
+  "validation": {
+    "focused_tests": "passed: 3 files, 10 tests",
+    "hook_tests": "passed: 4 tests",
+    "lint": "passed with 4 pre-existing warnings",
+    "build": "passed"
+  }
+}

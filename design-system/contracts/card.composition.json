@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract": "seleccase.design-system.card-composition",
+  "version": "1.0.0",
+  "component": "Card",
+  "properties": {
+    "surface": { "default": "default", "values": ["default", "muted", "strong"] },
+    "contentLayout": { "default": "inset", "values": ["inset", "continuous"] }
+  },
+  "compositions": [
+    {
+      "surface": "default",
+      "contentLayout": "inset",
+      "tokens": {
+        "bodyInset": "var(--space-4)",
+        "border": "var(--border-strong)",
+        "radius": "var(--radius-lg)"
+      }
+    },
+    {
+      "surface": "default",
+      "contentLayout": "continuous",
+      "tokens": {
+        "border": "var(--border-strong)",
+        "radius": "var(--radius-lg)"
+      }
+    }
+  ]
+}
