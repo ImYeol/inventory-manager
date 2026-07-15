@@ -60,6 +60,11 @@
       "dir": "shipping-credential-removal",
       "status": "completed",
       "completed_at": "2026-07-15T22:27:34+0900"
+    },
+    {
+      "dir": "configured-credential-summary-only",
+      "status": "completed",
+      "completed_at": "2026-07-15T22:38:07+0900"
     }
   ]
 }
