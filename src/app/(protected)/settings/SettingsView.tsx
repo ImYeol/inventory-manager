@@ -194,53 +194,54 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
               <Button type="button" variant="destructive" size="sm" onClick={() => setRemovalTarget('naver')}>
                 네이버 연결 해제
               </Button>
-            ) : null}
-            <Button type="submit" form="naver-settings" disabled={naverPending}>
-              {naverPending ? '네이버 저장 중…' : '네이버 저장'}
-            </Button>
+            ) : (
+              <Button type="submit" form="naver-settings" disabled={naverPending}>
+                {naverPending ? '네이버 저장 중…' : '네이버 저장'}
+              </Button>
+            )}
           </div>
         }
       >
-        <form id="naver-settings" className="space-y-4" onSubmit={handleNaverSave}>
-          <div className="grid gap-4">
-            <div>
-              <label htmlFor="naver-client-id" className={ui.label}>
-                네이버 Client ID
-              </label>
-              <Input
-                ref={naverClientIdRef}
-                id="naver-client-id"
-                type="text"
-                autoComplete="off"
-                spellCheck={false}
-                value={naverValues.clientId}
-                onChange={(event) => setNaverValues((prev) => ({ ...prev, clientId: event.target.value }))}
-              />
+        {!currentSummary.naver.configured ? (
+          <form id="naver-settings" className="space-y-4" onSubmit={handleNaverSave}>
+            <div className="grid gap-4">
+              <div>
+                <label htmlFor="naver-client-id" className={ui.label}>
+                  네이버 Client ID
+                </label>
+                <Input
+                  ref={naverClientIdRef}
+                  id="naver-client-id"
+                  type="text"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={naverValues.clientId}
+                  onChange={(event) => setNaverValues((prev) => ({ ...prev, clientId: event.target.value }))}
+                />
+              </div>
+              <div>
+                <label htmlFor="naver-client-secret" className={ui.label}>
+                  네이버 Client Secret
+                </label>
+                <Input
+                  ref={naverClientSecretRef}
+                  id="naver-client-secret"
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={naverValues.clientSecret}
+                  onChange={(event) => setNaverValues((prev) => ({ ...prev, clientSecret: event.target.value }))}
+                />
+              </div>
             </div>
-            <div>
-              <label htmlFor="naver-client-secret" className={ui.label}>
-                네이버 Client Secret
-              </label>
-              <Input
-                ref={naverClientSecretRef}
-                id="naver-client-secret"
-                type="password"
-                autoComplete="off"
-                spellCheck={false}
-                value={naverValues.clientSecret}
-                onChange={(event) => setNaverValues((prev) => ({ ...prev, clientSecret: event.target.value }))}
-              />
-            </div>
-          </div>
-          {naverError ? (
-            <p className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm text-[color:var(--danger-foreground)]')}>{naverError}</p>
-          ) : null}
-          {naverMessage ? (
-            <p className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm text-[color:var(--success-foreground)]')}>
-              {naverMessage}
-            </p>
-          ) : null}
-        </form>
+            {naverError ? (
+              <p className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm text-[color:var(--danger-foreground)]')}>{naverError}</p>
+            ) : null}
+            {naverMessage ? (
+              <p className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm text-[color:var(--success-foreground)]')}>{naverMessage}</p>
+            ) : null}
+          </form>
+        ) : null}
       </StoreConnectionRow>
 
       <StoreConnectionRow
@@ -258,14 +259,16 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
               <Button type="button" variant="destructive" size="sm" onClick={() => setRemovalTarget('coupang')}>
                 쿠팡 연결 해제
               </Button>
-            ) : null}
-            <Button type="submit" form="coupang-settings" disabled={coupangPending}>
-              {coupangPending ? '쿠팡 저장 중…' : '쿠팡 저장'}
-            </Button>
+            ) : (
+              <Button type="submit" form="coupang-settings" disabled={coupangPending}>
+                {coupangPending ? '쿠팡 저장 중…' : '쿠팡 저장'}
+              </Button>
+            )}
           </div>
         }
       >
-        <form id="coupang-settings" className="space-y-4" onSubmit={handleCoupangSave}>
+        {!currentSummary.coupang.configured ? (
+          <form id="coupang-settings" className="space-y-4" onSubmit={handleCoupangSave}>
           <div className="grid gap-4">
             <div>
               <label htmlFor="coupang-access-key" className={ui.label}>
@@ -337,7 +340,8 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
               {coupangMessage}
             </p>
           ) : null}
-        </form>
+          </form>
+        ) : null}
       </StoreConnectionRow>
 
       <Modal

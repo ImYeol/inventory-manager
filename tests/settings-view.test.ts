@@ -23,14 +23,14 @@ afterEach(() => {
 })
 
 describe('SettingsView', () => {
-  it('renders store connections directly inside settings as the canonical owner', () => {
+  it('shows configured providers as masked summaries with only their removal actions', () => {
     render(
       React.createElement(SettingsView, {
         summary: {
           naver: {
-            configured: false,
-            masked: {},
-            updatedAt: null,
+            configured: true,
+            masked: { clientId: 'nv-••••1234' },
+            updatedAt: '2026-04-12T11:00:00.000Z',
           },
           coupang: {
             configured: true,
@@ -48,8 +48,7 @@ describe('SettingsView', () => {
     expect(screen.queryByText('설정은 기준 데이터와 운영 진입점만 제공합니다.')).toBeNull()
     expect(screen.getAllByRole('heading', { name: '네이버' })).toHaveLength(1)
     expect(screen.getAllByRole('heading', { name: '쿠팡' })).toHaveLength(1)
-    expect(screen.getAllByText('미연결')).toHaveLength(1)
-    expect(screen.getAllByText('연결됨')).toHaveLength(1)
+    expect(screen.getAllByText('연결됨')).toHaveLength(2)
     const naverCard = screen.getByRole('heading', { name: '네이버' }).closest('section')
     const coupangCard = screen.getByRole('heading', { name: '쿠팡' }).closest('section')
     expect(naverCard).toBeTruthy()
@@ -58,13 +57,20 @@ describe('SettingsView', () => {
     expect(coupangCard?.className).toContain('ui-card-strong')
     expect(naverCard?.className).toContain('overflow-hidden')
     expect(coupangCard?.className).toContain('overflow-hidden')
-    expect(within(naverCard as HTMLElement).getByRole('button', { name: '네이버 저장' })).toBeTruthy()
-    expect(within(coupangCard as HTMLElement).getByRole('button', { name: '쿠팡 저장' })).toBeTruthy()
+    expect(within(naverCard as HTMLElement).getByText('nv-••••1234')).toBeTruthy()
+    expect(within(coupangCard as HTMLElement).getByText('cp-••••1111')).toBeTruthy()
+    expect(within(naverCard as HTMLElement).getByRole('button', { name: '네이버 연결 해제' })).toBeTruthy()
+    expect(within(coupangCard as HTMLElement).getByRole('button', { name: '쿠팡 연결 해제' })).toBeTruthy()
+    expect(within(naverCard as HTMLElement).queryByRole('button', { name: '네이버 저장' })).toBeNull()
+    expect(within(coupangCard as HTMLElement).queryByRole('button', { name: '쿠팡 저장' })).toBeNull()
     expect(screen.queryByRole('link', { name: '연결' })).toBeNull()
     expect(screen.queryByRole('link', { name: '변경' })).toBeNull()
-    expect(screen.getByLabelText('네이버 Client ID')).toBeTruthy()
-    expect(screen.getByLabelText('쿠팡 Access Key')).toBeTruthy()
-    expect(screen.getByLabelText('쿠팡 기본 택배사 코드')).toBeTruthy()
+    expect(screen.queryByLabelText('네이버 Client ID')).toBeNull()
+    expect(screen.queryByLabelText('네이버 Client Secret')).toBeNull()
+    expect(screen.queryByLabelText('쿠팡 Access Key')).toBeNull()
+    expect(screen.queryByLabelText('쿠팡 Secret Key')).toBeNull()
+    expect(screen.queryByLabelText('쿠팡 Vendor ID')).toBeNull()
+    expect(screen.queryByLabelText('쿠팡 기본 택배사 코드')).toBeNull()
     expect(screen.getByText('CJGLS')).toBeTruthy()
     expect(screen.queryByText('네이버와 쿠팡 연결 정보를 이 화면에서 관리합니다.')).toBeNull()
   })
@@ -109,9 +115,10 @@ describe('SettingsView', () => {
       })
     })
 
-    expect(await screen.findByText('네이버 API 정보를 저장했습니다.')).toBeTruthy()
     expect(screen.getByText('nv-••••1234')).toBeTruthy()
     expect(within(naverSection as HTMLElement).getByText('연결됨')).toBeTruthy()
+    expect(within(naverSection as HTMLElement).getByRole('button', { name: '네이버 연결 해제' })).toBeTruthy()
+    expect(within(naverSection as HTMLElement).queryByLabelText('네이버 Client ID')).toBeNull()
   })
 
   it('shows the safe server encryption setup guidance without exposing the environment variable name', async () => {
@@ -158,7 +165,6 @@ describe('SettingsView', () => {
       }),
     )
 
-    fireEvent.change(screen.getByLabelText('네이버 Client ID'), { target: { value: 'draft-client-id' } })
     fireEvent.click(screen.getByRole('button', { name: '네이버 연결 해제' }))
 
     expect(mocks.deleteShippingProviderCredentials).not.toHaveBeenCalled()
@@ -174,6 +180,7 @@ describe('SettingsView', () => {
     expect(await screen.findByText('네이버 연결을 해제했습니다.')).toBeTruthy()
     expect(screen.queryByRole('dialog')).toBeNull()
     expect((screen.getByLabelText('네이버 Client ID') as HTMLInputElement).value).toBe('')
+    expect(screen.getByRole('button', { name: '네이버 저장' })).toBeTruthy()
     const naverSection = screen.getByRole('heading', { name: '네이버' }).closest('section')
     expect(within(naverSection as HTMLElement).getByText('미연결')).toBeTruthy()
   })
