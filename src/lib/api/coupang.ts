@@ -98,9 +98,12 @@ export async function fetchCoupangProductSnapshots(
   let nextToken = ''
 
   do {
-    const params = new URLSearchParams({ maxPerPage: '100' })
+    const params = new URLSearchParams({
+      maxPerPage: '100',
+      vendorId: credentials.vendorId,
+    })
     if (nextToken) params.set('nextToken', nextToken)
-    const path = `/v2/providers/openapi/apis/api/v1/marketplace/seller-products?${params.toString()}`
+    const path = `/v2/providers/seller_api/apis/api/v1/marketplace/seller-products?${params.toString()}`
     const res = await fetch(`${BASE_URL}${path}`, {
       method: 'GET',
       headers: { Authorization: getAuthHeader('GET', path, credentials), 'Content-Type': 'application/json' },
@@ -116,7 +119,7 @@ export async function fetchCoupangProductSnapshots(
   } while (nextToken)
 
   const details = await mapWithConcurrency(sellerProductIds, 4, async (sellerProductId) => {
-    const path = `/v2/providers/openapi/apis/api/v1/marketplace/seller-products/${sellerProductId}`
+    const path = `/v2/providers/seller_api/apis/api/v1/marketplace/seller-products/${sellerProductId}`
     const res = await fetch(`${BASE_URL}${path}`, {
       method: 'GET',
       headers: { Authorization: getAuthHeader('GET', path, credentials), 'Content-Type': 'application/json' },

@@ -58,9 +58,16 @@ describe('coupang api helpers', () => {
     ])
 
     expect(fetchMock).toHaveBeenCalledTimes(4)
-    expect(String(fetchMock.mock.calls[0][0])).toContain('/marketplace/seller-products')
-    expect(String(fetchMock.mock.calls[1][0])).toContain('nextToken=NEXT')
-    expect(String(fetchMock.mock.calls[2][0])).toContain('/marketplace/seller-products/1001')
+    const firstListRequest = new URL(String(fetchMock.mock.calls[0][0]))
+    const secondListRequest = new URL(String(fetchMock.mock.calls[1][0]))
+    const firstDetailRequest = new URL(String(fetchMock.mock.calls[2][0]))
+
+    expect(firstListRequest.pathname).toBe('/v2/providers/seller_api/apis/api/v1/marketplace/seller-products')
+    expect(firstListRequest.searchParams.get('maxPerPage')).toBe('100')
+    expect(firstListRequest.searchParams.get('vendorId')).toBe('A00012345')
+    expect(secondListRequest.searchParams.get('nextToken')).toBe('NEXT')
+    expect(firstDetailRequest.pathname).toBe('/v2/providers/seller_api/apis/api/v1/marketplace/seller-products/1001')
+    expect(firstDetailRequest.searchParams.has('vendorId')).toBe(false)
   })
 
   it('fetches v5 order sheets with nextToken pagination and maps shipment data', async () => {
