@@ -38,7 +38,7 @@ export function StoreConnectionRow({
 
       <CardContent className="space-y-5 pt-0">
         {configured ? (
-          <dl className="grid gap-x-4 gap-y-2 rounded-xl bg-[color:var(--surface-muted)] px-4 py-3 text-sm sm:grid-cols-2">
+          <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
             {summary.map((item) => (
               <div key={item.label} className="flex items-baseline justify-between gap-3">
                 <dt className="text-xs font-medium text-[color:var(--muted-foreground)]">{item.label}</dt>

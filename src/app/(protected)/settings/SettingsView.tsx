@@ -192,7 +192,7 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
           <div className="flex items-center gap-2">
             {currentSummary.naver.configured ? (
               <Button type="button" variant="destructive" size="sm" onClick={() => setRemovalTarget('naver')}>
-                네이버 연결 해제
+                삭제
               </Button>
             ) : (
               <Button type="submit" form="naver-settings" disabled={naverPending}>
@@ -257,7 +257,7 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
           <div className="flex items-center gap-2">
             {currentSummary.coupang.configured ? (
               <Button type="button" variant="destructive" size="sm" onClick={() => setRemovalTarget('coupang')}>
-                쿠팡 연결 해제
+                삭제
               </Button>
             ) : (
               <Button type="submit" form="coupang-settings" disabled={coupangPending}>
@@ -359,7 +359,7 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
               취소
             </Button>
             <Button type="button" variant="destructive" onClick={handleCredentialRemoval} disabled={removalPending}>
-              {removalPending ? '해제 중…' : '연결 해제'}
+              {removalPending ? '삭제 중…' : '삭제'}
             </Button>
           </div>
         }

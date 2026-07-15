@@ -23,7 +23,7 @@ afterEach(() => {
 })
 
 describe('SettingsView', () => {
-  it('shows configured providers as masked summaries with only their removal actions', () => {
+  it('shows configured providers as masked summaries with one concise deletion action each', () => {
     render(
       React.createElement(SettingsView, {
         summary: {
@@ -59,8 +59,11 @@ describe('SettingsView', () => {
     expect(coupangCard?.className).toContain('overflow-hidden')
     expect(within(naverCard as HTMLElement).getByText('nv-••••1234')).toBeTruthy()
     expect(within(coupangCard as HTMLElement).getByText('cp-••••1111')).toBeTruthy()
-    expect(within(naverCard as HTMLElement).getByRole('button', { name: '네이버 연결 해제' })).toBeTruthy()
-    expect(within(coupangCard as HTMLElement).getByRole('button', { name: '쿠팡 연결 해제' })).toBeTruthy()
+    expect(within(naverCard as HTMLElement).getAllByRole('button', { name: '삭제' })).toHaveLength(1)
+    expect(within(coupangCard as HTMLElement).getAllByRole('button', { name: '삭제' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: '삭제' })).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: '네이버 연결 해제' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '쿠팡 연결 해제' })).toBeNull()
     expect(within(naverCard as HTMLElement).queryByRole('button', { name: '네이버 저장' })).toBeNull()
     expect(within(coupangCard as HTMLElement).queryByRole('button', { name: '쿠팡 저장' })).toBeNull()
     expect(screen.queryByRole('link', { name: '연결' })).toBeNull()
@@ -117,7 +120,7 @@ describe('SettingsView', () => {
 
     expect(screen.getByText('nv-••••1234')).toBeTruthy()
     expect(within(naverSection as HTMLElement).getByText('연결됨')).toBeTruthy()
-    expect(within(naverSection as HTMLElement).getByRole('button', { name: '네이버 연결 해제' })).toBeTruthy()
+    expect(within(naverSection as HTMLElement).getByRole('button', { name: '삭제' })).toBeTruthy()
     expect(within(naverSection as HTMLElement).queryByLabelText('네이버 Client ID')).toBeNull()
   })
 
@@ -165,13 +168,13 @@ describe('SettingsView', () => {
       }),
     )
 
-    fireEvent.click(screen.getByRole('button', { name: '네이버 연결 해제' }))
+    fireEvent.click(screen.getByRole('button', { name: '삭제' }))
 
     expect(mocks.deleteShippingProviderCredentials).not.toHaveBeenCalled()
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByText('네이버 연결을 해제할까요?')).toBeTruthy()
 
-    fireEvent.click(within(dialog).getByRole('button', { name: '연결 해제' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '삭제' }))
 
     await waitFor(() => {
       expect(mocks.deleteShippingProviderCredentials).toHaveBeenCalledWith('naver')
