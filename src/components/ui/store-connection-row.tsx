@@ -36,7 +36,7 @@ export function StoreConnectionRow({
         {action ? <div className="shrink-0">{action}</div> : null}
       </CardHeader>
 
-      <CardContent className="space-y-5 pt-0">
+      <CardContent className="space-y-5">
         {configured ? (
           <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
             {summary.map((item) => (

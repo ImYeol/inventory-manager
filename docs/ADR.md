@@ -114,6 +114,8 @@
 **이유**: settings-card처럼 카드가 두 개로 쪼개져 보이면 동일 surface가 아니라 임시 조립물처럼 읽힌다. 이런 문제를 페이지별 border 수정으로 막으면 재발한다.  
 **트레이드오프**: 카드가 어색하면 개별 화면에서 고치는 대신 shared primitive까지 올라가야 하므로 수정 범위가 커질 수 있다.
 
+**Card divider rhythm**: header bottom divider 뒤 첫 body content는 shared card body composition에서 최소 `--space-4`를 유지하며, 의도적으로 continuous data surface일 때만 zero gap을 허용한다.
+
 ## ADR-022: 운영 콘솔은 Simple Surface First와 component budget을 기본 원칙으로 삼는다
 **결정**: 운영 콘솔은 Simple Surface First와 component budget을 기본 판단 기준으로 삼는다.
 **이유**: 운영 콘솔에서 실제 가치가 생기는 지점은 설명 카드가 아니라 표, 필터, 액션이다. component 수와 action 수가 늘어날수록 사용자는 어디를 눌러야 하는지 다시 해석해야 한다.  

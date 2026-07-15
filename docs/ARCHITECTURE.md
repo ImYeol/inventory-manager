@@ -300,6 +300,7 @@ shipping_preview_rows
 - page-level UI에서 임의의 색상/보더/배경 inline style을 직접 넣지 않는다. 필요한 시맨틱은 `src/app/components/ui.tsx`, `src/app/globals.css`, `src/components/ui/*`에 variant나 token으로 올린다.
 - hooks는 UI 변경 명령 payload의 `command`와 `cmd`를 모두 해석해 docs 동반 검토를 확인한다.
 - strong card가 header/body를 함께 담는 경우, 절반만 살아 있는 seam이나 corner gap을 page-local border patch로 메우지 않는다. shared card/surface primitive의 variant와 padding/token을 고쳐서 하나의 clipped surface로 정리한다.
+- header bottom divider 뒤 첫 content의 vertical rhythm은 shared card body composition이 `--space-4` 이상으로 보장한다. zero gap은 의도적으로 continuous data surface일 때만 허용한다.
 
 ### External table example adaptation
 - 외부 data-table 예제는 `table layout`, `column visibility`, `row motion`, `dropdown interaction` 패턴만 적응하고 demo 도메인 필드(repository/contributors/avatar/Unsplash)는 들여오지 않는다. 결정 근거는 ADR-010.

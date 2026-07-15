@@ -72,6 +72,10 @@ purple SaaS gradient, glassmorphism, decorative glow는 금지한다.
 | `--space-12` | `3rem` | 48 |
 | `--space-16` | `4rem` | 64 |
 
+### Card divider rhythm
+
+공유 card header에 bottom divider가 있으면 첫 body content는 최소 `--space-4`로 시작한다. 의도적으로 연속된 data surface만 zero gap을 사용할 수 있다.
+
 ## Radius
 
 | 토큰 | 값 | 용도 |
