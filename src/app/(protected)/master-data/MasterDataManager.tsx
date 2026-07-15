@@ -266,7 +266,7 @@ export default function MasterDataManager({
     startTransition(async () => {
       try {
         const result = await syncProducts()
-        setSyncMeta(`추가 ${result.added} · 갱신 ${result.updated} · 연결 필요 ${result.mappingRequired}${result.failed ? ` · 실패 ${result.failed}` : ''}`)
+        setSyncMeta(`추가 ${result.added} · 갱신 ${result.updated} · 연결 필요 ${result.mappingRequired}${result.failed ? ` · 실패 ${result.failed}` : ''}${result.providerFailures.map((failure) => ` · ${failure.message}`).join('')}`)
         router.refresh()
       } catch (error) {
         setSyncMeta(error instanceof Error ? error.message : '동기화에 실패했습니다.')

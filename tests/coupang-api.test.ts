@@ -83,6 +83,8 @@ describe('coupang api helpers', () => {
       'X-Requested-By': requestedBy,
       'X-MARKET': 'KR',
     }))
+    const signedDate = String(firstListInit.headers.Authorization).match(/signed-date=([^,]+)/)?.[1]
+    expect(signedDate).toMatch(/^\d{6}T\d{6}Z$/)
   })
 
   it('fetches v5 order sheets with nextToken pagination and maps shipment data', async () => {

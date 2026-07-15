@@ -164,7 +164,7 @@ function getAuthHeader(
     .toISOString()
     .replace(/[-:]/g, '')
     .replace(/\.\d{3}/, '')
-    .replace('T', 'T')
+    .slice(2)
 
   const signature = generateHmacSignature(method, path, datetime, credentials.secretKey)
 

@@ -72,6 +72,7 @@ describe('channel product sync', () => {
       updated: 1,
       mappingRequired: 0,
       failed: 0,
+      providerFailures: [],
     })
 
     expect(supabase.refs.upsert).toHaveBeenCalledWith(
@@ -91,6 +92,7 @@ describe('channel product sync', () => {
       updated: 0,
       mappingRequired: 0,
       failed: 0,
+      providerFailures: [],
     })
 
     expect(supabase.refs.upsert).toHaveBeenCalledWith(
@@ -127,6 +129,7 @@ describe('channel product sync', () => {
       updated: 0,
       mappingRequired: 2,
       failed: 0,
+      providerFailures: [],
     })
 
     const payload = supabase.refs.upsert.mock.calls[0]?.[0]
@@ -149,11 +152,37 @@ describe('channel product sync', () => {
       { ...naverSnapshot, channel: 'coupang', externalProductId: 'seller-1', externalVariantId: 'item-1' },
     ])
 
-    await expect(syncProducts()).resolves.toEqual({ added: 2, updated: 0, mappingRequired: 0, failed: 0 })
+    await expect(syncProducts()).resolves.toEqual({ added: 2, updated: 0, mappingRequired: 0, failed: 0, providerFailures: [] })
 
     const variantIds = supabase.refs.upsert.mock.calls.flatMap(([payload]) =>
       (payload as Array<{ variant_id: number | null }>).map((ref) => ref.variant_id),
     )
     expect(variantIds).toEqual([42, 42])
+  })
+
+  it('returns a safe provider-specific result when a provider sync fails', async () => {
+    const supabase = createSupabaseMock([])
+    mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
+    mocks.getRequiredShippingCredentials.mockResolvedValue({
+      accessKey: 'access-key-that-must-not-leak',
+      secretKey: 'secret-key-that-must-not-leak',
+      vendorId: 'vendor',
+      defaultDeliveryCompanyCode: 'CJGLS',
+    })
+    mocks.fetchCoupangProductSnapshots.mockRejectedValue(
+      new Error('쿠팡 상품 목록 조회 실패: 401 {"accessKey":"access-key-that-must-not-leak","detail":"raw response body"}'),
+    )
+
+    const result = await syncProducts('coupang')
+
+    expect(result).toEqual(expect.objectContaining({
+      added: 0,
+      updated: 0,
+      mappingRequired: 0,
+      failed: 1,
+      providerFailures: [{ channel: 'coupang', message: '쿠팡 인증 정보를 확인해 주세요.' }],
+    }))
+    expect(JSON.stringify(result)).not.toContain('access-key-that-must-not-leak')
+    expect(JSON.stringify(result)).not.toContain('raw response body')
   })
 })
