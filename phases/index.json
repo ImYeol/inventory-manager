@@ -55,6 +55,11 @@
       "dir": "product-sync-auth-feedback",
       "status": "completed",
       "completed_at": "2026-07-15T21:34:24+0900"
+    },
+    {
+      "dir": "shipping-credential-removal",
+      "status": "completed",
+      "completed_at": "2026-07-15T22:27:34+0900"
     }
   ]
 }
