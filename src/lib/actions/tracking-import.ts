@@ -123,7 +123,7 @@ export async function finalizeTrackingImport(rows: FulfillmentCandidate[]) {
   }
   const coupangSent = coupang.length ? await sendCoupangTrackingNumbers(coupang.map((row) => ({ shipmentBoxId: row.shipmentBoxId ?? 0, orderId: row.orderId ?? 0, vendorItemIds: [row.vendorItemId ?? 0], trackingNumber: row.trackingNumber }))) : { success: true, failedBoxes: [] }
   const coupangFailures = new Set(coupangSent.failedBoxes)
-  if (!coupangSent.success) coupang.forEach((row) => coupangFailures.add(row.shipmentBoxId ?? 0))
+  if (!coupangSent.success && coupangSent.failedBoxes.length === 0) coupang.forEach((row) => coupangFailures.add(row.shipmentBoxId ?? 0))
   for (const row of pendingRows) {
     const externalFailed = row.channel === 'naver' ? naverFailures.has(row.externalLineId) : coupangFailures.has(row.shipmentBoxId ?? 0)
     if (externalFailed) { result.failed += 1; continue }
