@@ -50,6 +50,11 @@
     {
       "dir": "coupang-required-auth-headers",
       "status": "completed"
+    },
+    {
+      "dir": "product-sync-auth-feedback",
+      "status": "completed",
+      "completed_at": "2026-07-15T21:34:24+0900"
     }
   ]
 }
