@@ -36,6 +36,11 @@
     {
       "dir": "inventory-product-ux-hardening",
       "status": "completed"
+    },
+    {
+      "dir": "manual-channel-mapping-preservation",
+      "status": "completed",
+      "completed_at": "2026-07-15T12:29:27+0900"
     }
   ]
 }
