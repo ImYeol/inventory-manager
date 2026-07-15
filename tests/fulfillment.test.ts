@@ -46,7 +46,7 @@ describe('fulfillment finalization', () => {
     mocks.getSupabaseWithUser.mockResolvedValue({ user: { id: 'u1' }, supabase: { from: vi.fn(() => ({ select, insert })), rpc } })
     mocks.sendCoupangTrackingNumbers.mockResolvedValue({ success: false, failedBoxes: [] })
 
-    const result = await finalizeTrackingImport([{ lineId: 3, reservationId: 4, channel: 'coupang', externalLineId: '11:301', shipmentBoxId: 11, orderId: 22, vendorItemId: 301, trackingNumber: 'T-1', carrier: 'CJGLS' }])
+    const result = await finalizeTrackingImport([{ lineId: 3, reservationId: 4, channel: 'coupang', externalLineId: '11:301', shipmentBoxId: '11', orderId: 22, vendorItemId: 301, trackingNumber: 'T-1', carrier: 'CJGLS' }])
 
     expect(result).toEqual({ externalSucceeded: 0, finalized: 0, reconcileRequired: 0, failed: 1 })
     expect(insert).not.toHaveBeenCalled()
@@ -60,16 +60,31 @@ describe('fulfillment finalization', () => {
     const insert = vi.fn(() => ({ select: insertedSelect }))
     const rpc = vi.fn().mockResolvedValue({ data: true, error: null })
     mocks.getSupabaseWithUser.mockResolvedValue({ user: { id: 'u1' }, supabase: { from: vi.fn(() => ({ select, insert })), rpc } })
-    mocks.sendCoupangTrackingNumbers.mockResolvedValue({ success: false, failedBoxes: [12] })
+    mocks.sendCoupangTrackingNumbers.mockResolvedValue({ success: false, failedBoxes: ['12'] })
 
     const result = await finalizeTrackingImport([
-      { lineId: 3, reservationId: 4, channel: 'coupang', externalLineId: '11:301', shipmentBoxId: 11, orderId: 22, vendorItemId: 301, trackingNumber: 'T-1', carrier: 'CJGLS' },
-      { lineId: 5, reservationId: 6, channel: 'coupang', externalLineId: '12:302', shipmentBoxId: 12, orderId: 23, vendorItemId: 302, trackingNumber: 'T-2', carrier: 'CJGLS' },
+      { lineId: 3, reservationId: 4, channel: 'coupang', externalLineId: '11:301', shipmentBoxId: '11', orderId: 22, vendorItemId: 301, trackingNumber: 'T-1', carrier: 'CJGLS' },
+      { lineId: 5, reservationId: 6, channel: 'coupang', externalLineId: '12:302', shipmentBoxId: '12', orderId: 23, vendorItemId: 302, trackingNumber: 'T-2', carrier: 'CJGLS' },
     ])
 
     expect(result).toEqual({ externalSucceeded: 1, finalized: 1, reconcileRequired: 0, failed: 1 })
     expect(insert).toHaveBeenCalledTimes(1)
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({ channel_order_line_id: 3, external_reference: '11:301' }))
     expect(rpc).toHaveBeenCalledWith('finalize_order_fulfillment', { p_fulfillment_id: 9 })
+  })
+
+  it('matches a failed 18-digit Coupang box ID exactly', async () => {
+    const inExisting = vi.fn().mockResolvedValue({ data: [], error: null })
+    const select = vi.fn(() => ({ in: inExisting }))
+    const insert = vi.fn(() => ({ select: vi.fn().mockResolvedValue({ data: [{ id: 9 }], error: null }) }))
+    const rpc = vi.fn().mockResolvedValue({ data: true, error: null })
+    const shipmentBoxId = '900719925474099123'
+    mocks.getSupabaseWithUser.mockResolvedValue({ user: { id: 'u1' }, supabase: { from: vi.fn(() => ({ select, insert })), rpc } })
+    mocks.sendCoupangTrackingNumbers.mockResolvedValue({ success: false, failedBoxes: [shipmentBoxId] })
+
+    const result = await finalizeTrackingImport([{ lineId: 3, reservationId: 4, channel: 'coupang', externalLineId: `${shipmentBoxId}:301`, shipmentBoxId, orderId: 22, vendorItemId: 301, trackingNumber: 'T-1', carrier: 'CJGLS' }])
+
+    expect(result).toEqual({ externalSucceeded: 0, finalized: 0, reconcileRequired: 0, failed: 1 })
+    expect(insert).not.toHaveBeenCalled()
   })
 })

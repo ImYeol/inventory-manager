@@ -4,7 +4,7 @@ import { getSupabaseWithUser } from '../db'
 import { sendCoupangTrackingNumbers, sendNaverTrackingNumbers } from './shipping'
 import { BUILT_IN_TRACKING_PRESETS, matchTrackingRows, type TrackingColumnMapping, type TrackingMatch, type TrackingRow } from '../excel'
 
-export type FulfillmentCandidate = { lineId: number; reservationId: number; channel: 'naver' | 'coupang'; externalLineId: string; trackingNumber: string; carrier: string; trackingImportBatchId?: number; shipmentBoxId?: number; orderId?: number; vendorItemId?: number }
+export type FulfillmentCandidate = { lineId: number; reservationId: number; channel: 'naver' | 'coupang'; externalLineId: string; trackingNumber: string; carrier: string; trackingImportBatchId?: number; shipmentBoxId?: string; orderId?: number; vendorItemId?: number }
 export type TrackingPreviewRow = TrackingMatch & { fulfillmentCandidate?: FulfillmentCandidate }
 export type SavedTrackingPreset = { id: number; name: string; channel: 'naver' | 'coupang' | null; mapping: TrackingColumnMapping }
 
@@ -76,7 +76,8 @@ export async function previewTrackingImport(input: { filename: string; rows: Tra
       const externalLineId = String(line.external_line_id ?? '')
       const orderValue = Array.isArray(line.channel_orders) ? line.channel_orders[0] : line.channel_orders
       const externalOrderId = String((orderValue as Record<string, unknown> | undefined)?.external_order_id ?? '')
-      const [shipmentBoxId, orderId] = externalOrderId.split(':').map(Number)
+      const [shipmentBoxId, orderIdValue] = externalOrderId.split(':')
+      const orderId = Number(orderIdValue)
       const vendorItemId = Number(externalLineId.split(':').at(-1))
       return {
         ...match,
@@ -88,7 +89,7 @@ export async function previewTrackingImport(input: { filename: string; rows: Tra
           trackingNumber: match.trackingNumber,
           carrier: match.carrier,
           trackingImportBatchId: Number(batch.id),
-          ...(line.channel === 'coupang' ? { shipmentBoxId, orderId, vendorItemId } : {}),
+          ...(line.channel === 'coupang' && /^\d+$/.test(shipmentBoxId ?? '') && Number.isSafeInteger(orderId) && Number.isSafeInteger(vendorItemId) ? { shipmentBoxId, orderId, vendorItemId } : {}),
         },
       }
     }),
@@ -121,11 +122,11 @@ export async function finalizeTrackingImport(rows: FulfillmentCandidate[]) {
     const sent = await sendNaverTrackingNumbers(chunk.map((row) => ({ productOrderId: row.externalLineId, trackingNumber: row.trackingNumber })))
     sent.failedOrders.forEach((id) => naverFailures.add(id))
   }
-  const coupangSent = coupang.length ? await sendCoupangTrackingNumbers(coupang.map((row) => ({ shipmentBoxId: row.shipmentBoxId ?? 0, orderId: row.orderId ?? 0, vendorItemIds: [row.vendorItemId ?? 0], trackingNumber: row.trackingNumber }))) : { success: true, failedBoxes: [] }
+  const coupangSent = coupang.length ? await sendCoupangTrackingNumbers(coupang.map((row) => ({ shipmentBoxId: row.shipmentBoxId ?? '', orderId: row.orderId ?? 0, vendorItemIds: [row.vendorItemId ?? 0], trackingNumber: row.trackingNumber }))) : { success: true, failedBoxes: [] as string[] }
   const coupangFailures = new Set(coupangSent.failedBoxes)
-  if (!coupangSent.success && coupangSent.failedBoxes.length === 0) coupang.forEach((row) => coupangFailures.add(row.shipmentBoxId ?? 0))
+  if (!coupangSent.success && coupangSent.failedBoxes.length === 0) coupang.forEach((row) => coupangFailures.add(row.shipmentBoxId ?? ''))
   for (const row of pendingRows) {
-    const externalFailed = row.channel === 'naver' ? naverFailures.has(row.externalLineId) : coupangFailures.has(row.shipmentBoxId ?? 0)
+    const externalFailed = row.channel === 'naver' ? naverFailures.has(row.externalLineId) : coupangFailures.has(row.shipmentBoxId ?? '')
     if (externalFailed) { result.failed += 1; continue }
     const { data: fulfillment, error } = await supabase.from('order_fulfillments').insert({ user_id: user.id, channel_order_line_id: row.lineId, inventory_reservation_id: row.reservationId, tracking_import_batch_id: row.trackingImportBatchId ?? null, idempotency_key: keyFor(row), external_status: 'success', local_status: 'pending', tracking_number: row.trackingNumber, carrier_code: row.carrier, external_reference: row.externalLineId }).select('id')
     const item = Array.isArray(fulfillment) ? fulfillment[0] : fulfillment

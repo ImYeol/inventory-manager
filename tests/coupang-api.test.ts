@@ -182,7 +182,7 @@ describe('coupang api helpers', () => {
     expect(String(fetchMock.mock.calls[1][0])).toContain('nextToken=NEXT-1')
     expect(orders).toEqual([
       {
-        shipmentBoxId: 101,
+        shipmentBoxId: '101',
         orderId: 202,
         orderedAt: '2026-04-12T09:00:00.000Z',
         status: 'INSTRUCT',
@@ -201,7 +201,7 @@ describe('coupang api helpers', () => {
           },
         ],
       },
-      expect.objectContaining({ shipmentBoxId: 102, orderId: 203, orderItems: [] }),
+      expect.objectContaining({ shipmentBoxId: '102', orderId: 203, orderItems: [] }),
     ])
   })
 
@@ -214,13 +214,13 @@ describe('coupang api helpers', () => {
     const result = await confirmCoupangShipments(
       [
         {
-          shipmentBoxId: 11,
+          shipmentBoxId: '11',
           orderId: 101,
           vendorItemIds: [301, 302],
           trackingNumber: '1234567890',
         },
         {
-          shipmentBoxId: 12,
+          shipmentBoxId: '12',
           orderId: 102,
           vendorItemIds: [303],
           trackingNumber: '5555555555',
@@ -277,7 +277,7 @@ describe('coupang api helpers', () => {
     })
     expect(result).toEqual({
       success: false,
-      failedBoxes: [12],
+      failedBoxes: ['12'],
       error: '쿠팡 발송 처리에 실패했습니다.',
     })
   })
@@ -285,9 +285,9 @@ describe('coupang api helpers', () => {
   it('does not upload invoices when the refreshed order detail array is empty', async () => {
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ code: 'SUCCESS', message: '성공', data: [] }) })
 
-    await expect(confirmCoupangShipments([{ shipmentBoxId: 11, orderId: 101, vendorItemIds: [301], trackingNumber: '1234567890' }], {
+    await expect(confirmCoupangShipments([{ shipmentBoxId: '11', orderId: 101, vendorItemIds: [301], trackingNumber: '1234567890' }], {
       accessKey: 'access-key', secretKey: 'secret-key', vendorId: 'A00012345', defaultDeliveryCompanyCode: 'CJGLS',
-    })).resolves.toEqual({ success: false, failedBoxes: [11], error: '쿠팡 주문 상태를 다시 확인해 주세요.' })
+    })).resolves.toEqual({ success: false, failedBoxes: ['11'], error: '쿠팡 주문 상태를 다시 확인해 주세요.' })
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
@@ -304,7 +304,7 @@ describe('coupang api helpers', () => {
       }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { responseCode: 0, responseList: [] } }) })
 
-    await expect(confirmCoupangShipments([{ shipmentBoxId: 11, orderId: 101, vendorItemIds: [301, 302], trackingNumber: '1234567890' }], {
+    await expect(confirmCoupangShipments([{ shipmentBoxId: '11', orderId: 101, vendorItemIds: [301, 302], trackingNumber: '1234567890' }], {
       accessKey: 'access-key', secretKey: 'secret-key', vendorId: 'A00012345', defaultDeliveryCompanyCode: 'CJGLS',
     })).resolves.toEqual({ success: true, failedBoxes: [] })
 
@@ -314,5 +314,45 @@ describe('coupang api helpers', () => {
         { shipmentBoxId: 111, orderId: 101, vendorItemId: 302 },
       ],
     })
+  })
+
+  it('preserves an 18-digit shipment box ID from order JSON and serializes it as an exact numeric invoice token', async () => {
+    const shipmentBoxId = '900719925474099123'
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, text: async () => `{"data":[{"shipmentBoxId":${shipmentBoxId},"orderId":101,"orderedAt":"2026-04-12T00:00:00Z","status":"INSTRUCT","receiver":{"name":"수령인","addr1":"서울","addr2":""},"orderItems":[{"vendorItemId":301,"vendorItemName":"상품","shippingCount":1}]}]}` })
+      .mockResolvedValueOnce({ ok: true, text: async () => `{"data":[{"shipmentBoxId":${shipmentBoxId},"orderId":101,"status":"INSTRUCT","orderItems":[{"vendorItemId":301,"shippingCount":1}]}]}` })
+      .mockResolvedValueOnce({ ok: true, text: async () => '{"data":{"responseCode":0,"responseList":[]}}' })
+
+    await expect(fetchCoupangPendingOrders({
+      accessKey: 'access-key', secretKey: 'secret-key', vendorId: 'A00012345', defaultDeliveryCompanyCode: 'CJGLS',
+    })).resolves.toMatchObject([{ shipmentBoxId }])
+
+    await expect(confirmCoupangShipments([{ shipmentBoxId, orderId: 101, vendorItemIds: [301], trackingNumber: '1234567890' }], {
+      accessKey: 'access-key', secretKey: 'secret-key', vendorId: 'A00012345', defaultDeliveryCompanyCode: 'CJGLS',
+    })).resolves.toEqual({ success: true, failedBoxes: [] })
+
+    const body = String(fetchMock.mock.calls[2][1].body)
+    expect(body).toContain(`"shipmentBoxId":${shipmentBoxId}`)
+    expect(body).not.toContain(`"shipmentBoxId":"${shipmentBoxId}"`)
+  })
+
+  it('returns non-INSTRUCT refreshed shipments as failed without uploading them', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({
+      data: [{ shipmentBoxId: 11, orderId: 101, status: 'ACCEPT', orderItems: [{ vendorItemId: 301, shippingCount: 1 }] }],
+    }) })
+
+    await expect(confirmCoupangShipments([{ shipmentBoxId: '11', orderId: 101, vendorItemIds: [301], trackingNumber: '1234567890' }], {
+      accessKey: 'access-key', secretKey: 'secret-key', vendorId: 'A00012345', defaultDeliveryCompanyCode: 'CJGLS',
+    })).resolves.toEqual({ success: false, failedBoxes: ['11'], error: '쿠팡 주문 상태를 다시 확인해 주세요.' })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects malformed shipment box IDs without mapping an unsafe order', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, text: async () => '{"data":[{"shipmentBoxId":"900719925474099123x","orderId":101,"status":"INSTRUCT"}]}' })
+
+    await expect(fetchCoupangPendingOrders({
+      accessKey: 'access-key', secretKey: 'secret-key', vendorId: 'A00012345', defaultDeliveryCompanyCode: 'CJGLS',
+    })).resolves.toEqual([])
   })
 })

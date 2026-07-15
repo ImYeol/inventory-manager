@@ -39,9 +39,24 @@ describe('order sync', () => {
     const supabase = { from: vi.fn(() => ({ upsert, select })) }
     mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
     mocks.getRequiredShippingCredentials.mockResolvedValue({})
-    mocks.fetchCoupangPendingOrders.mockResolvedValue([{ shipmentBoxId: 1, orderId: 2, orderedAt: '2026-07-15T00:00:00Z', status: 'INSTRUCT', receiver: { name: '', addr1: '', addr2: '' }, orderItems: [{ vendorItemId: 3, vendorItemName: '옵션', shippingCount: 2, sellerSku: 'SKU-3', externalProductId: '4' }] }])
+    mocks.fetchCoupangPendingOrders.mockResolvedValue([{ shipmentBoxId: '1', orderId: 2, orderedAt: '2026-07-15T00:00:00Z', status: 'INSTRUCT', receiver: { name: '', addr1: '', addr2: '' }, orderItems: [{ vendorItemId: 3, vendorItemName: '옵션', shippingCount: 2, sellerSku: 'SKU-3', externalProductId: '4' }] }])
 
     await expect(syncOrders('coupang')).resolves.toMatchObject({ orders: 1, lines: 1, mappingRequired: 1, failed: 0 })
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ external_line_id: '1:3', quantity: 2, raw_payload: expect.objectContaining({ sellerSku: 'SKU-3' }) }), { onConflict: 'user_id,channel,external_line_id' })
+  })
+
+  it('persists an 18-digit Coupang shipment box ID without numeric coercion', async () => {
+    const upsert = vi.fn(() => ({ select: vi.fn(async () => ({ data: [{ id: 10 }], error: null })) }))
+    const query = { eq: vi.fn(), then: (resolve: (value: unknown) => unknown) => resolve({ data: [], error: null }) }
+    query.eq.mockReturnValue(query)
+    const select = vi.fn(() => query)
+    const supabase = { from: vi.fn(() => ({ upsert, select })) }
+    mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
+    mocks.getRequiredShippingCredentials.mockResolvedValue({})
+    mocks.fetchCoupangPendingOrders.mockResolvedValue([{ shipmentBoxId: '900719925474099123', orderId: 2, orderedAt: '2026-07-15T00:00:00Z', status: 'INSTRUCT', receiver: { name: '', addr1: '', addr2: '' }, orderItems: [{ vendorItemId: 3, vendorItemName: '옵션', shippingCount: 1 }] }])
+
+    await expect(syncOrders('coupang')).resolves.toMatchObject({ orders: 1, lines: 1, failed: 0 })
+    expect(upsert).toHaveBeenNthCalledWith(1, expect.objectContaining({ external_order_id: '900719925474099123:2' }), { onConflict: 'user_id,channel,external_order_id' })
+    expect(upsert).toHaveBeenNthCalledWith(2, expect.objectContaining({ external_line_id: '900719925474099123:3' }), { onConflict: 'user_id,channel,external_line_id' })
   })
 })

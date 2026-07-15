@@ -96,7 +96,7 @@ describe('shipping server actions', () => {
     mocks.getRequiredShippingCredentials.mockResolvedValue(credentials)
     mocks.fetchCoupangPendingOrders.mockResolvedValue([
       {
-        shipmentBoxId: 101,
+        shipmentBoxId: '101',
         orderId: 202,
         orderedAt: '2026-04-12T00:00:00.000Z',
         status: 'ACCEPT',
@@ -119,7 +119,7 @@ describe('shipping server actions', () => {
       success: true,
       orders: [
         {
-          shipmentBoxId: 101,
+          shipmentBoxId: '101',
           orderId: 202,
           orderedAt: '2026-04-12T00:00:00.000Z',
           status: 'ACCEPT',
@@ -171,7 +171,7 @@ describe('shipping server actions', () => {
       vendorId: 'A00012345',
       defaultDeliveryCompanyCode: 'CJGLS',
     }
-    const matches = [{ shipmentBoxId: 11, orderId: 22, vendorItemIds: [301, 302], trackingNumber: 'TRACK-11' }]
+    const matches = [{ shipmentBoxId: '11', orderId: 22, vendorItemIds: [301, 302], trackingNumber: 'TRACK-11' }]
 
     mocks.getRequiredShippingCredentials.mockResolvedValue(credentials)
     mocks.confirmCoupangShipments.mockResolvedValue({

@@ -72,10 +72,10 @@ export async function fetchCoupangOrders(input?: {
 }
 
 export async function sendCoupangTrackingNumbers(
-  matches: { shipmentBoxId: number; orderId: number; vendorItemIds: number[]; trackingNumber: string }[]
+  matches: { shipmentBoxId: string; orderId: number; vendorItemIds: number[]; trackingNumber: string }[]
 ): Promise<{
   success: boolean;
-  failedBoxes: number[];
+  failedBoxes: string[];
   error?: string;
 }> {
   try {

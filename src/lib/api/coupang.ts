@@ -19,7 +19,7 @@ export type CoupangOrderItem = {
 }
 
 export type CoupangOrderSheet = {
-  shipmentBoxId: number
+  shipmentBoxId: string
   orderId: number
   orderedAt: string
   status: string
@@ -45,6 +45,21 @@ function asString(value: unknown): string | null {
 
 function asNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function asShipmentBoxId(value: unknown): string | null {
+  if (typeof value === 'string') return /^\d+$/.test(value) ? value : null
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? String(value) : null
+}
+
+async function readCoupangJson(response: { text?: () => Promise<string>; json: () => Promise<unknown> }): Promise<unknown> {
+  if (typeof response.text !== 'function') return response.json()
+  const body = await response.text()
+  return JSON.parse(body.replace(/("shipmentBoxId"\s*:\s*)(0|[1-9]\d*)(?=\s*[,}])/g, '$1"$2"'))
+}
+
+function serializeInvoiceRequest(value: unknown): string {
+  return JSON.stringify(value).replace(/("shipmentBoxId":)"(\d+)"/g, '$1$2')
 }
 
 async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
@@ -234,43 +249,30 @@ function formatCoupangDateParam(date: string) {
   return `${date}+09:00`
 }
 
-function mapOrderSheet(order: {
-  shipmentBoxId: number
-  orderId: number
-  orderedAt: string
-  status: string
-  receiver?: {
-    name?: string
-    addr1?: string
-    addr2?: string
-  }
-  orderItems?: Array<{
-    vendorItemId?: number
-    vendorItemName?: string
-    shippingCount?: number
-    externalVendorSkuCode?: string
-    sellerProductId?: number | string
-    holdCountForCancel?: number
-    cancelCount?: number
-  }>
-}): CoupangOrderSheet {
+function mapOrderSheet(order: unknown): CoupangOrderSheet | null {
+  const raw = asRecord(order)
+  const shipmentBoxId = asShipmentBoxId(raw.shipmentBoxId)
+  if (!shipmentBoxId) return null
+  const receiver = asRecord(raw.receiver)
+  const orderItems = Array.isArray(raw.orderItems) ? raw.orderItems : []
   return {
-    shipmentBoxId: order.shipmentBoxId,
-    orderId: order.orderId,
-    orderedAt: order.orderedAt,
-    status: order.status,
+    shipmentBoxId,
+    orderId: asNumber(raw.orderId) ?? 0,
+    orderedAt: asString(raw.orderedAt) ?? '',
+    status: asString(raw.status) ?? '',
     receiver: {
-      name: order.receiver?.name ?? '',
-      addr1: order.receiver?.addr1 ?? '',
-      addr2: order.receiver?.addr2 ?? '',
+      name: asString(receiver.name) ?? '',
+      addr1: asString(receiver.addr1) ?? '',
+      addr2: asString(receiver.addr2) ?? '',
     },
-    orderItems: (order.orderItems ?? []).flatMap((item) => {
-      const shippingCount = Math.max(0, (item.shippingCount ?? 0) - (item.holdCountForCancel ?? 0) - (item.cancelCount ?? 0))
+    orderItems: orderItems.flatMap((value) => {
+      const item = asRecord(value)
+      const shippingCount = Math.max(0, (asNumber(item.shippingCount) ?? 0) - (asNumber(item.holdCountForCancel) ?? 0) - (asNumber(item.cancelCount) ?? 0))
       return shippingCount === 0 ? [] : [{
-        vendorItemId: item.vendorItemId ?? 0,
-        vendorItemName: item.vendorItemName ?? '',
-        shippingCount,
-        sellerSku: item.externalVendorSkuCode ?? null,
+        vendorItemId: asNumber(item.vendorItemId) ?? 0,
+        vendorItemName: asString(item.vendorItemName) ?? '',
+        shippingCount: Math.trunc(shippingCount),
+        sellerSku: asString(item.externalVendorSkuCode),
         externalProductId: item.sellerProductId === undefined ? null : String(item.sellerProductId),
       }]
     }),
@@ -313,9 +315,12 @@ export async function fetchCoupangPendingOrders(
       throw new Error(`쿠팡 주문 조회 실패: ${res.status}`)
     }
 
-    const data = await res.json()
+    const data = asRecord(await readCoupangJson(res))
     const pageOrders = Array.isArray(data.data) ? data.data : []
-    orders.push(...pageOrders.map(mapOrderSheet))
+    orders.push(...pageOrders.flatMap((order) => {
+      const mapped = mapOrderSheet(order)
+      return mapped ? [mapped] : []
+    }))
     nextToken = typeof data.nextToken === 'string' ? data.nextToken : ''
   } while (nextToken)
 
@@ -324,32 +329,35 @@ export async function fetchCoupangPendingOrders(
 
 export async function confirmCoupangShipments(
   shipments: {
-    shipmentBoxId: number
+    shipmentBoxId: string
     orderId: number
     vendorItemIds: number[]
     trackingNumber: string
   }[],
   credentials: CoupangCredentials,
-): Promise<{ success: boolean; failedBoxes: number[]; error?: string }> {
+): Promise<{ success: boolean; failedBoxes: string[]; error?: string }> {
   const path = `/v2/providers/openapi/apis/api/v4/vendors/${credentials.vendorId}/orders/invoices`
   const refreshedOrders = await mapWithConcurrency([...new Set(shipments.map((shipment) => shipment.orderId))], 4, async (orderId) => {
     const detailPath = `/v2/providers/openapi/apis/api/v5/vendors/${credentials.vendorId}/${orderId}/ordersheets`
     const res = await fetch(`${BASE_URL}${detailPath}`, { method: 'GET', headers: getCoupangHeaders('GET', detailPath, credentials) })
     if (!res.ok) return [orderId, null] as const
-    const response = asRecord(await res.json())
+    const response = asRecord(await readCoupangJson(res))
     const orderSheets = Array.isArray(response.data)
-      ? response.data.map((orderSheet) => mapOrderSheet(asRecord(orderSheet) as Parameters<typeof mapOrderSheet>[0]))
+      ? response.data.flatMap((orderSheet) => {
+        const mapped = mapOrderSheet(orderSheet)
+        return mapped ? [mapped] : []
+      })
       : []
     return [orderId, orderSheets] as const
   })
   const refreshedByOrderId = new Map(refreshedOrders)
-  const invalidBoxes = new Set<number>()
+  const invalidBoxes = new Set<string>()
   const validShipments = shipments.flatMap((shipment) => {
     const refreshed = refreshedByOrderId.get(shipment.orderId)?.find((orderSheet) =>
       orderSheet.orderId === shipment.orderId
       && shipment.vendorItemIds.every((vendorItemId) => orderSheet.orderItems.some((item) => item.vendorItemId === vendorItemId)),
     )
-    if (!refreshed || isCancelledOrder(refreshed.status)) {
+    if (!refreshed || refreshed.status !== 'INSTRUCT') {
       invalidBoxes.add(shipment.shipmentBoxId)
       return []
     }
@@ -359,7 +367,7 @@ export async function confirmCoupangShipments(
       invalidBoxes.add(shipment.shipmentBoxId)
       return []
     }
-    return [{ ...shipment, shipmentBoxId: refreshed.shipmentBoxId || shipment.shipmentBoxId, vendorItemIds }]
+    return [{ ...shipment, shipmentBoxId: refreshed.shipmentBoxId, vendorItemIds }]
   })
   if (validShipments.length === 0) return { success: false, failedBoxes: [...invalidBoxes], error: '쿠팡 주문 상태를 다시 확인해 주세요.' }
 
@@ -386,22 +394,26 @@ export async function confirmCoupangShipments(
       Authorization: authorization,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(requestBody),
+    body: serializeInvoiceRequest(requestBody),
   })
 
   if (!res.ok) {
     throw new Error(`쿠팡 발송 처리 실패: ${res.status}`)
   }
 
-  const data = await res.json()
-  const responseList: Array<{ succeed?: boolean; shipmentBoxId?: number }> =
-    Array.isArray(data.data?.responseList) ? data.data.responseList : []
+  const data = asRecord(await readCoupangJson(res))
+  const responseData = asRecord(data.data)
+  const responseList: Array<{ succeed?: unknown; shipmentBoxId?: unknown }> =
+    Array.isArray(responseData.responseList) ? responseData.responseList.map(asRecord) : []
   const failedBoxes = [...new Set(
     responseList
-      .filter((item: { succeed?: boolean }) => item.succeed === false)
-      .flatMap((item) => typeof item.shipmentBoxId === 'number' ? [item.shipmentBoxId] : []),
+      .filter((item) => item.succeed === false)
+      .flatMap((item) => {
+        const shipmentBoxId = asShipmentBoxId(item.shipmentBoxId)
+        return shipmentBoxId ? [shipmentBoxId] : []
+      }),
   )]
-  const responseCode = typeof data.data?.responseCode === 'number' ? data.data.responseCode : 99
+  const responseCode = asNumber(responseData.responseCode) ?? 99
   const failed = [...new Set([...invalidBoxes, ...failedBoxes])]
 
   return {
@@ -409,8 +421,4 @@ export async function confirmCoupangShipments(
     failedBoxes: failed,
     error: responseCode === 0 && failed.length === 0 ? undefined : '쿠팡 발송 처리에 실패했습니다.',
   }
-}
-
-function isCancelledOrder(status: string) {
-  return /CANCEL|CANCELED|CANCELLED|취소/i.test(status)
 }
