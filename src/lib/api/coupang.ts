@@ -55,22 +55,20 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item
   return results
 }
 
-function normalizeCoupangProduct(product: unknown): ChannelProductSnapshot[] {
+function normalizeCoupangProduct(product: unknown, inventories: Map<string, Record<string, unknown>>): ChannelProductSnapshot[] {
   const raw = asRecord(product)
   const sellerProductId = asString(raw.sellerProductId) ?? String(raw.sellerProductId ?? '')
   if (!sellerProductId) return []
 
-  const vendorItems = Array.isArray(raw.vendorItems) ? raw.vendorItems : []
-  return vendorItems.flatMap((vendorItem) => {
+  const items = Array.isArray(raw.items) ? raw.items : []
+  return items.flatMap((vendorItem) => {
     const item = asRecord(vendorItem)
     const vendorItemId = asString(item.vendorItemId) ?? String(item.vendorItemId ?? '')
     if (!vendorItemId) return []
-    const approvalStatus = asString(item.approvalStatus ?? raw.status ?? raw.statusName)
-    const onSale = item.onSale === true
-    const stockQuantity = asNumber(item.amountInStock)
-    const listingStatus = approvalStatus === 'PENDING'
-      ? 'approval-pending' as const
-      : onSale && stockQuantity === 0
+    const inventory = inventories.get(vendorItemId) ?? {}
+    const onSale = inventory.onSale === true
+    const stockQuantity = asNumber(inventory.amountInStock)
+    const listingStatus = onSale && stockQuantity === 0
         ? 'sold-out' as const
         : onSale
           ? 'active' as const
@@ -81,14 +79,23 @@ function normalizeCoupangProduct(product: unknown): ChannelProductSnapshot[] {
       externalVariantId: vendorItemId,
       sellerSku: asString(item.externalVendorSku),
       productName: asString(raw.sellerProductName ?? raw.productName),
-      optionName: asString(item.vendorItemName ?? item.itemName),
+      optionName: asString(item.itemName),
       listingStatus,
       stockQuantity,
-      price: asNumber(item.salePrice ?? item.price),
+      price: asNumber(inventory.salePrice),
       imageUrl: asString(item.mainImage ?? raw.imageUrl),
       rawAttributes: raw,
     }]
   })
+}
+
+function requestPath(pathname: string, query?: URLSearchParams) {
+  const encodedQuery = query?.toString() ?? ''
+  return {
+    pathname,
+    signedPath: `${pathname}${encodedQuery}`,
+    urlPath: encodedQuery ? `${pathname}?${encodedQuery}` : pathname,
+  }
 }
 
 function getCoupangHeaders(
@@ -116,10 +123,10 @@ export async function fetchCoupangProductSnapshots(
       vendorId: credentials.vendorId,
     })
     if (nextToken) params.set('nextToken', nextToken)
-    const path = `/v2/providers/seller_api/apis/api/v1/marketplace/seller-products?${params.toString()}`
-    const res = await fetch(`${BASE_URL}${path}`, {
+    const path = requestPath('/v2/providers/seller_api/apis/api/v1/marketplace/seller-products', params)
+    const res = await fetch(`${BASE_URL}${path.urlPath}`, {
       method: 'GET',
-      headers: getCoupangHeaders('GET', path, credentials),
+      headers: getCoupangHeaders('GET', path.signedPath, credentials),
     })
     if (!res.ok) throw new Error(`쿠팡 상품 목록 조회 실패: ${res.status}`)
     const response = asRecord(await res.json())
@@ -139,10 +146,23 @@ export async function fetchCoupangProductSnapshots(
     })
     if (!res.ok) throw new Error(`쿠팡 상품 상세 조회 실패: ${res.status}`)
     const response = asRecord(await res.json())
-    return normalizeCoupangProduct(response.data)
+    return asRecord(response.data)
   })
 
-  return details.flat()
+  const vendorItemIds = details.flatMap((product) => (Array.isArray(product.items) ? product.items : []).flatMap((item) => {
+    const value = asRecord(item).vendorItemId
+    return typeof value === 'string' || typeof value === 'number' ? [String(value)] : []
+  }))
+  const inventories = await mapWithConcurrency(vendorItemIds, 4, async (vendorItemId) => {
+    const path = `/v2/providers/seller_api/apis/api/v1/marketplace/vendor-items/${vendorItemId}/inventories`
+    const res = await fetch(`${BASE_URL}${path}`, { method: 'GET', headers: getCoupangHeaders('GET', path, credentials) })
+    if (!res.ok) throw new Error(`쿠팡 상품 재고 조회 실패: ${res.status}`)
+    const response = asRecord(await res.json())
+    return [vendorItemId, asRecord(response.data)] as const
+  })
+
+  const inventoryByVendorItemId = new Map(inventories)
+  return details.flatMap((detail) => normalizeCoupangProduct(detail, inventoryByVendorItemId))
 }
 
 function generateHmacSignature(
@@ -228,8 +248,10 @@ function mapOrderSheet(order: {
     vendorItemId?: number
     vendorItemName?: string
     shippingCount?: number
-    externalVendorSku?: string
+    externalVendorSkuCode?: string
     sellerProductId?: number | string
+    holdCountForCancel?: number
+    cancelCount?: number
   }>
 }): CoupangOrderSheet {
   return {
@@ -242,13 +264,16 @@ function mapOrderSheet(order: {
       addr1: order.receiver?.addr1 ?? '',
       addr2: order.receiver?.addr2 ?? '',
     },
-    orderItems: (order.orderItems ?? []).map((item) => ({
-      vendorItemId: item.vendorItemId ?? 0,
-      vendorItemName: item.vendorItemName ?? '',
-      shippingCount: item.shippingCount ?? 0,
-      sellerSku: item.externalVendorSku ?? null,
-      externalProductId: item.sellerProductId === undefined ? null : String(item.sellerProductId),
-    })),
+    orderItems: (order.orderItems ?? []).flatMap((item) => {
+      const shippingCount = Math.max(0, (item.shippingCount ?? 0) - (item.holdCountForCancel ?? 0) - (item.cancelCount ?? 0))
+      return shippingCount === 0 ? [] : [{
+        vendorItemId: item.vendorItemId ?? 0,
+        vendorItemName: item.vendorItemName ?? '',
+        shippingCount,
+        sellerSku: item.externalVendorSkuCode ?? null,
+        externalProductId: item.sellerProductId === undefined ? null : String(item.sellerProductId),
+      }]
+    }),
   }
 }
 
@@ -273,10 +298,10 @@ export async function fetchCoupangPendingOrders(
       params.set('nextToken', nextToken)
     }
 
-    const path = `/v2/providers/openapi/apis/api/v5/vendors/${credentials.vendorId}/ordersheets?${params.toString()}`
-    const authorization = getAuthHeader('GET', path, credentials)
+    const path = requestPath(`/v2/providers/openapi/apis/api/v5/vendors/${credentials.vendorId}/ordersheets`, params)
+    const authorization = getAuthHeader('GET', path.signedPath, credentials)
 
-    const res = await fetch(`${BASE_URL}${path}`, {
+    const res = await fetch(`${BASE_URL}${path.urlPath}`, {
       method: 'GET',
       headers: {
         Authorization: authorization,
@@ -307,10 +332,35 @@ export async function confirmCoupangShipments(
   credentials: CoupangCredentials,
 ): Promise<{ success: boolean; failedBoxes: number[]; error?: string }> {
   const path = `/v2/providers/openapi/apis/api/v4/vendors/${credentials.vendorId}/orders/invoices`
+  const refreshedOrders = await mapWithConcurrency([...new Set(shipments.map((shipment) => shipment.orderId))], 4, async (orderId) => {
+    const detailPath = `/v2/providers/openapi/apis/api/v5/vendors/${credentials.vendorId}/${orderId}/ordersheets`
+    const res = await fetch(`${BASE_URL}${detailPath}`, { method: 'GET', headers: getCoupangHeaders('GET', detailPath, credentials) })
+    if (!res.ok) return [orderId, null] as const
+    const response = asRecord(await res.json())
+    return [orderId, mapOrderSheet(asRecord(response.data) as Parameters<typeof mapOrderSheet>[0])] as const
+  })
+  const refreshedByOrderId = new Map(refreshedOrders)
+  const invalidBoxes = new Set<number>()
+  const validShipments = shipments.flatMap((shipment) => {
+    const refreshed = refreshedByOrderId.get(shipment.orderId)
+    if (!refreshed || isCancelledOrder(refreshed.status)) {
+      invalidBoxes.add(shipment.shipmentBoxId)
+      return []
+    }
+    const itemById = new Map(refreshed.orderItems.map((item) => [item.vendorItemId, item]))
+    const vendorItemIds = shipment.vendorItemIds.filter((vendorItemId) => itemById.has(vendorItemId))
+    if (vendorItemIds.length !== shipment.vendorItemIds.length) {
+      invalidBoxes.add(shipment.shipmentBoxId)
+      return []
+    }
+    return [{ ...shipment, shipmentBoxId: refreshed.shipmentBoxId || shipment.shipmentBoxId, vendorItemIds }]
+  })
+  if (validShipments.length === 0) return { success: false, failedBoxes: [...invalidBoxes], error: '쿠팡 주문 상태를 다시 확인해 주세요.' }
+
   const authorization = getAuthHeader('POST', path, credentials)
   const requestBody = {
     vendorId: credentials.vendorId,
-    orderSheetInvoiceApplyDtos: shipments.flatMap((shipment) =>
+    orderSheetInvoiceApplyDtos: validShipments.flatMap((shipment) =>
       shipment.vendorItemIds.map((vendorItemId) => ({
         shipmentBoxId: shipment.shipmentBoxId,
         orderId: shipment.orderId,
@@ -346,14 +396,15 @@ export async function confirmCoupangShipments(
       .flatMap((item) => typeof item.shipmentBoxId === 'number' ? [item.shipmentBoxId] : []),
   )]
   const responseCode = typeof data.data?.responseCode === 'number' ? data.data.responseCode : 99
-  const responseMessage =
-    typeof data.data?.responseMessage === 'string' && data.data.responseMessage.length > 0
-      ? data.data.responseMessage
-      : undefined
+  const failed = [...new Set([...invalidBoxes, ...failedBoxes])]
 
   return {
-    success: responseCode === 0 && failedBoxes.length === 0,
-    failedBoxes,
-    error: responseCode === 0 ? undefined : responseMessage,
+    success: responseCode === 0 && failed.length === 0,
+    failedBoxes: failed,
+    error: responseCode === 0 && failed.length === 0 ? undefined : '쿠팡 발송 처리에 실패했습니다.',
   }
+}
+
+function isCancelledOrder(status: string) {
+  return /CANCEL|CANCELED|CANCELLED|취소/i.test(status)
 }

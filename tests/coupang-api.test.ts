@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -11,10 +12,13 @@ const fetchMock = vi.fn()
 beforeEach(() => {
   fetchMock.mockReset()
   vi.stubGlobal('fetch', fetchMock)
+  vi.useFakeTimers()
+  vi.setSystemTime(new Date('2026-04-12T00:00:00.000Z'))
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
 describe('coupang api helpers', () => {
@@ -34,8 +38,7 @@ describe('coupang api helpers', () => {
           data: {
             sellerProductId: 1001,
             sellerProductName: '쿠팡 상품',
-            statusName: '승인완료',
-            vendorItems: [{ vendorItemId: 2001, externalVendorSku: 'SKU-CP-1', approvalStatus: 'APPROVED', amountInStock: 7, onSale: true }],
+            items: [{ vendorItemId: 2001, externalVendorSku: 'SKU-CP-1', itemName: '옵션 1' }],
           },
         }),
       })
@@ -45,19 +48,21 @@ describe('coupang api helpers', () => {
           data: {
             sellerProductId: 1002,
             sellerProductName: '쿠팡 상품 2',
-            vendorItems: [{ vendorItemId: 2002, externalVendorSku: 'SKU-CP-2', approvalStatus: 'PENDING', amountInStock: 0, onSale: false }],
+            items: [{ vendorItemId: 2002, externalVendorSku: 'SKU-CP-2', itemName: '옵션 2' }],
           },
         }),
       })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { amountInStock: 7, salePrice: 12000, onSale: true } }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { amountInStock: 0, salePrice: 15000, onSale: false } }) })
 
     await expect(fetchCoupangProductSnapshots({
       accessKey: 'access-key', secretKey: 'secret-key', vendorId: 'A00012345', defaultDeliveryCompanyCode: 'CJGLS',
     })).resolves.toEqual([
-      expect.objectContaining({ channel: 'coupang', externalProductId: '1001', externalVariantId: '2001', sellerSku: 'SKU-CP-1', listingStatus: 'active', stockQuantity: 7 }),
-      expect.objectContaining({ channel: 'coupang', externalProductId: '1002', externalVariantId: '2002', sellerSku: 'SKU-CP-2', listingStatus: 'approval-pending', stockQuantity: 0 }),
+      expect.objectContaining({ channel: 'coupang', externalProductId: '1001', externalVariantId: '2001', sellerSku: 'SKU-CP-1', optionName: '옵션 1', listingStatus: 'active', stockQuantity: 7, price: 12000 }),
+      expect.objectContaining({ channel: 'coupang', externalProductId: '1002', externalVariantId: '2002', sellerSku: 'SKU-CP-2', optionName: '옵션 2', listingStatus: 'paused', stockQuantity: 0, price: 15000 }),
     ])
 
-    expect(fetchMock).toHaveBeenCalledTimes(4)
+    expect(fetchMock).toHaveBeenCalledTimes(6)
     const firstListRequest = new URL(String(fetchMock.mock.calls[0][0]))
     const secondListRequest = new URL(String(fetchMock.mock.calls[1][0]))
     const firstDetailRequest = new URL(String(fetchMock.mock.calls[2][0]))
@@ -84,7 +89,15 @@ describe('coupang api helpers', () => {
       'X-MARKET': 'KR',
     }))
     const signedDate = String(firstListInit.headers.Authorization).match(/signed-date=([^,]+)/)?.[1]
-    expect(signedDate).toMatch(/^\d{6}T\d{6}Z$/)
+    expect(signedDate).toBe('260412T000000Z')
+    const signature = String(firstListInit.headers.Authorization).match(/signature=([^,]+)/)?.[1]
+    const canonicalPath = `${firstListRequest.pathname}${firstListRequest.search.slice(1)}`
+    const expectedSignature = crypto.createHmac('sha256', 'secret-key').update(`${signedDate}GET${canonicalPath}`).digest('hex')
+    const incorrectSignature = crypto.createHmac('sha256', 'secret-key').update(`${signedDate}GET${firstListRequest.pathname}${firstListRequest.search}`).digest('hex')
+    expect(signature).toBe(expectedSignature)
+    expect(signature).not.toBe(incorrectSignature)
+    expect(new URL(String(fetchMock.mock.calls[4][0])).pathname).toBe('/v2/providers/seller_api/apis/api/v1/marketplace/vendor-items/2001/inventories')
+    expect(new URL(String(fetchMock.mock.calls[5][0])).pathname).toBe('/v2/providers/seller_api/apis/api/v1/marketplace/vendor-items/2002/inventories')
   })
 
   it('fetches v5 order sheets with nextToken pagination and maps shipment data', async () => {
@@ -107,7 +120,10 @@ describe('coupang api helpers', () => {
                 {
                   vendorItemId: 301,
                   vendorItemName: '옵션 1',
-                  shippingCount: 1,
+                  shippingCount: 3,
+                  holdCountForCancel: 1,
+                  cancelCount: 1,
+                  externalVendorSkuCode: 'SKU-301',
                 },
               ],
             },
@@ -134,6 +150,9 @@ describe('coupang api helpers', () => {
                   vendorItemId: 302,
                   vendorItemName: '옵션 2',
                   shippingCount: 2,
+                  holdCountForCancel: 1,
+                  cancelCount: 5,
+                  externalVendorSkuCode: 'SKU-302',
                 },
               ],
             },
@@ -177,60 +196,20 @@ describe('coupang api helpers', () => {
             vendorItemId: 301,
             vendorItemName: '옵션 1',
             shippingCount: 1,
-            sellerSku: null,
+            sellerSku: 'SKU-301',
             externalProductId: null,
           },
         ],
       },
-      {
-        shipmentBoxId: 102,
-        orderId: 203,
-        orderedAt: '2026-04-13T09:00:00.000Z',
-        status: 'INSTRUCT',
-        receiver: {
-          name: '김철수',
-          addr1: '부산광역시',
-          addr2: '해운대구',
-        },
-        orderItems: [
-          {
-            vendorItemId: 302,
-            vendorItemName: '옵션 2',
-            shippingCount: 2,
-            sellerSku: null,
-            externalProductId: null,
-          },
-        ],
-      },
+      expect.objectContaining({ shipmentBoxId: 102, orderId: 203, orderItems: [] }),
     ])
   })
 
   it('posts invoice uploads to orders/invoices with item-level payloads', async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        data: {
-          responseCode: 1,
-          responseMessage: 'PARTIAL_ERROR',
-          responseList: [
-            {
-              shipmentBoxId: 11,
-              succeed: true,
-              resultCode: 'OK',
-              retryRequired: false,
-              resultMessage: null,
-            },
-            {
-              shipmentBoxId: 12,
-              succeed: false,
-              resultCode: 'INVALID_INVOICE_NUMBER',
-              retryRequired: true,
-              resultMessage: '송장번호가 유효하지 않습니다.',
-            },
-          ],
-        },
-      }),
-    })
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { shipmentBoxId: 111, orderId: 101, status: 'INSTRUCT', orderItems: [{ vendorItemId: 301, shippingCount: 1 }, { vendorItemId: 302, shippingCount: 1 }] } }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { shipmentBoxId: 12, orderId: 102, status: 'INSTRUCT', orderItems: [{ vendorItemId: 303, shippingCount: 1 }] } }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { responseCode: 1, responseMessage: 'PARTIAL_ERROR', responseList: [{ shipmentBoxId: 111, succeed: true }, { shipmentBoxId: 12, succeed: false }] } }) })
 
     const result = await confirmCoupangShipments(
       [
@@ -255,15 +234,17 @@ describe('coupang api helpers', () => {
       },
     )
 
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(String(fetchMock.mock.calls[0][0])).toContain('/api/v4/vendors/A00012345/orders/invoices')
-    const [, requestInit] = fetchMock.mock.calls[0]
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/api/v5/vendors/A00012345/101/ordersheets')
+    expect(String(fetchMock.mock.calls[1][0])).toContain('/api/v5/vendors/A00012345/102/ordersheets')
+    expect(String(fetchMock.mock.calls[2][0])).toContain('/api/v4/vendors/A00012345/orders/invoices')
+    const [, requestInit] = fetchMock.mock.calls[2]
     expect(requestInit.method).toBe('POST')
     expect(JSON.parse(String(requestInit.body))).toEqual({
       vendorId: 'A00012345',
       orderSheetInvoiceApplyDtos: [
         {
-          shipmentBoxId: 11,
+          shipmentBoxId: 111,
           orderId: 101,
           vendorItemId: 301,
           deliveryCompanyCode: 'CJGLS',
@@ -273,7 +254,7 @@ describe('coupang api helpers', () => {
           estimatedShippingDate: '',
         },
         {
-          shipmentBoxId: 11,
+          shipmentBoxId: 111,
           orderId: 101,
           vendorItemId: 302,
           deliveryCompanyCode: 'CJGLS',
@@ -297,7 +278,17 @@ describe('coupang api helpers', () => {
     expect(result).toEqual({
       success: false,
       failedBoxes: [12],
-      error: 'PARTIAL_ERROR',
+      error: '쿠팡 발송 처리에 실패했습니다.',
     })
+  })
+
+  it('does not upload invoices when refreshed order items are cancelled or not fulfillable', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: { shipmentBoxId: 11, orderId: 101, status: 'CANCELLED', orderItems: [{ vendorItemId: 301, shippingCount: 1, cancelCount: 1 }] } }) })
+
+    await expect(confirmCoupangShipments([{ shipmentBoxId: 11, orderId: 101, vendorItemIds: [301], trackingNumber: '1234567890' }], {
+      accessKey: 'access-key', secretKey: 'secret-key', vendorId: 'A00012345', defaultDeliveryCompanyCode: 'CJGLS',
+    })).resolves.toEqual({ success: false, failedBoxes: [11], error: '쿠팡 주문 상태를 다시 확인해 주세요.' })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

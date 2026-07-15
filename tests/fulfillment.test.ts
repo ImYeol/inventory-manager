@@ -37,4 +37,19 @@ describe('fulfillment finalization', () => {
     expect(mocks.sendNaverTrackingNumbers).not.toHaveBeenCalled()
     expect(insert).not.toHaveBeenCalled()
   })
+
+  it('does not record or finalize a Coupang fulfillment when the overall provider result fails', async () => {
+    const inExisting = vi.fn().mockResolvedValue({ data: [], error: null })
+    const select = vi.fn(() => ({ in: inExisting }))
+    const insert = vi.fn(() => ({ select: vi.fn().mockResolvedValue({ data: [{ id: 9 }], error: null }) }))
+    const rpc = vi.fn()
+    mocks.getSupabaseWithUser.mockResolvedValue({ user: { id: 'u1' }, supabase: { from: vi.fn(() => ({ select, insert })), rpc } })
+    mocks.sendCoupangTrackingNumbers.mockResolvedValue({ success: false, failedBoxes: [] })
+
+    const result = await finalizeTrackingImport([{ lineId: 3, reservationId: 4, channel: 'coupang', externalLineId: '11:301', shipmentBoxId: 11, orderId: 22, vendorItemId: 301, trackingNumber: 'T-1', carrier: 'CJGLS' }])
+
+    expect(result).toEqual({ externalSucceeded: 0, finalized: 0, reconcileRequired: 0, failed: 1 })
+    expect(insert).not.toHaveBeenCalled()
+    expect(rpc).not.toHaveBeenCalled()
+  })
 })
