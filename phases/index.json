@@ -69,6 +69,10 @@
     {
       "dir": "connection-summary-density",
       "status": "completed"
+    },
+    {
+      "dir": "card-divider-rhythm-guardrail",
+      "status": "blocked"
     }
   ]
 }
