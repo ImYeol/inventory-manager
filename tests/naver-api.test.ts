@@ -1,19 +1,59 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { fetchNaverProductSnapshots } from '@/lib/api/naver'
+const mocks = vi.hoisted(() => ({
+  hashSync: vi.fn(),
+}))
+
+vi.mock('bcryptjs', () => ({
+  default: { hashSync: mocks.hashSync },
+  hashSync: mocks.hashSync,
+}))
+
+import {
+  dispatchNaverOrders,
+  fetchNaverPendingOrders,
+  fetchNaverProductSnapshots,
+} from '@/lib/api/naver'
 
 const fetchMock = vi.fn()
 
 beforeEach(() => {
   fetchMock.mockReset()
+  mocks.hashSync.mockReset()
+  mocks.hashSync.mockReturnValue('$2b$hashed-signature')
   vi.stubGlobal('fetch', fetchMock)
+  vi.spyOn(Date, 'now').mockReturnValue(1_752_576_000_000)
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
 
 describe('naver product API helper', () => {
+  it('uses bcrypt plus Base64 for a client-credentials token request without sending the client secret', async () => {
+    const credentials = { clientId: 'test-client-id', clientSecret: '[redacted]' }
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'access-token' }) })
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: { contents: [], pagination: { page: 1, totalPages: 1 } } }) })
+
+    await fetchNaverProductSnapshots(credentials)
+
+    expect(mocks.hashSync).toHaveBeenCalledWith('test-client-id_1752576000000', '[redacted]')
+    const tokenRequest = fetchMock.mock.calls[0]
+    expect(String(tokenRequest[0])).toContain('/v1/oauth2/token')
+    expect(tokenRequest[1]).toMatchObject({ method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
+    expect(tokenRequest[1].headers).not.toHaveProperty('Authorization')
+    const params = new URLSearchParams(String(tokenRequest[1].body))
+    expect(Object.fromEntries(params)).toEqual({
+      client_id: 'test-client-id',
+      timestamp: '1752576000000',
+      client_secret_sign: Buffer.from('$2b$hashed-signature').toString('base64'),
+      grant_type: 'client_credentials',
+      type: 'SELF',
+    })
+    expect(String(tokenRequest[1].body)).not.toContain(credentials.clientSecret)
+  })
+
   it('pages product search at the maximum supported size and normalizes typed snapshots', async () => {
     fetchMock
       .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'access-token' }) })
@@ -80,5 +120,61 @@ describe('naver product API helper', () => {
     await expect(
       fetchNaverProductSnapshots({ clientId: 'client-id', clientSecret: 'secret-value' }),
     ).rejects.toThrow('네이버 인증 실패: 401')
+  })
+
+  it('uses GET query cursors for changed orders, chunks detail requests, and retains shippable rows', async () => {
+    const credentials = { clientId: 'test-client-id', clientSecret: '[redacted]' }
+    const productOrderIds = Array.from({ length: 301 }, (_, index) => `PO-${index + 1}`)
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'access-token' }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: { lastChangeStatuses: productOrderIds.slice(0, 300).map((productOrderId) => ({ productOrderId })), more: { moreFrom: 'cursor-from', moreSequence: 'cursor-sequence' } } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: { lastChangeStatuses: productOrderIds.slice(300).map((productOrderId) => ({ productOrderId })), more: null } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: [
+          { productOrderId: 'PO-1', orderId: 'O-1', productName: 'Shippable', shippingAddress: {}, quantity: 1, orderDate: '2026-07-15T00:00:00Z', productOrderStatus: 'PAYED' },
+          { productOrderId: 'PO-2', orderId: 'O-2', productName: 'Not shippable', shippingAddress: {}, quantity: 1, orderDate: '2026-07-15T00:00:00Z', productOrderStatus: 'CANCELED' },
+        ] }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [] }) })
+
+    await expect(fetchNaverPendingOrders(credentials)).resolves.toEqual([
+      expect.objectContaining({ productOrderId: 'PO-1', productOrderStatus: 'PAYED' }),
+    ])
+
+    const changedOrderFirstRequest = fetchMock.mock.calls[1]
+    const changedOrderSecondRequest = fetchMock.mock.calls[2]
+    expect(String(changedOrderFirstRequest[0])).toContain('/v1/pay-order/seller/product-orders/last-changed-statuses?')
+    expect(changedOrderFirstRequest[1]).toMatchObject({ method: 'GET', headers: { Authorization: 'Bearer access-token' } })
+    expect(changedOrderFirstRequest[1]).not.toHaveProperty('body')
+    const continuationRequest = new URL(String(changedOrderSecondRequest[0]))
+    expect(continuationRequest.searchParams.get('lastChangedFrom')).toBe('cursor-from')
+    expect(continuationRequest.searchParams.get('moreSequence')).toBe('cursor-sequence')
+    const detailRequests = fetchMock.mock.calls.slice(3)
+    expect(detailRequests).toHaveLength(2)
+    for (const [, init] of detailRequests) {
+      expect(init).toMatchObject({ method: 'POST', headers: { Authorization: 'Bearer access-token' } })
+      expect(JSON.parse(String(init.body)).productOrderIds.length).toBeLessThanOrEqual(300)
+    }
+  })
+
+  it('keeps bearer-token dispatch requests on the server helper', async () => {
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'access-token' }) })
+      .mockResolvedValueOnce({ ok: true })
+
+    await expect(dispatchNaverOrders([{ productOrderId: 'PO-1', trackingNumber: 'TRACK-1' }], { clientId: 'test-client-id', clientSecret: '[redacted]' })).resolves.toEqual({ success: true, failedOrders: [] })
+
+    expect(fetchMock.mock.calls[1][0]).toContain('/v1/pay-order/seller/product-orders/dispatch')
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({
+      method: 'POST',
+      headers: { Authorization: 'Bearer access-token', 'Content-Type': 'application/json' },
+    })
   })
 })

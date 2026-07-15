@@ -1,7 +1,7 @@
 // 네이버 커머스 API 헬퍼 (서버 전용)
 // 참고: https://apicenter.commerce.naver.com/ko/basic/commerce-api
 
-import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 
 import type { ChannelProductSnapshot } from '../channel-products';
 import type { NaverCredentials } from '../shipping-credentials';
@@ -26,13 +26,10 @@ async function getAccessToken(credentials: NaverCredentials): Promise<string> {
   const clientId = credentials.clientId;
   const clientSecret = credentials.clientSecret;
 
-  // bcrypt 타입 시그니처 생성
+  // Naver Commerce OAuth uses bcrypt(clientId_timestamp, clientSecret), then Base64.
   const timestamp = Date.now();
   const password = `${clientId}_${timestamp}`;
-  const signature = crypto
-    .createHmac('sha256', clientSecret)
-    .update(password)
-    .digest('base64');
+  const signature = Buffer.from(bcrypt.hashSync(password, clientSecret)).toString('base64');
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -64,6 +61,10 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function asString(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null
+}
+
+function asIdentifier(value: unknown): string | null {
+  return asString(value) ?? (typeof value === 'number' && Number.isFinite(value) ? String(value) : null)
 }
 
 function asNumber(value: unknown): number | null {
@@ -145,85 +146,88 @@ export async function fetchNaverPendingOrders(
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-  const body = {
-    lastChangedFrom: weekAgo.toISOString(),
-    lastChangedTo: now.toISOString(),
-    lastChangedType: 'PAYED',
-  };
+  const productOrderIds = new Set<string>();
+  let moreFrom: string | null = null;
+  let moreSequence: string | null = null;
 
-  const res = await fetch(
-    `${BASE_URL}/v1/pay-order/seller/product-orders/last-changed-statuses`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
+  do {
+    const params = new URLSearchParams({
+      lastChangedFrom: moreFrom ?? weekAgo.toISOString(),
+      lastChangedTo: now.toISOString(),
+      lastChangedType: 'PAYED',
+      limitCount: '300',
+    });
+    if (moreSequence) params.set('moreSequence', moreSequence);
+
+    const res = await fetch(
+      `${BASE_URL}/v1/pay-order/seller/product-orders/last-changed-statuses?${params.toString()}`,
+      {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error(`네이버 주문 조회 실패: ${res.status}`);
     }
-  );
 
-  if (!res.ok) {
-    throw new Error(`네이버 주문 조회 실패: ${res.status}`);
+    const payload = asRecord(asRecord(await res.json()).data);
+    const statuses = Array.isArray(payload.lastChangeStatuses) ? payload.lastChangeStatuses : [];
+    for (const status of statuses) {
+      const productOrderId = asString(asRecord(status).productOrderId);
+      if (productOrderId) productOrderIds.add(productOrderId);
+    }
+
+    const more = asRecord(payload.more);
+    moreFrom = asString(more.moreFrom);
+    moreSequence = asString(more.moreSequence);
+  } while (moreFrom && moreSequence);
+
+  if (productOrderIds.size === 0) return [];
+
+  const detailedOrders: Record<string, unknown>[] = [];
+  const ids = [...productOrderIds];
+  for (let index = 0; index < ids.length; index += 300) {
+    const detailRes = await fetch(
+      `${BASE_URL}/v1/pay-order/seller/product-orders/query`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ productOrderIds: ids.slice(index, index + 300) }),
+      }
+    );
+
+    if (!detailRes.ok) {
+      throw new Error(`네이버 주문 상세 조회 실패: ${detailRes.status}`);
+    }
+
+    const data = asRecord(await detailRes.json());
+    const orders = Array.isArray(data.data) ? data.data : [];
+    detailedOrders.push(...orders.map(asRecord));
   }
 
-  const data = await res.json();
-  const productOrderIds: string[] = (data.data?.lastChangeStatuses ?? []).map(
-    (s: { productOrderId: string }) => s.productOrderId
-  );
-
-  if (productOrderIds.length === 0) return [];
-
-  // 주문 상세 조회
-  const detailRes = await fetch(
-    `${BASE_URL}/v1/pay-order/seller/product-orders/query`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ productOrderIds }),
-    }
-  );
-
-  if (!detailRes.ok) {
-    throw new Error(`네이버 주문 상세 조회 실패: ${detailRes.status}`);
-  }
-
-  const detailData = await detailRes.json();
-  return (detailData.data ?? []).map(
-    (order: {
-      productOrderId: string;
-      orderId: string;
-      productName: string;
-      shippingAddress: {
-        name: string;
-        baseAddress: string;
-        detailAddress: string;
+  return detailedOrders
+    .filter((order) => asString(order.productOrderStatus) === 'PAYED')
+    .map((order) => {
+      const shippingAddress = asRecord(order.shippingAddress);
+      const productOrderId = asString(order.productOrderId) ?? '';
+      return {
+        productOrderId,
+        orderId: asString(order.orderId) ?? '',
+        productName: asString(order.productName) ?? '',
+        recipientName: asString(shippingAddress.name) ?? '',
+        recipientAddress: `${asString(shippingAddress.baseAddress) ?? ''} ${asString(shippingAddress.detailAddress) ?? ''}`.trim(),
+        quantity: asNumber(order.quantity) ?? 0,
+        orderDate: asString(order.orderDate) ?? '',
+        productOrderStatus: asString(order.productOrderStatus) ?? '',
+        sellerSku: asString(order.sellerManagementCode) ?? asString(order.productSellerCode),
+        externalProductId: asIdentifier(order.productId) ?? asIdentifier(order.originProductNo),
+        externalVariantId: asIdentifier(order.channelProductId) ?? productOrderId,
       };
-      quantity: number;
-      orderDate: string;
-      productOrderStatus: string;
-      sellerManagementCode?: string;
-      productId?: string | number;
-      originProductNo?: string | number;
-      channelProductId?: string | number;
-      productSellerCode?: string;
-    }) => ({
-      productOrderId: order.productOrderId,
-      orderId: order.orderId,
-      productName: order.productName,
-      recipientName: order.shippingAddress?.name ?? '',
-      recipientAddress: `${order.shippingAddress?.baseAddress ?? ''} ${order.shippingAddress?.detailAddress ?? ''}`.trim(),
-      quantity: order.quantity,
-      orderDate: order.orderDate,
-      productOrderStatus: order.productOrderStatus,
-      sellerSku: order.sellerManagementCode ?? order.productSellerCode ?? null,
-      externalProductId: String(order.productId ?? order.originProductNo ?? '' ) || null,
-      externalVariantId: String(order.channelProductId ?? order.productOrderId),
-    })
-  );
+    });
 }
 
 // 운송장 발송 처리
