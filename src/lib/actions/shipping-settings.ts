@@ -3,11 +3,13 @@
 import {
   buildCoupangMaskedSummary,
   buildNaverMaskedSummary,
+  deleteShippingCredentialsForCurrentUser,
   getShippingSettingsSummaryForCurrentUser,
   saveShippingCredentialsForCurrentUser,
   ShippingCredentialsConfigurationError,
   type CoupangCredentials,
   type NaverCredentials,
+  type ShippingProvider,
   type ShippingSettingsSummary,
   type ShippingSettingsSummaryItem,
 } from '../shipping-credentials'
@@ -19,6 +21,11 @@ export type CoupangSettingsInput = CoupangCredentials
 type SaveSettingsResult = {
   success: boolean
   summary?: ShippingSettingsSummaryItem
+  error?: string
+}
+
+type DeleteSettingsResult = {
+  success: boolean
   error?: string
 }
 
@@ -115,6 +122,20 @@ export async function saveCoupangSettings(
     return {
       success: false,
       error: getSaveSettingsError(error, '쿠팡 API 설정을 저장하지 못했습니다.'),
+    }
+  }
+}
+
+export async function deleteShippingProviderCredentials(
+  provider: ShippingProvider
+): Promise<DeleteSettingsResult> {
+  try {
+    await deleteShippingCredentialsForCurrentUser(provider)
+    return { success: true }
+  } catch {
+    return {
+      success: false,
+      error: '연결 정보를 삭제하지 못했습니다. 잠시 후 다시 시도해주세요.',
     }
   }
 }

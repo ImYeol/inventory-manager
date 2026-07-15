@@ -9,6 +9,7 @@ vi.mock('@/lib/db', () => ({
 }))
 
 import {
+  deleteShippingProviderCredentials,
   getShippingSettingsSummary,
   saveCoupangSettings,
   saveNaverSettings,
@@ -25,6 +26,21 @@ function createSupabaseMock(initialRows: CredentialsRow[] = []) {
 
   const query = {
     select: vi.fn(async () => ({ data: rows, error: null })),
+    delete: vi.fn(() => ({
+      eq: vi.fn((column: string, value: string) => {
+        if (column === 'user_id') {
+          return {
+            eq: vi.fn(async (providerColumn: string, provider: CredentialsRow['provider']) => {
+              expect(providerColumn).toBe('provider')
+              rows = rows.filter((row) => row.provider !== provider)
+              return { error: null }
+            }),
+          }
+        }
+
+        throw new Error(`Unexpected deletion constraint: ${column}=${value}`)
+      }),
+    })),
     upsert: vi.fn(async (payload: Record<string, unknown>) => {
       const nextRow = {
         provider: payload.provider as 'naver' | 'coupang',
@@ -233,5 +249,47 @@ describe('shipping settings server actions', () => {
     })
 
     expect(supabase.query.upsert).not.toHaveBeenCalled()
+  })
+
+  it('deletes only the current user credential for the requested provider', async () => {
+    const supabase = createSupabaseMock([
+      {
+        provider: 'naver',
+        masked_summary: { clientId: 'na********34' },
+        updated_at: '2026-04-12T09:00:00.000Z',
+      },
+      {
+        provider: 'coupang',
+        masked_summary: {
+          accessKey: 'co********34',
+          vendorId: 'A1*****78',
+          defaultDeliveryCompanyCode: 'CJGLS',
+        },
+        updated_at: '2026-04-12T09:00:00.000Z',
+      },
+    ])
+
+    mocks.getSupabaseWithUser.mockResolvedValue({
+      supabase: { from: supabase.from },
+      user: { id: 'user-1' },
+    })
+
+    await expect(deleteShippingProviderCredentials('naver')).resolves.toEqual({ success: true })
+
+    expect(supabase.query.delete).toHaveBeenCalledTimes(1)
+    const userScope = supabase.query.delete.mock.results[0].value.eq
+    expect(userScope).toHaveBeenCalledWith('user_id', 'user-1')
+    await expect(getShippingSettingsSummary()).resolves.toEqual({
+      naver: { configured: false, masked: {}, updatedAt: null },
+      coupang: {
+        configured: true,
+        masked: {
+          accessKey: 'co********34',
+          vendorId: 'A1*****78',
+          defaultDeliveryCompanyCode: 'CJGLS',
+        },
+        updatedAt: '2026-04-12T09:00:00.000Z',
+      },
+    })
   })
 })

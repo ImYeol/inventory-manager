@@ -1,10 +1,16 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition, type FormEvent } from 'react'
-import { getShippingSettingsSummary, saveCoupangSettings, saveNaverSettings } from '@/lib/actions/shipping-settings'
-import type { ShippingSettingsSummary } from '@/lib/shipping-credentials'
+import {
+  deleteShippingProviderCredentials,
+  getShippingSettingsSummary,
+  saveCoupangSettings,
+  saveNaverSettings,
+} from '@/lib/actions/shipping-settings'
+import type { ShippingProvider, ShippingSettingsSummary } from '@/lib/shipping-credentials'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Modal } from '@/components/ui/modal'
 import { StoreConnectionRow } from '@/components/ui/store-connection-row'
 import { cx, ui } from '../../components/ui'
 
@@ -26,8 +32,10 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
   const [coupangMessage, setCoupangMessage] = useState('')
   const [naverError, setNaverError] = useState('')
   const [coupangError, setCoupangError] = useState('')
+  const [removalTarget, setRemovalTarget] = useState<ShippingProvider | null>(null)
   const [naverPending, startNaverTransition] = useTransition()
   const [coupangPending, startCoupangTransition] = useTransition()
+  const [removalPending, startRemovalTransition] = useTransition()
   const naverClientIdRef = useRef<HTMLInputElement>(null)
   const naverClientSecretRef = useRef<HTMLInputElement>(null)
   const coupangAccessKeyRef = useRef<HTMLInputElement>(null)
@@ -134,6 +142,45 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
     })
   }
 
+  const handleCredentialRemoval = () => {
+    if (!removalTarget) {
+      return
+    }
+
+    const provider = removalTarget
+    const providerName = provider === 'naver' ? '네이버' : '쿠팡'
+    setNaverMessage('')
+    setCoupangMessage('')
+    setNaverError('')
+    setCoupangError('')
+
+    startRemovalTransition(async () => {
+      const result = await deleteShippingProviderCredentials(provider)
+
+      if (!result.success) {
+        const error = result.error ?? '연결 정보를 삭제하지 못했습니다. 잠시 후 다시 시도해주세요.'
+        if (provider === 'naver') {
+          setNaverError(error)
+        } else {
+          setCoupangError(error)
+        }
+        return
+      }
+
+      await refreshSummary()
+      if (provider === 'naver') {
+        setNaverValues({ clientId: '', clientSecret: '' })
+        setNaverMessage(`${providerName} 연결을 해제했습니다.`)
+      } else {
+        setCoupangValues({ accessKey: '', secretKey: '', vendorId: '', defaultDeliveryCompanyCode: '' })
+        setCoupangMessage(`${providerName} 연결을 해제했습니다.`)
+      }
+      setRemovalTarget(null)
+    })
+  }
+
+  const removalProviderName = removalTarget === 'naver' ? '네이버' : '쿠팡'
+
   return (
     <div className="grid gap-4 xl:grid-cols-2">
       <StoreConnectionRow
@@ -142,9 +189,16 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
         summary={[{ label: 'Client ID', value: currentSummary.naver.masked.clientId }]}
         updatedAt={currentSummary.naver.updatedAt}
         action={
-          <Button type="submit" form="naver-settings" disabled={naverPending}>
-            {naverPending ? '네이버 저장 중…' : '네이버 저장'}
-          </Button>
+          <div className="flex items-center gap-2">
+            {currentSummary.naver.configured ? (
+              <Button type="button" variant="destructive" size="sm" onClick={() => setRemovalTarget('naver')}>
+                네이버 연결 해제
+              </Button>
+            ) : null}
+            <Button type="submit" form="naver-settings" disabled={naverPending}>
+              {naverPending ? '네이버 저장 중…' : '네이버 저장'}
+            </Button>
+          </div>
         }
       >
         <form id="naver-settings" className="space-y-4" onSubmit={handleNaverSave}>
@@ -199,9 +253,16 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
         ]}
         updatedAt={currentSummary.coupang.updatedAt}
         action={
-          <Button type="submit" form="coupang-settings" disabled={coupangPending}>
-            {coupangPending ? '쿠팡 저장 중…' : '쿠팡 저장'}
-          </Button>
+          <div className="flex items-center gap-2">
+            {currentSummary.coupang.configured ? (
+              <Button type="button" variant="destructive" size="sm" onClick={() => setRemovalTarget('coupang')}>
+                쿠팡 연결 해제
+              </Button>
+            ) : null}
+            <Button type="submit" form="coupang-settings" disabled={coupangPending}>
+              {coupangPending ? '쿠팡 저장 중…' : '쿠팡 저장'}
+            </Button>
+          </div>
         }
       >
         <form id="coupang-settings" className="space-y-4" onSubmit={handleCoupangSave}>
@@ -278,6 +339,29 @@ export default function SettingsView({ summary, focusProvider }: SettingsViewPro
           ) : null}
         </form>
       </StoreConnectionRow>
+
+      <Modal
+        open={removalTarget !== null}
+        title={`${removalProviderName} 연결을 해제할까요?`}
+        description="저장된 API 연결 정보가 삭제되어 해당 채널의 운영 동기화가 중단됩니다."
+        onOpenChange={(open) => {
+          if (!removalPending && !open) {
+            setRemovalTarget(null)
+          }
+        }}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setRemovalTarget(null)} disabled={removalPending}>
+              취소
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleCredentialRemoval} disabled={removalPending}>
+              {removalPending ? '해제 중…' : '연결 해제'}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-[color:var(--muted-foreground)]">해제 후에는 새 API 정보를 저장해야 다시 동기화할 수 있습니다.</p>
+      </Modal>
     </div>
   )
 }

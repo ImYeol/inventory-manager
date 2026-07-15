@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 
 const mocks = vi.hoisted(() => ({
   getShippingSettingsSummary: vi.fn(),
+  deleteShippingProviderCredentials: vi.fn(),
   saveNaverSettings: vi.fn(),
   saveCoupangSettings: vi.fn(),
 }))
@@ -16,6 +17,7 @@ import SettingsView from '@/app/(protected)/settings/SettingsView'
 afterEach(() => {
   cleanup()
   mocks.getShippingSettingsSummary.mockReset()
+  mocks.deleteShippingProviderCredentials.mockReset()
   mocks.saveNaverSettings.mockReset()
   mocks.saveCoupangSettings.mockReset()
 })
@@ -134,5 +136,45 @@ describe('SettingsView', () => {
     expect(await screen.findByText('저장소 보안 설정이 필요합니다. 배포 환경의 서버 전용 암호화 키를 설정한 뒤 다시 시도해주세요.')).toBeTruthy()
     expect(screen.queryByText(/SHIPPING_CREDENTIALS_ENCRYPTION_KEY/)).toBeNull()
     expect(screen.queryByText('client-secret')).toBeNull()
+  })
+
+  it('requires confirmation before removing a configured provider and refreshes its summary', async () => {
+    mocks.deleteShippingProviderCredentials.mockResolvedValue({ success: true })
+    mocks.getShippingSettingsSummary.mockResolvedValue({
+      naver: { configured: false, masked: {}, updatedAt: null },
+      coupang: { configured: false, masked: {}, updatedAt: null },
+    })
+
+    render(
+      React.createElement(SettingsView, {
+        summary: {
+          naver: {
+            configured: true,
+            masked: { clientId: 'nv-••••1234' },
+            updatedAt: '2026-04-12T11:00:00.000Z',
+          },
+          coupang: { configured: false, masked: {}, updatedAt: null },
+        },
+      }),
+    )
+
+    fireEvent.change(screen.getByLabelText('네이버 Client ID'), { target: { value: 'draft-client-id' } })
+    fireEvent.click(screen.getByRole('button', { name: '네이버 연결 해제' }))
+
+    expect(mocks.deleteShippingProviderCredentials).not.toHaveBeenCalled()
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('네이버 연결을 해제할까요?')).toBeTruthy()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '연결 해제' }))
+
+    await waitFor(() => {
+      expect(mocks.deleteShippingProviderCredentials).toHaveBeenCalledWith('naver')
+    })
+
+    expect(await screen.findByText('네이버 연결을 해제했습니다.')).toBeTruthy()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect((screen.getByLabelText('네이버 Client ID') as HTMLInputElement).value).toBe('')
+    const naverSection = screen.getByRole('heading', { name: '네이버' }).closest('section')
+    expect(within(naverSection as HTMLElement).getByText('미연결')).toBeTruthy()
   })
 })

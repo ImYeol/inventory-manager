@@ -219,6 +219,19 @@ export async function saveShippingCredentialsForCurrentUser(
   return summary[provider]
 }
 
+export async function deleteShippingCredentialsForCurrentUser(provider: ShippingProvider): Promise<void> {
+  const { supabase, user } = await getSupabaseWithUser()
+  const { error } = await supabase
+    .from('shipping_provider_credentials')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('provider', provider)
+
+  if (error) {
+    throw new Error('운송장 API 설정을 삭제하지 못했습니다.')
+  }
+}
+
 export async function getRequiredShippingCredentials(
   provider: 'naver'
 ): Promise<NaverCredentials>
