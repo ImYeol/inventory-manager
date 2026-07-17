@@ -88,6 +88,10 @@
     {
       "dir": "coupang-openapi-contract-alignment",
       "status": "completed"
+    },
+    {
+      "dir": "sku-channel-mapping-operations",
+      "status": "pending"
     }
   ]
 }
