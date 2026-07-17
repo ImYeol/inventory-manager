@@ -103,6 +103,11 @@
       "dir": "manual-outbound-and-adjustment",
       "status": "completed",
       "completed_at": "2026-07-18T00:15:40+0900"
+    },
+    {
+      "dir": "quick-inbound-operations",
+      "status": "completed",
+      "completed_at": "2026-07-18T00:26:30+0900"
     }
   ]
 }
