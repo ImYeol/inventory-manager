@@ -9,6 +9,12 @@ export type ReservationStock = {
   committed: number
 }
 
+export type InventorySyncRef = {
+  id: number
+  channel: OrderChannel
+  externalVariantId: string
+}
+
 export type NormalizedOrderLine = {
   externalLineId: string
   externalProductId: string | null
@@ -66,6 +72,21 @@ export function reservationDisposition(
   return eligible.length === 1
     ? { status: 'ACTIVE' as const, warehouseId: eligible[0].warehouseId }
     : { status: 'EXCEPTION' as const }
+}
+
+/**
+ * Channel quantities are always an absolute snapshot of sellable stock. The
+ * caller supplies only explicit ChannelProductRef rows, so an order SKU or a
+ * provider seller SKU can never create an implicit channel mapping.
+ */
+export function inventorySyncEntries(input: { onHand: number; committed: number; refs: InventorySyncRef[] }) {
+  const targetQuantity = Math.max(0, input.onHand - input.committed)
+  return input.refs.map((ref) => ({
+    channelProductRefId: ref.id,
+    channel: ref.channel,
+    externalVariantId: ref.externalVariantId,
+    targetQuantity,
+  }))
 }
 
 export function orderViewFor(status: string, fulfillmentStatus: string) {

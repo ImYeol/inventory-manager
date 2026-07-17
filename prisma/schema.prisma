@@ -220,16 +220,39 @@ model ChannelProductRef {
   channelReported   Int?               @map("channel_reported")
   lastSyncedAt      DateTime?          @map("last_synced_at") @db.Timestamptz(6)
   lastSyncError     String?            @map("last_sync_error")
+  syncTargetQuantity Int?              @map("sync_target_quantity")
+  syncStatus        String             @default("idle") @map("sync_status")
   verificationStatus String             @default("unverified") @map("verification_status")
   createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime           @default(now()) @map("updated_at") @db.Timestamptz(6)
   variant           ProductVariant?    @relation(fields: [variantId, userId], references: [id, userId], onDelete: NoAction)
   orderLines        ChannelOrderLine[]
+  inventorySyncOutbox InventorySyncOutbox[]
 
   @@unique([id, userId])
   @@unique([userId, channel, externalProductId, externalVariantId])
   @@index([userId], map: "channel_product_refs_user_id_idx")
   @@map("channel_product_refs")
+}
+
+model InventorySyncOutbox {
+  id                  BigInt            @id @default(autoincrement()) @db.BigInt
+  userId              String            @map("user_id") @db.Uuid
+  channelProductRefId BigInt            @map("channel_product_ref_id") @db.BigInt
+  targetQuantity      Int               @map("target_quantity")
+  status              String
+  attempts            Int               @default(0)
+  lastError           String?           @map("last_error")
+  requestedAt         DateTime          @default(now()) @map("requested_at") @db.Timestamptz(6)
+  completedAt         DateTime?         @map("completed_at") @db.Timestamptz(6)
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime          @default(now()) @map("updated_at") @db.Timestamptz(6)
+  channelProductRef   ChannelProductRef @relation(fields: [channelProductRefId, userId], references: [id, userId], onDelete: Cascade)
+
+  @@unique([id, userId])
+  @@unique([userId, channelProductRefId])
+  @@index([userId], map: "inventory_sync_outbox_user_id_idx")
+  @@map("inventory_sync_outbox")
 }
 
 model ChannelOrder {

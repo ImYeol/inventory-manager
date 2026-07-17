@@ -2,6 +2,7 @@
 
 import { getSupabaseWithUser } from '../db'
 import { sendCoupangTrackingNumbers, sendNaverTrackingNumbers } from './shipping'
+import { queueInventorySyncForReservation } from './inventory-sync'
 import { BUILT_IN_TRACKING_PRESETS, matchTrackingRows, type TrackingColumnMapping, type TrackingMatch, type TrackingRow } from '../excel'
 
 export type FulfillmentCandidate = { lineId: number; reservationId: number; channel: 'naver' | 'coupang'; externalLineId: string; trackingNumber: string; carrier: string; trackingImportBatchId?: number; shipmentBoxId?: string; orderId?: number; vendorItemId?: number }
@@ -100,7 +101,7 @@ export async function finalizeTrackingImport(rows: FulfillmentCandidate[]) {
   const { supabase, user } = await getSupabaseWithUser()
   const result = { externalSucceeded: 0, finalized: 0, reconcileRequired: 0, failed: 0 }
   const keys = rows.map(keyFor)
-  const { data: existing, error: existingError } = await supabase.from('order_fulfillments').select('id,idempotency_key,local_status').in('idempotency_key', keys)
+  const { data: existing, error: existingError } = await supabase.from('order_fulfillments').select('id,idempotency_key,local_status,inventory_reservation_id').in('idempotency_key', keys)
   if (existingError) throw new Error('기존 발송 처리 상태를 확인하지 못했습니다.')
   const existingByKey = new Map((existing ?? []).map((item) => [item.idempotency_key, item]))
   for (const item of existing ?? []) {
@@ -111,7 +112,10 @@ export async function finalizeTrackingImport(rows: FulfillmentCandidate[]) {
     }
     const retried = await supabase.rpc('finalize_order_fulfillment', { p_fulfillment_id: item.id })
     if (retried.error || !retried.data) result.reconcileRequired += 1
-    else result.finalized += 1
+    else {
+      result.finalized += 1
+      await queueInventorySyncForReservation(supabase, user.id, Number(item.inventory_reservation_id)).catch(() => undefined)
+    }
   }
   const pendingRows = rows.filter((row) => !existingByKey.has(keyFor(row)))
   const naver = pendingRows.filter((row) => row.channel === 'naver')
@@ -136,7 +140,10 @@ export async function finalizeTrackingImport(rows: FulfillmentCandidate[]) {
     if (finalized.error || !finalized.data) {
       result.reconcileRequired += 1
       await supabase.from('order_fulfillments').update({ local_status: 'failed', error: 'RECONCILE_REQUIRED' }).eq('id', item.id)
-    } else result.finalized += 1
+    } else {
+      result.finalized += 1
+      await queueInventorySyncForReservation(supabase, user.id, row.reservationId).catch(() => undefined)
+    }
   }
   return result
 }

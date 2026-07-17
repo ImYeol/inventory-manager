@@ -6,6 +6,7 @@ import type { CoupangOrderSheet } from '../api/coupang'
 import type { NaverOrder } from '../api/naver'
 import { getSupabaseWithUser } from '../db'
 import { reservationDisposition } from '../orders'
+import { queueVariantInventorySync } from './inventory-sync'
 import { getRequiredShippingCredentials } from '../shipping-credentials'
 
 type Channel = 'naver' | 'coupang'
@@ -65,6 +66,7 @@ export async function syncOrders(channel?: Channel): Promise<{ orders: number; l
           const storedLineId = storedLines[0].id
           if (isCancelled(status)) {
             await supabase.from('inventory_reservations').update({ status: 'released', released_at: new Date().toISOString() }).eq('channel_order_line_id', storedLineId).eq('status', 'active')
+            if (variantId) await queueVariantInventorySync(supabase, user.id, Number(variantId)).catch(() => undefined)
             continue
           }
           if (!variantId) { result.mappingRequired += 1; continue }
@@ -85,6 +87,7 @@ export async function syncOrders(channel?: Channel): Promise<{ orders: number; l
           if (reservationError) throw new Error('재고 예약을 저장하지 못했습니다.')
           await supabase.from('channel_order_lines').update({ line_status: 'RESERVED' }).eq('id', storedLineId)
           result.reservations += 1
+          await queueVariantInventorySync(supabase, user.id, Number(variantId)).catch(() => undefined)
         }
       }
     } catch { result.failed += 1 }
@@ -118,5 +121,6 @@ export async function assignOrderLine(input: { lineId: number; variantId: number
   if (reservationError) throw new Error('주문 예약을 저장하지 못했습니다.')
   const { error } = await supabase.from('channel_order_lines').update({ variant_id: input.variantId, line_status: 'RESERVED' }).eq('id', input.lineId)
   if (error) throw new Error('주문 항목을 배정하지 못했습니다.')
+  await queueVariantInventorySync(supabase, user.id, input.variantId).catch(() => undefined)
   return { success: true, warehouseId: input.warehouseId }
 }
