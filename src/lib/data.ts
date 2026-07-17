@@ -427,6 +427,9 @@ export async function getCatalogData(): Promise<CatalogData> {
 
 export type ProductWorkspaceVariant = {
   id: number
+  modelId?: number
+  sizeId?: number
+  colorId?: number
   modelName: string
   sizeName: string
   colorName: string
@@ -507,6 +510,9 @@ export async function getProductWorkspaceData(): Promise<{
   }
   const variants = (variantsRes.data ?? []).map((row) => ({
     id: Number(row.id),
+    modelId: Number(row.model_id),
+    sizeId: Number(row.size_id),
+    colorId: Number(row.color_id),
     modelName: models.get(Number(row.model_id)) ?? `모델 #${row.model_id}`,
     sizeName: sizes.get(Number(row.size_id)) ?? `사이즈 #${row.size_id}`,
     colorName: colors.get(Number(row.color_id)) ?? `색상 #${row.color_id}`,

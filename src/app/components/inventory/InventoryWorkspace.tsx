@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import HistoryView, { type HistoryFilterState } from '@/app/(protected)/history/HistoryView'
 import InOutForm from '@/app/(protected)/inout/InOutForm'
 import { PageHeader, ui } from '@/app/components/ui'
+import { ChannelBadge, type ChannelListingStatus } from '@/components/ui/channel-badge'
 import { FixedSheet } from '@/components/ui/fixed-sheet'
 import { InventoryDataTable, type InventoryColumnKey, type InventoryDataRow } from '@/components/ui/inventory-data-table'
 import { InventoryTableToolbar } from '@/components/ui/inventory-table-toolbar'
@@ -63,6 +64,21 @@ type TransactionItem = {
   colorRgb: string
 }
 
+type ProductVariantLookup = {
+  id: number
+  modelId?: number
+  sizeId?: number
+  colorId?: number
+}
+
+type ChannelProductRefSummary = {
+  id: number
+  variantId: number | null
+  channel: 'naver' | 'coupang'
+  listingStatus: ChannelListingStatus
+  lastSyncError: string | null
+}
+
 type InventoryOverviewRow = InventoryDataRow & {
   warehouseId: number
   rawStatus: 'all' | 'normal' | 'warning' | 'danger'
@@ -93,12 +109,16 @@ export default function InventoryWorkspace({
   transactions,
   committedByVariant = {},
   incomingByVariant = {},
+  variants = [],
+  channelProductRefs = [],
 }: {
   models: ModelWithRelations[]
   warehouses: WarehouseLookup[]
   transactions: TransactionItem[]
   committedByVariant?: Record<string, number>
   incomingByVariant?: Record<string, number>
+  variants?: ProductVariantLookup[]
+  channelProductRefs?: ChannelProductRefSummary[]
 }) {
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | 'all'>('all')
   const [search, setSearch] = useState('')
@@ -127,6 +147,26 @@ export default function InventoryWorkspace({
     [models],
   )
 
+  const variantsByInventoryKey = useMemo(
+    () => new Map(
+      variants
+        .filter((variant): variant is ProductVariantLookup & { modelId: number; sizeId: number; colorId: number } => (
+          typeof variant.modelId === 'number' && typeof variant.sizeId === 'number' && typeof variant.colorId === 'number'
+        ))
+        .map((variant) => [`${variant.modelId}:${variant.sizeId}:${variant.colorId}`, variant]),
+    ),
+    [variants],
+  )
+
+  const channelRefsByVariantId = useMemo(() => {
+    const refs = new Map<number, ChannelProductRefSummary[]>()
+    for (const ref of channelProductRefs) {
+      if (ref.variantId === null) continue
+      refs.set(ref.variantId, [...(refs.get(ref.variantId) ?? []), ref])
+    }
+    return refs
+  }, [channelProductRefs])
+
   const overviewRows = useMemo(() => {
     return models.flatMap((model) =>
       model.colors.flatMap((color) =>
@@ -139,12 +179,18 @@ export default function InventoryWorkspace({
               const onHand = item.quantity
               const available = onHand - committed
               const status = inventoryStatus(available)
+              const mappedVariant = variantsByInventoryKey.get(variantId)
+              const channelRefs = mappedVariant ? channelRefsByVariantId.get(mappedVariant.id) ?? [] : []
+              const naverCount = channelRefs.filter((ref) => ref.channel === 'naver').length
+              const coupangCount = channelRefs.filter((ref) => ref.channel === 'coupang').length
+              const syncErrorRefs = channelRefs.filter((ref) => ref.lastSyncError !== null || ref.listingStatus === 'sync-error')
 
               return {
                 key: `${item.id}`,
                 modelName: model.name,
                 skuOption: (
-                  <div className="flex items-center gap-2 text-[color:var(--muted)]">
+                  <div className="space-y-1 text-[color:var(--muted)]">
+                    <div className="flex items-center gap-2">
                     <span
                       className="inline-block h-3.5 w-3.5 rounded-full border border-[color:var(--border)]"
                       style={{ backgroundColor: color.rgbCode }}
@@ -152,6 +198,17 @@ export default function InventoryWorkspace({
                     <span>
                       {`${model.name}-${color.name}-${size.name}`} · {color.name} / {size.name}
                     </span>
+                    </div>
+                    {channelRefs.length > 0 ? (
+                      <div className="flex flex-wrap items-center gap-1 text-xs text-[color:var(--muted-foreground)]">
+                        <span>{`네이버 ${naverCount} · 쿠팡 ${coupangCount}`}</span>
+                        {syncErrorRefs.map((ref) => (
+                          <ChannelBadge key={ref.id} channel={ref.channel} listingStatus="sync-error" compact />
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-[color:var(--muted-foreground)]">매핑 없음</span>
+                    )}
                   </div>
                 ),
                 warehouseName: item.warehouseName,
@@ -170,7 +227,7 @@ export default function InventoryWorkspace({
         }),
       ),
     )
-  }, [committedByVariant, incomingByVariant, models])
+  }, [channelRefsByVariantId, committedByVariant, incomingByVariant, models, variantsByInventoryKey])
 
   const filteredRows = useMemo(() => {
     return overviewRows.filter((row) => {

@@ -182,6 +182,44 @@ describe('InventoryWorkspace', () => {
     expect(screen.queryByText('주의 항목')).toBeNull()
   })
 
+  it('summarizes explicit channel mappings in the SKU cell and distinguishes sync errors from unmapped SKUs', () => {
+    render(
+      React.createElement(InventoryWorkspace, {
+        warehouses: [{ id: 1, name: '오금동' }],
+        models: [
+          {
+            id: 1,
+            name: 'LP01',
+            sizes: [
+              { id: 11, name: 'S', sortOrder: 1, modelId: 1 },
+              { id: 12, name: 'M', sortOrder: 2, modelId: 1 },
+            ],
+            colors: [{ id: 21, name: '네이비', rgbCode: '#111111', textWhite: true, sortOrder: 1, modelId: 1 }],
+            inventory: [
+              { id: 101, modelId: 1, sizeId: 11, colorId: 21, warehouseId: 1, warehouseName: '오금동', quantity: 8 },
+              { id: 102, modelId: 1, sizeId: 12, colorId: 21, warehouseId: 1, warehouseName: '오금동', quantity: 6 },
+            ],
+          },
+        ],
+        transactions: [],
+        variants: [
+          { id: 501, modelId: 1, sizeId: 11, colorId: 21 },
+          { id: 502, modelId: 1, sizeId: 12, colorId: 21 },
+        ],
+        channelProductRefs: [
+          { id: 1, variantId: 501, channel: 'naver', listingStatus: 'active', lastSyncError: null },
+          { id: 2, variantId: 501, channel: 'coupang', listingStatus: 'active', lastSyncError: '권한 확인 필요' },
+        ],
+      }),
+    )
+
+    expect(screen.getByText('네이버 1 · 쿠팡 1')).toBeTruthy()
+    expect(screen.getByText('쿠팡 동기화 오류')).toBeTruthy()
+    expect(screen.getByText('매핑 없음')).toBeTruthy()
+    expect(screen.queryByText('CP-1')).toBeNull()
+    expect(screen.queryByText('CPV-1')).toBeNull()
+  })
+
   it('switches to the embedded history view through tabs without duplicating top-level filters and keeps history filters independent', async () => {
     render(
       React.createElement(InventoryWorkspace, {
