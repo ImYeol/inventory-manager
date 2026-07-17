@@ -625,12 +625,15 @@ describe('Supabase data mappers', () => {
     })
   })
 
-  it('sends reasoned manual outbound and counted quantity operations through one RPC', async () => {
+  it('sends reasoned quick inbound with absolute inventory sync targets through one RPC', async () => {
     const rpc = vi.fn(async () => ({ error: null }))
     const supabase = { from: vi.fn(), rpc, auth: { getUser: vi.fn() } }
     mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
 
     await runManualInventoryOperations([
+      {
+        kind: 'inbound', date: '2026-07-18', modelId: 3, sizeId: 12, colorId: 22, warehouseId: 2, quantity: 5, reason: '검수 입고',
+      },
       {
         kind: 'manual-outbound', date: '2026-07-18', modelId: 1, sizeId: 10, colorId: 20, warehouseId: 1, quantity: 3, reason: '파손 폐기',
       },
@@ -641,6 +644,7 @@ describe('Supabase data mappers', () => {
 
     expect(rpc).toHaveBeenCalledWith('apply_manual_inventory_operations', {
       p_items: [
+        { kind: 'inbound', date: '2026-07-18', model_id: 3, size_id: 12, color_id: 22, warehouse_id: 2, quantity: 5, reason: '검수 입고' },
         { kind: 'manual-outbound', date: '2026-07-18', model_id: 1, size_id: 10, color_id: 20, warehouse_id: 1, quantity: 3, reason: '파손 폐기' },
         { kind: 'count-adjustment', date: '2026-07-18', model_id: 2, size_id: 11, color_id: 21, warehouse_id: 1, quantity: 0, reason: '월말 실사' },
       ],

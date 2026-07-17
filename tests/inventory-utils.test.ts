@@ -18,7 +18,13 @@ describe('inventory utility constants', () => {
     expect(() => parseTransactionType('other')).toThrow('Unsupported transaction type: other')
   })
 
-  it('keeps manual outbound and count adjustment contracts distinct and requires an audit reason', () => {
+  it('keeps quick inbound, manual outbound, and count adjustment contracts distinct and requires an audit reason', () => {
+    expect(normalizeManualInventoryOperation({ kind: 'inbound', quantity: 3, reason: '검수 입고' })).toEqual({
+      kind: 'inbound',
+      type: 'INBOUND',
+      quantity: 3,
+      reason: '검수 입고',
+    })
     expect(normalizeManualInventoryOperation({ kind: 'manual-outbound', quantity: 3, reason: '파손 폐기' })).toEqual({
       kind: 'manual-outbound',
       type: 'OUTBOUND',

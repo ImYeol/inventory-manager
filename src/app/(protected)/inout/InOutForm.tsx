@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { createManualInventoryOperations, createTransactions, getCurrentStock } from '@/lib/actions'
+import { createManualInventoryOperations, getCurrentStock } from '@/lib/actions'
 import { EditableTable } from '@/components/ui/editable-table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cx, ui } from '../../components/ui'
@@ -55,12 +55,6 @@ function todayString() {
   const month = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
-}
-
-function formatDateKR(dateStr: string) {
-  const p = dateStr.split('-')
-  if (p.length === 3) return `${p[0].slice(2)}.${p[1]}.${p[2]}`
-  return dateStr
 }
 
 function createRowKey() {
@@ -156,7 +150,6 @@ export default function InOutForm({
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null)
   const [reason, setReason] = useState('')
   const resolvedOperation = operation ?? (initialType === '출고' ? 'manual-outbound' : 'inbound')
-  const isManualOperation = resolvedOperation !== 'inbound'
   const isCountAdjustment = resolvedOperation === 'count-adjustment'
   const operationLabel = resolvedOperation === 'inbound' ? '입고' : resolvedOperation === 'manual-outbound' ? '수동 출고' : '실사 조정'
 
@@ -306,7 +299,7 @@ export default function InOutForm({
       return
     }
 
-    if (isManualOperation && !reason.trim()) {
+    if (!reason.trim()) {
       setMessage({ text: '사유를 입력해주세요.', error: true })
       return
     }
@@ -321,15 +314,12 @@ export default function InOutForm({
           colorId: row.colorId as number,
           quantity: row.quantity as number,
         }))
-        if (isManualOperation) {
-          await createManualInventoryOperations(items.map((item) => ({
-            ...item,
-            kind: resolvedOperation as 'manual-outbound' | 'count-adjustment',
-            reason,
-          })))
-        } else {
-          await createTransactions(items.map((item) => ({ ...item, date: formatDateKR(item.date), type: initialType })))
-        }
+        await createManualInventoryOperations(items.map((item) => ({
+          ...item,
+          date: item.date,
+          kind: resolvedOperation,
+          reason,
+        })))
 
         setMessage({ text: `${filledRows.length}건이 성공적으로 등록되었습니다.`, error: false })
         setRows(Array.from({ length: INITIAL_ROW_COUNT }, emptyRow))
@@ -380,20 +370,18 @@ export default function InOutForm({
         </div>
       </div>
 
-      {isManualOperation ? (
-        <div>
-          <label className={ui.label} htmlFor="manual-operation-reason">
-            {isCountAdjustment ? '실사 조정 사유' : '수동 출고 사유'}
-          </label>
-          <input
-            id="manual-operation-reason"
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            className={ui.controlSm}
-            placeholder={isCountAdjustment ? '예: 월말 실사' : '예: 파손 폐기'}
-          />
-        </div>
-      ) : null}
+      <div>
+        <label className={ui.label} htmlFor="manual-operation-reason">
+          {resolvedOperation === 'inbound' ? '빠른 입고 사유' : isCountAdjustment ? '실사 조정 사유' : '수동 출고 사유'}
+        </label>
+        <input
+          id="manual-operation-reason"
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          className={ui.controlSm}
+          placeholder={resolvedOperation === 'inbound' ? '예: 검수 입고' : isCountAdjustment ? '예: 월말 실사' : '예: 파손 폐기'}
+        />
+      </div>
 
       <EditableTable
         columns={[

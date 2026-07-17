@@ -193,7 +193,7 @@ export async function createTransactions(
 
 export async function createManualInventoryOperations(
   items: Array<{
-    kind: 'manual-outbound' | 'count-adjustment'
+    kind: 'inbound' | 'manual-outbound' | 'count-adjustment'
     date: string
     warehouseId: number
     modelId: number

@@ -13,6 +13,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/actions', () => ({
   createTransactions: vi.fn(),
+  createManualInventoryOperations: vi.fn(),
   getCurrentStock: vi.fn(),
 }))
 
@@ -143,8 +144,19 @@ describe('InOutForm', () => {
     expect(screen.queryByText('표 붙여넣기')).toBeNull()
   })
 
-  it('requires a reason for manual outbound and exposes counted quantity for stock counts', () => {
+  it('requires an auditable reason for quick inbound, manual outbound, and stock counts', () => {
     const { rerender } = render(
+      React.createElement(InOutForm, {
+        warehouses: [{ id: 7, name: '본사 창고' }],
+        models: [],
+        operation: 'inbound',
+      }),
+    )
+
+    expect(screen.getByLabelText('빠른 입고 사유')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '입고 등록 (0건)' })).toBeTruthy()
+
+    rerender(
       React.createElement(InOutForm, {
         warehouses: [{ id: 7, name: '본사 창고' }],
         models: [],

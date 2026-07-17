@@ -174,9 +174,14 @@ describe('server action wrappers', () => {
 
   it('delegates manual warehouse operations through the reasoned operation boundary', async () => {
     mocks.runManualInventoryOperations.mockResolvedValue(undefined)
-    const items = [{
-      kind: 'manual-outbound' as const, date: '2026-07-18', warehouseId: 1, modelId: 1, sizeId: 10, colorId: 20, quantity: 2, reason: '파손 폐기',
-    }]
+    const items = [
+      {
+        kind: 'inbound' as const, date: '2026-07-18', warehouseId: 1, modelId: 1, sizeId: 10, colorId: 20, quantity: 2, reason: '검수 입고',
+      },
+      {
+        kind: 'manual-outbound' as const, date: '2026-07-18', warehouseId: 1, modelId: 1, sizeId: 10, colorId: 20, quantity: 1, reason: '파손 폐기',
+      },
+    ]
 
     await expect(createManualInventoryOperations(items)).resolves.toEqual({ success: true })
     expect(mocks.runManualInventoryOperations).toHaveBeenCalledWith(items)

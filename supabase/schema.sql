@@ -645,14 +645,21 @@ begin
     v_reason := btrim(coalesce(item ->> 'reason', ''));
     v_date := (item ->> 'date')::date;
 
-    if v_kind not in ('manual-outbound', 'count-adjustment') then
+    if v_kind not in ('inbound', 'manual-outbound', 'count-adjustment') then
       raise exception 'Unsupported manual inventory operation.';
     end if;
     if v_reason = '' then
       raise exception 'A reason is required.';
     end if;
-    if v_quantity is null or v_quantity < 0 or (v_kind = 'manual-outbound' and v_quantity = 0) then
+    if v_date is null then
+      raise exception 'A date is required.';
+    end if;
+    if v_quantity is null or v_quantity < 0 or (v_kind <> 'count-adjustment' and v_quantity = 0) then
       raise exception 'Quantity is invalid.';
+    end if;
+
+    if not exists (select 1 from public.warehouses where id = v_warehouse_id and user_id = v_user_id) then
+      raise exception 'Warehouse not found.';
     end if;
 
     select * into v_inventory
@@ -661,11 +668,18 @@ begin
       and color_id = v_color_id and warehouse_id = v_warehouse_id
     for update;
 
-    if not found then
+    if not found and v_kind <> 'inbound' then
       raise exception 'Inventory not found.';
     end if;
 
-    if v_kind = 'manual-outbound' then
+    if v_kind = 'inbound' then
+      insert into public.inventory (user_id, model_id, size_id, color_id, warehouse_id, quantity)
+      values (v_user_id, v_model_id, v_size_id, v_color_id, v_warehouse_id, v_quantity)
+      on conflict (user_id, model_id, size_id, color_id, warehouse_id)
+      do update set quantity = public.inventory.quantity + excluded.quantity, updated_at = v_requested_at;
+      insert into public.transactions (user_id, date, model_id, size_id, color_id, type, quantity, warehouse_id, source_channel, reference_type, memo)
+      values (v_user_id, v_date, v_model_id, v_size_id, v_color_id, 'INBOUND', v_quantity, v_warehouse_id, 'manual', 'quick_inbound', v_reason);
+    elsif v_kind = 'manual-outbound' then
       if v_inventory.quantity < v_quantity then
         raise exception 'Insufficient on-hand inventory.';
       end if;

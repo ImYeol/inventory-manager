@@ -1,6 +1,6 @@
 export const TRANSACTION_TYPE_VALUES = ['INBOUND', 'OUTBOUND', 'ADJUSTMENT'] as const
 export type TransactionTypeValue = (typeof TRANSACTION_TYPE_VALUES)[number]
-export type ManualInventoryOperationKind = 'manual-outbound' | 'count-adjustment'
+export type ManualInventoryOperationKind = 'inbound' | 'manual-outbound' | 'count-adjustment'
 
 export const transactionTypeLabels: Record<TransactionTypeValue, string> = {
   INBOUND: '입고',
@@ -22,13 +22,13 @@ export function normalizeManualInventoryOperation(input: {
 }) {
   const reason = input.reason.trim()
   if (!reason) throw new Error('사유를 입력해주세요.')
-  if (!Number.isInteger(input.quantity) || input.quantity < 0 || (input.kind === 'manual-outbound' && input.quantity === 0)) {
+  if (!Number.isInteger(input.quantity) || input.quantity < 0 || (input.kind !== 'count-adjustment' && input.quantity === 0)) {
     throw new Error('수량을 확인해주세요.')
   }
 
   return {
     kind: input.kind,
-    type: input.kind === 'manual-outbound' ? ('OUTBOUND' as const) : ('ADJUSTMENT' as const),
+    type: input.kind === 'inbound' ? ('INBOUND' as const) : input.kind === 'manual-outbound' ? ('OUTBOUND' as const) : ('ADJUSTMENT' as const),
     quantity: input.quantity,
     reason,
   }
