@@ -121,6 +121,10 @@
     {
       "dir": "inbound-draft-inline-sku-creation",
       "status": "completed"
+    },
+    {
+      "dir": "inbound-template-file-upload",
+      "status": "completed"
     }
   ]
 }
