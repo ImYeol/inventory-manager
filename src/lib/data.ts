@@ -431,7 +431,10 @@ export type ProductWorkspaceVariant = {
   sizeName: string
   colorName: string
   sellerSku: string
+  onHand: number
+  committed: number
   available: number
+  incoming: number
 }
 
 export type ProductWorkspaceChannelRef = {
@@ -457,7 +460,7 @@ export async function getProductWorkspaceData(): Promise<{
   channelProductRefs: ProductWorkspaceChannelRef[]
 }> {
   const { supabase } = await getSupabaseWithUser()
-  const [variantsRes, modelsRes, sizesRes, colorsRes, inventoryRes, reservationsRes, refsRes] = await Promise.all([
+  const [variantsRes, modelsRes, sizesRes, colorsRes, inventoryRes, reservationsRes, refsRes, arrivalsRes, arrivalItemsRes] = await Promise.all([
     supabase.from('product_variants').select('id, model_id, size_id, color_id, seller_sku'),
     supabase.from('models').select('id, name'),
     supabase.from('sizes').select('id, name'),
@@ -465,6 +468,8 @@ export async function getProductWorkspaceData(): Promise<{
     supabase.from('inventory').select('model_id, size_id, color_id, quantity'),
     supabase.from('inventory_reservations').select('product_variant_id, quantity').eq('status', 'active'),
     supabase.from('channel_product_refs').select('id, variant_id, channel, external_product_id, external_variant_id, product_name, option_name, seller_sku, listing_status, channel_attributes, channel_reported, last_synced_at, last_sync_error, verification_status'),
+    supabase.from('factory_arrivals').select('id, status'),
+    supabase.from('factory_arrival_items').select('factory_arrival_id, model_id, size_id, color_id, ordered_quantity, received_quantity'),
   ])
   if ([variantsRes, reservationsRes, refsRes].some((response) => isMissingSchemaError(response.error))) {
     return { variants: [], channelProductRefs: [] }
@@ -485,13 +490,29 @@ export async function getProductWorkspaceData(): Promise<{
     const id = Number(row.product_variant_id)
     committed.set(id, (committed.get(id) ?? 0) + row.quantity)
   }
+  const openArrivalIds = new Set(
+    (arrivalsRes.error ? [] : arrivalsRes.data ?? [])
+      .filter((arrival) => isOpenSourcingArrival(arrival.status))
+      .map((arrival) => Number(arrival.id)),
+  )
+  const incoming = new Map<string, number>()
+  if (!arrivalItemsRes.error) {
+    for (const item of arrivalItemsRes.data ?? []) {
+      if (!openArrivalIds.has(Number(item.factory_arrival_id))) continue
+      const key = `${item.model_id}:${item.size_id}:${item.color_id}`
+      incoming.set(key, (incoming.get(key) ?? 0) + Math.max(item.ordered_quantity - item.received_quantity, 0))
+    }
+  }
   const variants = (variantsRes.data ?? []).map((row) => ({
     id: Number(row.id),
     modelName: models.get(Number(row.model_id)) ?? `모델 #${row.model_id}`,
     sizeName: sizes.get(Number(row.size_id)) ?? `사이즈 #${row.size_id}`,
     colorName: colors.get(Number(row.color_id)) ?? `색상 #${row.color_id}`,
     sellerSku: row.seller_sku,
+    onHand: onHand.get(`${row.model_id}:${row.size_id}:${row.color_id}`) ?? 0,
+    committed: committed.get(Number(row.id)) ?? 0,
     available: (onHand.get(`${row.model_id}:${row.size_id}:${row.color_id}`) ?? 0) - (committed.get(Number(row.id)) ?? 0),
+    incoming: incoming.get(`${row.model_id}:${row.size_id}:${row.color_id}`) ?? 0,
   }))
   const channelProductRefs = (refsRes.data ?? []).map((row) => {
     const attributes = (row.channel_attributes ?? {}) as { imageUrl?: unknown; price?: unknown }

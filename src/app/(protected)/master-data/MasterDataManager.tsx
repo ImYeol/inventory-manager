@@ -4,30 +4,26 @@ import { useEffect, useRef, useState, useTransition, type FormEvent } from 'reac
 import { useRouter } from 'next/navigation'
 
 import { BasicDataTable } from '@/components/ui/basic-data-table'
-import { StatusBadge } from '@/components/ui/badge-1'
 import { Button } from '@/components/ui/button'
 import { ChannelBadge } from '@/components/ui/channel-badge'
-import { ProductVariantCombobox } from '@/components/ui/product-variant-combobox'
+import { FilterToolbar } from '@/components/ui/filter-toolbar'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { TableSurface } from '@/components/ui/table-surface'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ActionToolbar } from '@/components/ui/toolbar'
-import { FilterToolbar } from '@/components/ui/filter-toolbar'
-import { TableSurface } from '@/components/ui/table-surface'
 import { cx, ui } from '../../components/ui'
-import { linkVariant } from '@/lib/actions/channel-product-link'
+import { createWarehouse, deleteWarehouse } from '@/lib/actions'
+import {
+  createChannelProductMapping,
+  unlinkChannelProductMapping,
+  updateChannelProductMapping,
+} from '@/lib/actions/channel-product-link'
 import { createInternalProduct } from '@/lib/actions/internal-product'
 import type { ProductWorkspaceChannelRef, ProductWorkspaceVariant } from '@/lib/data'
-import {
-  createWarehouse,
-  deleteWarehouse,
-} from '@/lib/actions'
 
-type WarehouseLookup = {
-  id: number
-  name: string
-}
-
+type WarehouseLookup = { id: number; name: string }
 type WarehouseStat = WarehouseLookup & {
   skuCount?: number
   stockQty: number
@@ -37,59 +33,41 @@ type WarehouseStat = WarehouseLookup & {
   latestOutbound?: { quantity: number; date: string } | null
   latestMovementDate?: string | null
 }
-
 type MasterDataManagerProps = {
   warehouses: WarehouseLookup[]
   warehouseStats?: WarehouseStat[]
   variants?: ProductWorkspaceVariant[]
   channelProductRefs?: ProductWorkspaceChannelRef[]
 }
-
 type TabKey = 'product' | 'warehouse'
-
-type InternalProductDraft = {
-  name: string
-  sizeText: string
-  colorText: string
-  skuPrefix: string
-}
-
-type ProductView = 'all' | 'mapping-required' | 'inventory-mismatch' | 'paused'
-type ChannelRow = { kind: 'variant'; variant: ProductWorkspaceVariant } | { kind: 'unlinked-ref'; ref: ProductWorkspaceChannelRef }
-
+type ProductChannelFilter = 'all' | 'naver' | 'coupang'
+type MappingStateFilter = 'all' | 'mapped' | 'mapping-required' | 'sync-error'
+type InternalProductDraft = { name: string; sizeText: string; colorText: string; skuPrefix: string }
+type MappingDraft = { channel: 'naver' | 'coupang'; sellerSku: string; externalProductId: string; externalVariantId: string }
 type WarehouseRow = {
   warehouse: WarehouseLookup
   skuCount: number
   stockQty: number
-  inboundQty: number
-  outboundQty: number
   latestInbound: { quantity: number; date: string } | null
   latestOutbound: { quantity: number; date: string } | null
   latestMovementDate: string | null
 }
 
 function splitList(value: string) {
-  return value
-    .split(/[\n,]/)
-    .map((entry) => entry.trim())
-    .filter(Boolean)
+  return value.split(/[\n,]/).map((entry) => entry.trim()).filter(Boolean)
 }
 
 function formatDate(value?: string | null) {
   if (!value) return '없음'
-
-  return new Intl.DateTimeFormat('ko-KR', {
-    dateStyle: 'medium',
-  }).format(new Date(value))
+  return new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium' }).format(new Date(value))
 }
 
 function createInternalProductDraft(): InternalProductDraft {
-  return {
-    name: '',
-    sizeText: '',
-    colorText: '',
-    skuPrefix: '',
-  }
+  return { name: '', sizeText: '', colorText: '', skuPrefix: '' }
+}
+
+function createMappingDraft(variant: ProductWorkspaceVariant): MappingDraft {
+  return { channel: 'naver', sellerSku: variant.sellerSku, externalProductId: '', externalVariantId: '' }
 }
 
 export default function MasterDataManager({
@@ -102,39 +80,30 @@ export default function MasterDataManager({
   const [isPending, startTransition] = useTransition()
   const [activeTab, setActiveTab] = useState<TabKey>('product')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-
-  const [isWarehouseModalOpen, setIsWarehouseModalOpen] = useState(false)
-  const [warehouseName, setWarehouseName] = useState('')
-  const warehouseNameRef = useRef<HTMLInputElement>(null)
-
-  const [deleteWarehouseTarget, setDeleteWarehouseTarget] = useState<{ id: number; name: string } | null>(null)
-
+  const [productQuery, setProductQuery] = useState('')
+  const [channelFilter, setChannelFilter] = useState<ProductChannelFilter>('all')
+  const [mappingStateFilter, setMappingStateFilter] = useState<MappingStateFilter>('all')
+  const [selectedVariant, setSelectedVariant] = useState<ProductWorkspaceVariant | null>(null)
+  const [mappingDraft, setMappingDraft] = useState<MappingDraft | null>(null)
+  const [editingMappingId, setEditingMappingId] = useState<number | null>(null)
   const [isInternalProductModalOpen, setIsInternalProductModalOpen] = useState(false)
   const [internalProductDraft, setInternalProductDraft] = useState<InternalProductDraft>(createInternalProductDraft())
   const [isCreatingInternalProduct, setIsCreatingInternalProduct] = useState(false)
-  const [productQuery, setProductQuery] = useState('')
-  const [productView, setProductView] = useState<ProductView>('all')
-  const [selectedChannelRef, setSelectedChannelRef] = useState<ProductWorkspaceChannelRef | null>(null)
-  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
+  const [isWarehouseModalOpen, setIsWarehouseModalOpen] = useState(false)
+  const [warehouseName, setWarehouseName] = useState('')
+  const warehouseNameRef = useRef<HTMLInputElement>(null)
+  const [deleteWarehouseTarget, setDeleteWarehouseTarget] = useState<WarehouseLookup | null>(null)
 
   const showToast = (next: { type: 'success' | 'error'; text: string }) => {
     setMessage(next)
     window.setTimeout(() => setMessage(null), 2500)
   }
-
-  const clearMessage = () => {
-    setMessage(null)
-  }
-
-  const runWithToast = (
-    task: () => Promise<void>,
-    successText: string,
-    onSuccess?: () => void,
-  ) => {
+  const refsForVariant = (variantId: number) => channelProductRefs.filter((ref) => ref.variantId === variantId)
+  const run = (task: () => Promise<unknown>, successText: string, after?: () => void) => {
     startTransition(async () => {
       try {
         await task()
-        onSuccess?.()
+        after?.()
         router.refresh()
         showToast({ type: 'success', text: successText })
       } catch (error) {
@@ -144,485 +113,117 @@ export default function MasterDataManager({
   }
 
   useEffect(() => {
-    if (!isWarehouseModalOpen) {
-      return
-    }
-
-    warehouseNameRef.current?.focus()
+    if (isWarehouseModalOpen) warehouseNameRef.current?.focus()
   }, [isWarehouseModalOpen])
 
-  const openWarehouseModal = () => {
-    clearMessage()
-    setWarehouseName('')
-    setIsWarehouseModalOpen(true)
-  }
-
-  const closeWarehouseModal = () => {
-    setIsWarehouseModalOpen(false)
-  }
-
-  const openInternalProductModal = () => {
-    clearMessage()
-    setInternalProductDraft(createInternalProductDraft())
-    setIsInternalProductModalOpen(true)
-  }
-
-  const closeInternalProductModal = () => {
-    if (isCreatingInternalProduct) {
-      return
-    }
-    setIsInternalProductModalOpen(false)
-  }
-
-  const commitWarehouse = () => {
-    if (!warehouseName.trim()) return
-
-    clearMessage()
-    runWithToast(
-      async () => {
-        await createWarehouse(warehouseName)
-        setWarehouseName('')
-      },
-      '창고가 등록되었습니다.',
-      closeWarehouseModal,
-    )
-  }
-
-  const submitWarehouse = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    commitWarehouse()
-  }
-
-  const requestDeleteWarehouse = (warehouseId: number, warehouseName: string) => {
-    setDeleteWarehouseTarget({ id: warehouseId, name: warehouseName })
-  }
-
-  const confirmDeleteWarehouse = () => {
-    if (!deleteWarehouseTarget) return
-
-    runWithToast(
-      async () => {
-        await deleteWarehouse(deleteWarehouseTarget.id)
-      },
-      `${deleteWarehouseTarget.name} 창고가 삭제되었습니다.`,
-      () => setDeleteWarehouseTarget(null),
-    )
-  }
-
-  const commitInternalProduct = () => {
-    setIsCreatingInternalProduct(true)
-    startTransition(async () => {
-      try {
-        const result = await createInternalProduct({ name: internalProductDraft.name, sizes: splitList(internalProductDraft.sizeText), colors: splitList(internalProductDraft.colorText), skuPrefix: internalProductDraft.skuPrefix })
-        showToast({ type: 'success', text: `내부 상품과 판매 옵션 ${result.variantCount}개를 등록했습니다.` })
-        setIsInternalProductModalOpen(false); router.refresh()
-      } catch (error) { showToast({ type: 'error', text: error instanceof Error ? error.message : '내부 상품 등록에 실패했습니다.' })
-      } finally { setIsCreatingInternalProduct(false) }
-    })
-  }
+  const filteredVariants = variants.filter((variant) => {
+    const refs = refsForVariant(variant.id)
+    const query = productQuery.trim().toLowerCase()
+    if (query && ![variant.modelName, variant.sizeName, variant.colorName, variant.sellerSku].join(' ').toLowerCase().includes(query)) return false
+    if (channelFilter !== 'all' && !refs.some((ref) => ref.channel === channelFilter)) return false
+    if (mappingStateFilter === 'mapped') return refs.length > 0
+    if (mappingStateFilter === 'mapping-required') return refs.length === 0
+    if (mappingStateFilter === 'sync-error') return refs.some((ref) => Boolean(ref.lastSyncError))
+    return true
+  })
 
   const warehouseRows: WarehouseRow[] = initialWarehouses.map((warehouse) => {
     const stat = warehouseStats.find((item) => item.id === warehouse.id)
-
     return {
       warehouse,
       skuCount: stat?.skuCount ?? 0,
       stockQty: stat?.stockQty ?? 0,
-      inboundQty: stat?.inboundQty ?? 0,
-      outboundQty: stat?.outboundQty ?? 0,
       latestInbound: stat?.latestInbound ?? null,
       latestOutbound: stat?.latestOutbound ?? null,
       latestMovementDate: stat?.latestMovementDate ?? null,
     }
   })
-
-  const warehouseCount = warehouseRows.length
-  const totalWarehouseStock = warehouseRows.reduce((sum, item) => sum + item.stockQty, 0)
-  const totalWarehouseSku = warehouseRows.reduce((sum, item) => sum + item.skuCount, 0)
-  const refsForVariant = (variant: ProductWorkspaceVariant) => channelProductRefs.filter((ref) => ref.variantId === variant.id)
-  const refForChannel = (variant: ProductWorkspaceVariant, channel: ProductWorkspaceChannelRef['channel']) =>
-    refsForVariant(variant).find((ref) => ref.channel === channel) ?? null
-  const channelRows: ChannelRow[] = [
-    ...variants.map((variant) => ({ kind: 'variant' as const, variant })),
-    ...channelProductRefs.filter((ref) => ref.variantId === null).map((ref) => ({ kind: 'unlinked-ref' as const, ref })),
-  ]
-  const filteredChannelRows = channelRows.filter((row) => {
-    const variant = row.kind === 'variant' ? row.variant : null
-    const refs = variant ? refsForVariant(variant) : [row.ref]
-    const query = productQuery.trim().toLowerCase()
-    const searchable = variant ? `${variant.modelName} ${variant.sizeName} ${variant.colorName} ${variant.sellerSku}` : `${row.ref.productName} ${row.ref.optionName} ${row.ref.sellerSku}`
-    if (query && !searchable.toLowerCase().includes(query)) return false
-    if (!variant) return productView === 'all' || productView === 'mapping-required' || productView === 'paused' && row.ref.listingStatus === 'paused'
-    if (productView === 'mapping-required') return refs.some((ref) => ref.variantId === null) || refs.length < 2
-    if (productView === 'inventory-mismatch') return refs.some((ref) => ref.channelReported !== null && ref.channelReported !== variant.available)
-    if (productView === 'paused') return refs.some((ref) => ref.listingStatus === 'paused')
-    return true
-  })
-
-  const toggleSelectedRefLink = () => {
-    if (!selectedChannelRef) return
-    const nextVariantId = selectedChannelRef.variantId === null && selectedVariantId ? Number(selectedVariantId) : null
-    if (selectedChannelRef.variantId === null && (!Number.isInteger(nextVariantId) || Number(nextVariantId) <= 0)) {
-      showToast({ type: 'error', text: '연결할 내부 판매 옵션을 선택해주세요.' })
-      return
-    }
-    runWithToast(
-      async () => { await linkVariant(selectedChannelRef.id, nextVariantId) },
-      nextVariantId === null ? '채널 상품 연결을 해제했습니다.' : '채널 상품을 연결했습니다.',
-      () => setSelectedChannelRef(null),
-    )
-  }
-
-  const openChannelRef = (ref: ProductWorkspaceChannelRef) => {
-    setSelectedChannelRef(ref)
-    const exact = ref.sellerSku ? variants.filter((variant) => variant.sellerSku === ref.sellerSku) : []
-    setSelectedVariantId(ref.variantId === null && exact.length === 1 ? String(exact[0].id) : ref.variantId === null ? null : String(ref.variantId))
-  }
-
-  const comboboxVariants = variants.map((variant) => ({
-    ...variant, id: String(variant.id), modelId: 0, sizeId: 0, colorId: 0,
-    channels: { naver: refForChannel(variant, 'naver')?.listingStatus ?? 'unregistered', coupang: refForChannel(variant, 'coupang')?.listingStatus ?? 'unregistered' },
-  }))
   const draftSizes = splitList(internalProductDraft.sizeText)
   const draftColors = splitList(internalProductDraft.colorText)
   const draftVariantCount = Math.max(draftSizes.length, 1) * Math.max(draftColors.length, 1)
   const draftSkuExample = [internalProductDraft.skuPrefix.trim(), draftSizes[0], draftColors[0]].filter(Boolean).join('-') || '—'
+  const selectedRefs = selectedVariant ? refsForVariant(selectedVariant.id) : []
+
+  const openSkuModal = (variant: ProductWorkspaceVariant) => {
+    setSelectedVariant(variant)
+    setMappingDraft(null)
+    setEditingMappingId(null)
+  }
+  const startNewMapping = () => {
+    if (!selectedVariant) return
+    setEditingMappingId(null)
+    setMappingDraft(createMappingDraft(selectedVariant))
+  }
+  const startEditMapping = (ref: ProductWorkspaceChannelRef) => {
+    setEditingMappingId(ref.id)
+    setMappingDraft({ channel: ref.channel, sellerSku: ref.sellerSku ?? '', externalProductId: ref.externalProductId, externalVariantId: ref.externalVariantId })
+  }
+  const saveMapping = () => {
+    if (!selectedVariant || !mappingDraft) return
+    const input = { variantId: selectedVariant.id, ...mappingDraft }
+    run(
+      () => editingMappingId === null ? createChannelProductMapping(input) : updateChannelProductMapping(editingMappingId, input),
+      editingMappingId === null ? '채널 판매 옵션을 연결했습니다.' : '채널 판매 옵션을 수정했습니다.',
+      () => { setMappingDraft(null); setEditingMappingId(null) },
+    )
+  }
 
   return (
     <div className="space-y-4">
-      {message ? (
-        <div
-          className={cx(
-            ui.surfaceMuted,
-            'px-4 py-3 text-sm font-medium',
-            message.type === 'success'
-              ? 'text-[color:var(--success-foreground)]'
-              : 'text-[color:var(--danger-foreground)]',
-          )}
-          role="status"
-          aria-live="polite"
-        >
-          {message.text}
-        </div>
-      ) : null}
-
+      {message ? <div role="status" aria-live="polite" className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm font-medium', message.type === 'success' ? 'text-[color:var(--success-foreground)]' : 'text-[color:var(--danger-foreground)]')}>{message.text}</div> : null}
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)} className="mt-4 space-y-4">
-        <TabsList aria-label="상품 관리 보기 전환">
-          <TabsTrigger value="product">상품</TabsTrigger>
-          <TabsTrigger value="warehouse">창고</TabsTrigger>
-        </TabsList>
-
+        <TabsList aria-label="상품 관리 보기 전환"><TabsTrigger value="product">상품</TabsTrigger><TabsTrigger value="warehouse">창고</TabsTrigger></TabsList>
         <TabsContent value="product" className="m-0">
           <TableSurface
-              toolbar={
-                <FilterToolbar>
-                  <div className="flex min-w-0 items-center gap-2">
-                    <Input
-                      aria-label="상품 검색"
-                      value={productQuery}
-                      onChange={(event) => setProductQuery(event.target.value)}
-                      placeholder="상품 또는 seller SKU 검색"
-                      className="h-10 w-56"
-                    />
-                    <div className="inline-flex shrink-0 gap-1" aria-label="상품 고정 보기">
-                      {([
-                        ['all', '전체'], ['mapping-required', '연결 필요'], ['inventory-mismatch', '재고 불일치'], ['paused', '판매 중지'],
-                      ] as Array<[ProductView, string]>).map(([value, label]) => (
-                        <Button key={value} type="button" size="sm" variant={productView === value ? 'secondary' : 'ghost'} className="h-9 px-2" onClick={() => setProductView(value)}>
-                          {label}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                  <ActionToolbar className="shrink-0">
-                    <Button type="button" variant="secondary" size="sm" className="h-10 px-3" onClick={openInternalProductModal}>내부 상품 등록</Button>
-                  </ActionToolbar>
-                </FilterToolbar>
-              }
-            >
-              <BasicDataTable<ChannelRow>
-                bare
-                columns={[
-                  { key: 'product', label: '상품 / 옵션' }, { key: 'sku', label: '판매자 SKU' },
-                  { key: 'coupang', label: '쿠팡' }, { key: 'naver', label: '네이버' },
-                  { key: 'available', label: '내부 가용', align: 'right' }, { key: 'gap', label: '재고 차이', align: 'right' },
-                  { key: 'synced', label: '마지막 동기화' }, { key: 'actions', label: '작업', align: 'right' },
-                ]}
-                rows={filteredChannelRows}
-                rowKey={(row) => row.kind === 'variant' ? `variant-${row.variant.id}` : `ref-${row.ref.id}`}
-                emptyState="등록된 내부 판매 옵션이 없습니다. 내부 상품을 등록한 뒤 채널 옵션을 명시적으로 연결하세요."
-                renderCell={(row, columnKey) => {
-                  const variant = row.kind === 'variant' ? row.variant : null
-                  const onlyRef = row.kind === 'unlinked-ref' ? row.ref : null
-                  const coupang = variant ? refForChannel(variant, 'coupang') : onlyRef?.channel === 'coupang' ? onlyRef : null
-                  const naver = variant ? refForChannel(variant, 'naver') : onlyRef?.channel === 'naver' ? onlyRef : null
-                  const refs = [coupang, naver].filter((ref): ref is ProductWorkspaceChannelRef => Boolean(ref))
-                  if (columnKey === 'product') return <span className="font-medium text-[color:var(--foreground)]">{variant ? `${variant.modelName} · ${variant.sizeName} / ${variant.colorName}` : `${onlyRef?.productName ?? '채널 상품'} · ${onlyRef?.optionName ?? '판매 옵션 미상'}`}</span>
-                  if (columnKey === 'sku') return <span className="font-mono text-sm text-[color:var(--muted)]">{variant?.sellerSku ?? onlyRef?.sellerSku ?? '—'}</span>
-                  if (columnKey === 'coupang' || columnKey === 'naver') {
-                    const channel = columnKey as ProductWorkspaceChannelRef['channel']
-                    const ref = channel === 'coupang' ? coupang : naver
-                    const badgeStatus = ref?.variantId === null
-                      ? 'mapping-required'
-                      : ref?.lastSyncError
-                        ? 'sync-error'
-                        : ref?.listingStatus
-                    return ref ? <Button type="button" variant="ghost" size="sm" className="h-8 px-1" onClick={() => openChannelRef(ref)}><ChannelBadge channel={channel} listingStatus={badgeStatus ?? 'unregistered'} /></Button> : <ChannelBadge channel={channel} listingStatus="unregistered" compact />
-                  }
-                  if (columnKey === 'available') return <span className="font-semibold tabular-nums">{variant ? variant.available.toLocaleString() : '—'}</span>
-                  if (columnKey === 'gap') {
-                    const gaps = variant ? refs.map((ref) => ref.channelReported === null ? null : variant.available - ref.channelReported).filter((gap): gap is number => gap !== null) : []
-                    return <span className="font-mono tabular-nums text-[color:var(--muted)]">{gaps.length ? gaps.map((gap) => `${gap > 0 ? '+' : ''}${gap}`).join(' / ') : '—'}</span>
-                  }
-                  if (columnKey === 'synced') return <span className="text-sm text-[color:var(--muted)]">{formatDate(refs.map((ref) => ref.lastSyncedAt).filter(Boolean).sort().at(-1) ?? null)}</span>
-                  if (columnKey === 'actions') return <Button type="button" variant="ghost" size="sm" className="h-8 px-2" onClick={() => refs[0] && openChannelRef(refs[0])} disabled={!refs.length}>{onlyRef ? '연결' : '상세'}</Button>
-                  return null
-                }}
-              />
-            </TableSurface>
+            toolbar={<FilterToolbar>
+              <div className="flex min-w-0 items-center gap-2">
+                <Input aria-label="상품 검색" value={productQuery} onChange={(event) => setProductQuery(event.target.value)} placeholder="SKU 또는 옵션 검색" className="w-56 ui-control-sm" />
+                <Select value={channelFilter} onValueChange={(value) => setChannelFilter(value as ProductChannelFilter)}><SelectTrigger aria-label="채널 필터" className="w-28 ui-control-sm"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">전체 채널</SelectItem><SelectItem value="naver">네이버</SelectItem><SelectItem value="coupang">쿠팡</SelectItem></SelectContent></Select>
+                <Select value={mappingStateFilter} onValueChange={(value) => setMappingStateFilter(value as MappingStateFilter)}><SelectTrigger aria-label="매핑 상태 필터" className="w-32 ui-control-sm"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">전체 상태</SelectItem><SelectItem value="mapped">매핑됨</SelectItem><SelectItem value="mapping-required">연결 필요</SelectItem><SelectItem value="sync-error">동기화 오류</SelectItem></SelectContent></Select>
+              </div>
+              <ActionToolbar className="shrink-0"><span className={ui.dataMeta}>{filteredVariants.length}개 SKU</span><Button type="button" variant="secondary" size="sm" onClick={() => { setInternalProductDraft(createInternalProductDraft()); setIsInternalProductModalOpen(true) }}>내부 상품 등록</Button></ActionToolbar>
+            </FilterToolbar>}
+          >
+            <BasicDataTable<ProductWorkspaceVariant>
+              bare tableAriaLabel="내부 SKU 목록"
+              columns={[{ key: 'sku', label: 'SKU / 옵션' }, { key: 'inventory', label: '재고', align: 'right' }, { key: 'mappings', label: '판매 옵션' }, { key: 'reported', label: '마지막 보고 / 오류' }, { key: 'actions', label: '작업', align: 'right' }]}
+              rows={filteredVariants} rowKey={(variant) => variant.id} onRowClick={openSkuModal} rowAriaLabel={(variant) => `${variant.sellerSku} 매핑 상세`}
+              emptyState="등록된 내부 판매 옵션이 없습니다. 내부 상품을 등록한 뒤 채널 판매 옵션을 연결하세요."
+              renderCell={(variant, columnKey) => {
+                const refs = refsForVariant(variant.id)
+                if (columnKey === 'sku') return <div><p className="font-mono text-sm font-medium text-[color:var(--foreground)]">{variant.sellerSku}</p><p className="text-sm text-[color:var(--muted)]">{variant.modelName} · {variant.sizeName} / {variant.colorName}</p></div>
+                if (columnKey === 'inventory') return <span className="font-mono tabular-nums text-sm text-[color:var(--foreground)]">{variant.onHand} / {variant.committed} / {variant.available} / {variant.incoming}</span>
+                if (columnKey === 'mappings') return <span className="text-sm text-[color:var(--muted)]">네이버 {refs.filter((ref) => ref.channel === 'naver').length} · 쿠팡 {refs.filter((ref) => ref.channel === 'coupang').length}</span>
+                if (columnKey === 'reported') return refs.length ? <div className="space-y-1">{refs.map((ref) => <div key={ref.id} className="flex items-center gap-2"><ChannelBadge channel={ref.channel} listingStatus={ref.lastSyncError ? 'sync-error' : ref.listingStatus} compact /><span className="font-mono text-xs text-[color:var(--muted)]">{ref.channelReported ?? '—'}</span>{ref.lastSyncError ? <span className="text-xs text-[color:var(--danger-foreground)]">{ref.lastSyncError}</span> : null}</div>)}</div> : <span className="text-sm text-[color:var(--muted-foreground)]">연결 필요</span>
+                if (columnKey === 'actions') return <Button type="button" variant="ghost" size="sm" onClick={(event) => { event.stopPropagation(); openSkuModal(variant) }}>상세</Button>
+                return null
+              }}
+            />
+          </TableSurface>
         </TabsContent>
-
         <TabsContent value="warehouse" className="m-0">
-          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <ActionToolbar>
-              <StatusBadge tone="neutral">{warehouseCount}개 창고</StatusBadge>
-              <StatusBadge tone="neutral">SKU {totalWarehouseSku.toLocaleString()}개</StatusBadge>
-              <StatusBadge tone="neutral">총 재고 {totalWarehouseStock.toLocaleString()}개</StatusBadge>
-            </ActionToolbar>
-
-            <ActionToolbar>
-              <Button type="button" variant="secondary" size="sm" className="h-10 px-3" onClick={openWarehouseModal}>
-                창고 등록
-              </Button>
-            </ActionToolbar>
-          </div>
-
-          <BasicDataTable<WarehouseRow>
-            columns={[
-              { key: 'warehouse', label: '창고' },
-              { key: 'skuCount', label: 'SKU', align: 'right' },
-              { key: 'stockQty', label: '현재 재고', align: 'right' },
-              { key: 'movement', label: '최근 변동' },
-              { key: 'actions', label: '작업', align: 'right' },
-            ]}
-            rows={warehouseRows}
-            rowKey={(row) => row.warehouse.id}
-            emptyState="등록된 창고가 없습니다."
-            renderCell={(row, columnKey) => {
-              if (columnKey === 'warehouse') {
-                return <span className="font-medium text-[color:var(--foreground)]">{row.warehouse.name}</span>
-              }
-
-              if (columnKey === 'skuCount') {
-                return <span className="font-mono tabular-nums text-[color:var(--muted)]">{row.skuCount.toLocaleString()}</span>
-              }
-
-              if (columnKey === 'stockQty') {
-                return <span className="font-semibold text-[color:var(--foreground)]">{row.stockQty.toLocaleString()}</span>
-              }
-
-              if (columnKey === 'movement') {
-                return (
-                  <div className="space-y-0.5 text-sm text-[color:var(--muted)]">
-                    <p>입고 {row.latestInbound ? `${row.latestInbound.quantity} / ${formatDate(row.latestInbound.date)}` : '없음'}</p>
-                    <p>출고 {row.latestOutbound ? `${row.latestOutbound.quantity} / ${formatDate(row.latestOutbound.date)}` : '없음'}</p>
-                    <p className="text-xs text-[color:var(--muted-foreground)]">최근 {formatDate(row.latestMovementDate)}</p>
-                  </div>
-                )
-              }
-
-              if (columnKey === 'actions') {
-                return (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-2"
-                    onClick={() => requestDeleteWarehouse(row.warehouse.id, row.warehouse.name)}
-                    aria-label={`${row.warehouse.name} 삭제`}
-                  >
-                    삭제
-                  </Button>
-                )
-              }
-
+          <TableSurface toolbar={<FilterToolbar><span className={ui.dataMeta}>{warehouseRows.length}개 창고</span><ActionToolbar><Button type="button" variant="secondary" size="sm" onClick={() => { setWarehouseName(''); setIsWarehouseModalOpen(true) }}>창고 등록</Button></ActionToolbar></FilterToolbar>}>
+            <BasicDataTable<WarehouseRow> bare columns={[{ key: 'warehouse', label: '창고' }, { key: 'skuCount', label: 'SKU', align: 'right' }, { key: 'stockQty', label: '현재 재고', align: 'right' }, { key: 'movement', label: '최근 변동' }, { key: 'actions', label: '작업', align: 'right' }]} rows={warehouseRows} rowKey={(row) => row.warehouse.id} emptyState="등록된 창고가 없습니다." renderCell={(row, key) => {
+              if (key === 'warehouse') return <span className="font-medium">{row.warehouse.name}</span>
+              if (key === 'skuCount') return <span className="font-mono tabular-nums">{row.skuCount}</span>
+              if (key === 'stockQty') return <span className="font-semibold tabular-nums">{row.stockQty}</span>
+              if (key === 'movement') return <span className="text-sm text-[color:var(--muted)]">입고 {row.latestInbound?.quantity ?? '없음'} · 출고 {row.latestOutbound?.quantity ?? '없음'} · {formatDate(row.latestMovementDate)}</span>
+              if (key === 'actions') return <Button type="button" variant="ghost" size="sm" onClick={() => setDeleteWarehouseTarget(row.warehouse)}>삭제</Button>
               return null
-            }}
-          />
+            }} />
+          </TableSurface>
         </TabsContent>
       </Tabs>
 
-      <Modal
-        open={Boolean(selectedChannelRef)}
-        title={selectedChannelRef ? `${selectedChannelRef.channel === 'naver' ? '네이버' : '쿠팡'} 채널 상품` : '채널 상품'}
-        onOpenChange={(open) => { if (!open) setSelectedChannelRef(null) }}
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setSelectedChannelRef(null)}>닫기</Button>
-            <Button
-              type="button"
-              onClick={toggleSelectedRefLink}
-              disabled={isPending || (selectedChannelRef?.variantId === null && !selectedVariantId)}
-            >
-              {selectedChannelRef?.variantId === null ? '연결' : '해제'}
-            </Button>
-          </div>
-        }
-      >
-        {selectedChannelRef ? (
-          <div className="space-y-3 text-sm">
-            {selectedChannelRef.imageUrl ? (
-              // Synced provider thumbnails are arbitrary remote URLs and are intentionally not routed through Next image optimization.
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={selectedChannelRef.imageUrl} alt="채널 상품 이미지" className="h-24 w-24 rounded-[var(--radius-md)] object-cover" />
-            ) : null}
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-              <dt className="text-[color:var(--muted-foreground)]">가격</dt><dd>{selectedChannelRef.price?.toLocaleString() ?? '—'}</dd>
-              <dt className="text-[color:var(--muted-foreground)]">상품 ID</dt><dd>{selectedChannelRef.externalProductId}</dd>
-              <dt className="text-[color:var(--muted-foreground)]">옵션 ID</dt><dd>{selectedChannelRef.externalVariantId}</dd>
-              <dt className="text-[color:var(--muted-foreground)]">판매자 SKU</dt><dd>{selectedChannelRef.sellerSku ?? '—'}</dd>
-              <dt className="text-[color:var(--muted-foreground)]">채널 재고</dt><dd>{selectedChannelRef.channelReported ?? '—'}</dd>
-              <dt className="text-[color:var(--muted-foreground)]">동기화 오류</dt><dd>{selectedChannelRef.lastSyncError ?? '없음'}</dd>
-            </dl>
-            {selectedChannelRef.variantId === null ? <div className="space-y-2 border-t border-[color:var(--border)] pt-3"><label className={ui.label}>내부 판매 옵션</label><ProductVariantCombobox aria-label="내부 판매 옵션" variants={comboboxVariants} value={selectedVariantId} onValueChange={setSelectedVariantId} /><p className={ui.helpText}>판매자 SKU가 정확히 하나 일치하면 제안값으로 선택합니다. 상품명으로는 자동 연결하지 않습니다.</p></div> : null}
-          </div>
-        ) : null}
+      <Modal open={Boolean(selectedVariant)} title="SKU 매핑" description={selectedVariant ? `${selectedVariant.sellerSku} · ${selectedVariant.modelName}` : undefined} onOpenChange={(open) => { if (!open) { setSelectedVariant(null); setMappingDraft(null) } }} footer={<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setSelectedVariant(null)}>닫기</Button>{mappingDraft ? <Button type="button" onClick={saveMapping} disabled={isPending || !mappingDraft.sellerSku.trim() || !mappingDraft.externalProductId.trim() || !mappingDraft.externalVariantId.trim()}>저장</Button> : <Button type="button" onClick={startNewMapping}>매핑 추가</Button>}</div>}>
+        <div className="space-y-3 text-sm">
+          {mappingDraft ? <div className="grid gap-3"><Select value={mappingDraft.channel} onValueChange={(value) => setMappingDraft((draft) => draft ? { ...draft, channel: value as MappingDraft['channel'] } : draft)}><SelectTrigger aria-label="채널 선택"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="naver">네이버</SelectItem><SelectItem value="coupang">쿠팡</SelectItem></SelectContent></Select><label className="space-y-1"><span className={ui.label}>판매자 SKU</span><Input aria-label="판매자 SKU" value={mappingDraft.sellerSku} onChange={(event) => setMappingDraft((draft) => draft ? { ...draft, sellerSku: event.target.value } : draft)} /></label><label className="space-y-1"><span className={ui.label}>채널 상품 ID</span><Input aria-label="채널 상품 ID" value={mappingDraft.externalProductId} onChange={(event) => setMappingDraft((draft) => draft ? { ...draft, externalProductId: event.target.value } : draft)} /></label><label className="space-y-1"><span className={ui.label}>채널 옵션 ID</span><Input aria-label="채널 옵션 ID" value={mappingDraft.externalVariantId} onChange={(event) => setMappingDraft((draft) => draft ? { ...draft, externalVariantId: event.target.value } : draft)} /></label></div> : selectedRefs.length ? selectedRefs.map((ref) => <div key={ref.id} className="flex items-center justify-between gap-3 border-b border-[color:var(--border)] pb-3 last:border-0"><div className="min-w-0"><ChannelBadge channel={ref.channel} listingStatus={ref.lastSyncError ? 'sync-error' : ref.listingStatus} /><p className="mt-1 font-mono text-xs text-[color:var(--muted)]">{ref.externalProductId} / {ref.externalVariantId}</p>{ref.lastSyncError ? <p className="mt-1 text-xs text-[color:var(--danger-foreground)]">{ref.lastSyncError}</p> : null}</div><ActionToolbar><Button type="button" variant="ghost" size="sm" onClick={() => startEditMapping(ref)}>수정</Button><Button type="button" variant="ghost" size="sm" onClick={() => run(() => unlinkChannelProductMapping(ref.id), '채널 판매 옵션을 해제했습니다.')}>해제</Button></ActionToolbar></div>) : <p className="text-[color:var(--muted)]">연결된 채널 판매 옵션이 없습니다.</p>}
+        </div>
       </Modal>
 
-      <Modal
-        open={isWarehouseModalOpen}
-        title="창고 등록"
-        description="창고명만 입력해 빠르게 추가합니다."
-        onOpenChange={(open) => setIsWarehouseModalOpen(open)}
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={closeWarehouseModal}>
-              취소
-            </Button>
-            <Button type="button" onClick={commitWarehouse} disabled={isPending || !warehouseName.trim()}>
-              등록
-            </Button>
-          </div>
-        }
-      >
-        <form id="warehouse-form" onSubmit={submitWarehouse} className="space-y-3">
-          <div className="space-y-2">
-            <label htmlFor="warehouse-name" className={ui.label}>
-              창고명
-            </label>
-            <Input
-              ref={warehouseNameRef}
-              id="warehouse-name"
-              value={warehouseName}
-              onChange={(event) => setWarehouseName(event.target.value)}
-              placeholder="예: 대전 2센터 A구역"
-            />
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        open={Boolean(deleteWarehouseTarget)}
-        title="창고 삭제 확인"
-        description={deleteWarehouseTarget ? `${deleteWarehouseTarget.name} 창고를 삭제합니다.` : undefined}
-        onOpenChange={(open) => {
-          if (!open) setDeleteWarehouseTarget(null)
-        }}
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setDeleteWarehouseTarget(null)}>
-              취소
-            </Button>
-            <Button type="button" variant="destructive" onClick={confirmDeleteWarehouse} disabled={!deleteWarehouseTarget}>
-              삭제
-            </Button>
-          </div>
-        }
-      >
-        <p className="text-sm leading-6 text-[color:var(--muted)]">삭제 후에는 창고 재고와 연결된 내역이 더 이상 이 표에서 보이지 않습니다.</p>
-      </Modal>
-
-      <Modal
-        open={isInternalProductModalOpen}
-        title="내부 상품 등록"
-        description="채널에 없는 로컬 상품을 판매 옵션과 판매자 SKU로 함께 만듭니다."
-        onOpenChange={(open) => {
-          if (!open) closeInternalProductModal()
-        }}
-        className="max-w-3xl"
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={closeInternalProductModal} disabled={isCreatingInternalProduct}>
-              취소
-            </Button>
-            <Button
-              type="button"
-              onClick={commitInternalProduct}
-              disabled={isCreatingInternalProduct || !internalProductDraft.name.trim() || !internalProductDraft.skuPrefix.trim()}
-            >
-              {isCreatingInternalProduct ? '등록 중...' : '등록'}
-            </Button>
-          </div>
-        }
-      >
-        <form id="internal-product-form" onSubmit={(event) => { event.preventDefault(); commitInternalProduct() }} className="space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="model-name" className={ui.label}>
-              상품명
-            </label>
-            <Input
-              id="model-name"
-              value={internalProductDraft.name}
-              onChange={(event) => setInternalProductDraft((prev) => ({ ...prev, name: event.target.value }))}
-              placeholder="예: 블루종 A"
-            />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <label htmlFor="model-size-text" className={ui.label}>
-                사이즈 (선택)
-              </label>
-              <textarea
-                id="model-size-text"
-                rows={4}
-                value={internalProductDraft.sizeText}
-                onChange={(event) => setInternalProductDraft((prev) => ({ ...prev, sizeText: event.target.value }))}
-                placeholder="예: S, M, L"
-                className={ui.control}
-              />
-              <p className={ui.helpText}>쉼표나 줄바꿈으로 구분합니다. 옵션이 없으면 비워두세요.</p>
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="model-color-text" className={ui.label}>
-                색상 (선택)
-              </label>
-              <textarea
-                id="model-color-text"
-                rows={4}
-                value={internalProductDraft.colorText}
-                onChange={(event) => setInternalProductDraft((prev) => ({ ...prev, colorText: event.target.value }))}
-                placeholder="예: 블랙, 화이트"
-                className={ui.control}
-              />
-              <p className={ui.helpText}>쉼표나 줄바꿈으로 구분합니다. 옵션이 없으면 비워두세요.</p>
-            </div>
-          </div>
-
-          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-            <div className="space-y-2">
-              <label htmlFor="sku-prefix" className={ui.label}>
-                SKU prefix
-              </label>
-              <Input id="sku-prefix" value={internalProductDraft.skuPrefix} onChange={(event) => setInternalProductDraft((prev) => ({ ...prev, skuPrefix: event.target.value }))} placeholder="예: LP01" />
-            </div>
-            <div className={cx(ui.surfaceMuted, 'px-3 py-2 text-sm text-[color:var(--muted)]')}>
-              판매 옵션 {draftVariantCount}개 · 예시 {draftSkuExample}
-            </div>
-          </div>
-        </form>
-      </Modal>
+      <Modal open={isWarehouseModalOpen} title="창고 등록" onOpenChange={setIsWarehouseModalOpen} footer={<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setIsWarehouseModalOpen(false)}>취소</Button><Button type="button" disabled={isPending || !warehouseName.trim()} onClick={() => run(() => createWarehouse(warehouseName), '창고가 등록되었습니다.', () => setIsWarehouseModalOpen(false))}>등록</Button></div>}><form onSubmit={(event: FormEvent) => { event.preventDefault(); if (warehouseName.trim()) run(() => createWarehouse(warehouseName), '창고가 등록되었습니다.', () => setIsWarehouseModalOpen(false)) }}><label className="space-y-1"><span className={ui.label}>창고명</span><Input ref={warehouseNameRef} value={warehouseName} onChange={(event) => setWarehouseName(event.target.value)} /></label></form></Modal>
+      <Modal open={Boolean(deleteWarehouseTarget)} title="창고 삭제 확인" onOpenChange={(open) => { if (!open) setDeleteWarehouseTarget(null) }} footer={<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setDeleteWarehouseTarget(null)}>취소</Button><Button type="button" variant="destructive" onClick={() => deleteWarehouseTarget && run(() => deleteWarehouse(deleteWarehouseTarget.id), `${deleteWarehouseTarget.name} 창고가 삭제되었습니다.`, () => setDeleteWarehouseTarget(null))}>삭제</Button></div>}><p className="text-sm text-[color:var(--muted)]">삭제 후에는 창고 재고와 연결된 내역이 이 표에서 보이지 않습니다.</p></Modal>
+      <Modal open={isInternalProductModalOpen} title="내부 상품 등록" onOpenChange={(open) => { if (!isCreatingInternalProduct) setIsInternalProductModalOpen(open) }} footer={<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setIsInternalProductModalOpen(false)} disabled={isCreatingInternalProduct}>취소</Button><Button type="button" disabled={isCreatingInternalProduct || !internalProductDraft.name.trim() || !internalProductDraft.skuPrefix.trim()} onClick={() => { setIsCreatingInternalProduct(true); run(() => createInternalProduct({ name: internalProductDraft.name, sizes: splitList(internalProductDraft.sizeText), colors: splitList(internalProductDraft.colorText), skuPrefix: internalProductDraft.skuPrefix }), '내부 상품을 등록했습니다.', () => { setIsCreatingInternalProduct(false); setIsInternalProductModalOpen(false) }) }}>등록</Button></div>}><form className="space-y-4" onSubmit={(event) => event.preventDefault()}><label className="space-y-1"><span className={ui.label}>상품명</span><Input value={internalProductDraft.name} onChange={(event) => setInternalProductDraft((draft) => ({ ...draft, name: event.target.value }))} /></label><div className="grid gap-4 md:grid-cols-2"><label className="space-y-1"><span className={ui.label}>사이즈 (선택)</span><textarea aria-label="사이즈 (선택)" value={internalProductDraft.sizeText} onChange={(event) => setInternalProductDraft((draft) => ({ ...draft, sizeText: event.target.value }))} className={ui.control} /><span className={ui.helpText}>옵션이 없으면 비워두세요.</span></label><label className="space-y-1"><span className={ui.label}>색상 (선택)</span><textarea aria-label="색상 (선택)" value={internalProductDraft.colorText} onChange={(event) => setInternalProductDraft((draft) => ({ ...draft, colorText: event.target.value }))} className={ui.control} /><span className={ui.helpText}>옵션이 없으면 비워두세요.</span></label></div><label className="space-y-1"><span className={ui.label}>SKU prefix</span><Input aria-label="SKU prefix" value={internalProductDraft.skuPrefix} onChange={(event) => setInternalProductDraft((draft) => ({ ...draft, skuPrefix: event.target.value }))} /></label><p className={cx(ui.surfaceMuted, 'px-3 py-2 text-sm text-[color:var(--muted)]')}>판매 옵션 {draftVariantCount}개 · 예시 {draftSkuExample}</p></form></Modal>
     </div>
   )
 }
