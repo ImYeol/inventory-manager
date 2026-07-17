@@ -867,7 +867,7 @@ export async function getManualInboundDraftRows(): Promise<ManualInboundDraftRow
   try {
     const [draftsRes, rowsRes, factoriesRes, warehousesRes, variantsRes, modelsRes] = await Promise.all([
       supabase.from('inbound_drafts').select('id, supplier_id, status'),
-      supabase.from('inbound_draft_rows').select('id, inbound_draft_id, template, external_sku, quantity, received_quantity, warehouse_id, product_variant_id'),
+      supabase.from('inbound_draft_rows').select('id, inbound_draft_id, template, external_sku, quantity, received_quantity, warehouse_id, product_variant_id, source_row_number, validation_error'),
       supabase.from('factories').select('id, name'),
       supabase.from('warehouses').select('id, name'),
       supabase.from('product_variants').select('id, model_id, seller_sku'),
@@ -881,7 +881,7 @@ export async function getManualInboundDraftRows(): Promise<ManualInboundDraftRow
     const variants = new Map((variantsRes.data ?? []).map((variant) => [Number(variant.id), variant]))
     return (rowsRes.data ?? []).flatMap((row) => {
       const draft = drafts.get(Number(row.inbound_draft_id))
-      if (!draft || draft.status === 'received' || Number(row.received_quantity) >= Number(row.quantity)) return []
+      if (!draft || draft.status === 'received' || row.validation_error || row.quantity === null || Number(row.received_quantity) >= Number(row.quantity)) return []
       const variant = row.product_variant_id === null ? null : variants.get(Number(row.product_variant_id))
       return [{
         id: Number(row.id), draftId: Number(row.inbound_draft_id), supplierName: factoryNames.get(Number(draft.supplier_id)) ?? '공급자',
@@ -1053,12 +1053,13 @@ export async function runReceiveFactoryArrival(
 export async function createInboundDraft(input: {
   supplierId: number
   rows: InboundDraftRowInput[]
+  source?: { storagePath: string; filename: string; fileHash: string; sheetName: string; headerRowNumber: number; headers: string[] }
 }) {
   if (!input.supplierId || input.rows.length === 0) throw new Error('공급자와 입고 행을 입력해주세요.')
   const { supabase } = await getSupabaseWithUser()
   const { data: draft, error: draftError } = await supabase
     .from('inbound_drafts')
-    .insert({ supplier_id: input.supplierId })
+    .insert({ supplier_id: input.supplierId, source_storage_path: input.source?.storagePath ?? null, source_filename: input.source?.filename ?? null, source_file_hash: input.source?.fileHash ?? null, source_sheet_name: input.source?.sheetName ?? null, source_header_row_number: input.source?.headerRowNumber ?? null, source_headers: input.source?.headers ?? null })
     .select('id')
     .single()
   if (draftError || !draft?.id) throw new Error(draftError?.message ?? '입고 초안을 저장하지 못했습니다.')
@@ -1069,6 +1070,9 @@ export async function createInboundDraft(input: {
     quantity: row.quantity,
     warehouse_id: row.warehouseId,
     product_variant_id: row.productVariantId,
+    source_row_number: 'sourceRowNumber' in row ? (row as InboundDraftRowInput & { sourceRowNumber?: number }).sourceRowNumber ?? null : null,
+    source_values: 'sourceValues' in row ? (row as InboundDraftRowInput & { sourceValues?: Record<string, string> }).sourceValues ?? {} : {},
+    validation_error: 'validationError' in row ? (row as InboundDraftRowInput & { validationError?: string | null }).validationError ?? null : null,
   })))
   if (rowsError) throw new Error(rowsError.message)
   return Number(draft.id)

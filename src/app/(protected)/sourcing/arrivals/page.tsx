@@ -30,7 +30,7 @@ export default async function SourcingArrivalsPage() {
         arrivals={arrivals}
       />
       <div className="mx-auto mt-6 w-full max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
-        <ManualInboundDraftRows rows={manualInboundDraftRows} />
+        <ManualInboundDraftRows rows={manualInboundDraftRows} suppliers={factories.map((factory) => ({ id: factory.id, name: factory.name }))} warehouses={warehouses.map((warehouse) => ({ id: warehouse.id, name: warehouse.name }))} />
       </div>
     </>
   )

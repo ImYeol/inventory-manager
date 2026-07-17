@@ -627,7 +627,7 @@ export async function receiveFactoryArrival(input: {
 export async function createManualInboundDraft(input: { supplierId: number; rows: InboundDraftRowInput[] }) {
   if (!input.supplierId || input.rows.length === 0) throw new Error('공급자와 입고 행을 입력해주세요.')
   for (const row of input.rows) {
-    if (!row.template.trim() || !row.externalSku.trim() || !Number.isInteger(row.quantity) || row.quantity <= 0 || !row.warehouseId) {
+    if (!row.template.trim() || !row.externalSku.trim() || !Number.isInteger(row.quantity) || row.quantity === null || row.quantity <= 0 || !row.warehouseId) {
       throw new Error('템플릿, 외부 SKU, 수량, 창고를 모두 입력해주세요.')
     }
   }
