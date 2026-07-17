@@ -93,6 +93,11 @@
       "dir": "sku-channel-mapping-operations",
       "status": "completed",
       "completed_at": "2026-07-17T22:01:44+0900"
+    },
+    {
+      "dir": "inventory-channel-mapping-visibility",
+      "status": "completed",
+      "completed_at": "2026-07-17T23:57:18+0900"
     }
   ]
 }
