@@ -98,6 +98,11 @@
       "dir": "inventory-channel-mapping-visibility",
       "status": "completed",
       "completed_at": "2026-07-17T23:57:18+0900"
+    },
+    {
+      "dir": "manual-outbound-and-adjustment",
+      "status": "completed",
+      "completed_at": "2026-07-18T00:15:40+0900"
     }
   ]
 }
