@@ -8,6 +8,7 @@ import {
   type TransactionTypeValue,
 } from './inventory'
 import type { InboundDraftRowInput } from './inbound'
+import type { InboundTemplateVersion } from './inbound-import'
 
 type WarehouseRow = {
   id: number
@@ -1053,13 +1054,15 @@ export async function runReceiveFactoryArrival(
 export async function createInboundDraft(input: {
   supplierId: number
   rows: InboundDraftRowInput[]
+  templateId?: number
+  templateVersionId?: number
   source?: { storagePath: string; filename: string; fileHash: string; sheetName: string; headerRowNumber: number; headers: string[] }
 }) {
   if (!input.supplierId || input.rows.length === 0) throw new Error('공급자와 입고 행을 입력해주세요.')
   const { supabase } = await getSupabaseWithUser()
   const { data: draft, error: draftError } = await supabase
     .from('inbound_drafts')
-    .insert({ supplier_id: input.supplierId, source_storage_path: input.source?.storagePath ?? null, source_filename: input.source?.filename ?? null, source_file_hash: input.source?.fileHash ?? null, source_sheet_name: input.source?.sheetName ?? null, source_header_row_number: input.source?.headerRowNumber ?? null, source_headers: input.source?.headers ?? null })
+    .insert({ supplier_id: input.supplierId, template_id: input.templateId ?? null, template_version_id: input.templateVersionId ?? null, source_storage_path: input.source?.storagePath ?? null, source_filename: input.source?.filename ?? null, source_file_hash: input.source?.fileHash ?? null, source_sheet_name: input.source?.sheetName ?? null, source_header_row_number: input.source?.headerRowNumber ?? null, source_headers: input.source?.headers ?? null })
     .select('id')
     .single()
   if (draftError || !draft?.id) throw new Error(draftError?.message ?? '입고 초안을 저장하지 못했습니다.')
@@ -1076,6 +1079,32 @@ export async function createInboundDraft(input: {
   })))
   if (rowsError) throw new Error(rowsError.message)
   return Number(draft.id)
+}
+
+export async function getInboundTemplateVersion(templateVersionId: number): Promise<InboundTemplateVersion & { active: boolean }> {
+  const { supabase } = await getSupabaseWithUser()
+  const { data, error } = await supabase.from('inbound_template_versions')
+    .select('id, template_id, version_number, sheet_name, header_row_number, headers, mappings, inbound_templates!inner(is_active)')
+    .eq('id', templateVersionId).single()
+  if (error || !data) throw new Error(error?.message ?? '입고 템플릿 버전을 찾을 수 없습니다.')
+  const mappings = data.mappings as { externalSku: string; quantity: string; source: Record<string, string> }
+  return { id: Number(data.id), templateId: Number(data.template_id), versionNumber: Number(data.version_number), sheetName: data.sheet_name, headerRowNumber: Number(data.header_row_number), headers: data.headers as string[], mappings, active: Boolean((data.inbound_templates as { is_active?: boolean } | null)?.is_active) }
+}
+
+/** Active templates only: inactive versions remain reachable from their audited drafts. */
+export async function getActiveInboundTemplates(): Promise<Array<{ id: number; name: string; versionId: number; versionNumber: number }>> {
+  const { supabase } = await getSupabaseWithUser()
+  const { data, error } = await supabase
+    .from('inbound_templates')
+    .select('id, name, inbound_template_versions(id, version_number)')
+    .eq('is_active', true)
+    .order('name')
+  if (error) throw new Error(error.message)
+  return (data ?? []).flatMap((template) => {
+    const versions = (template.inbound_template_versions as Array<{ id: number; version_number: number }> | null) ?? []
+    const latest = versions.reduce<{ id: number; version_number: number } | null>((current, version) => (!current || version.version_number > current.version_number ? version : current), null)
+    return latest ? [{ id: Number(template.id), name: String(template.name), versionId: Number(latest.id), versionNumber: Number(latest.version_number) }] : []
+  })
 }
 
 export async function runReceiveInboundDraftRows(draftId: number, rows: Array<{ rowId: number; quantity: number }>) {

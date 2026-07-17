@@ -12,6 +12,16 @@ export function inboundSupplierSkuKey(input: Pick<InboundDraftRowInput, 'supplie
   return `${input.supplierId}:${input.template.trim()}:${input.externalSku.trim()}`
 }
 
+export function inboundTemplateSkuKey(input: { supplierId: number; templateId: number; externalSku: string }) {
+  return `${input.supplierId}:${input.templateId}:${input.externalSku.trim()}`
+}
+
+/** Invalid preview rows are draftable evidence; receipt validation happens later. */
+export function validateInboundPreviewRows(rows: Array<{ externalSku: string; quantity: number | null; validationError: string | null; productVariantId: number | null }>) {
+  void rows
+  return [] as string[]
+}
+
 export function validateInboundDraftRows(rows: InboundDraftRowInput[]) {
   return rows.flatMap((row, index) => {
     const prefix = `${index + 1}행:`

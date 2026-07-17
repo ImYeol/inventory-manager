@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { BUILT_IN_INBOUND_PRESETS, parseInboundWorksheet, suggestExactInboundLinks } from '@/lib/inbound-import'
+import {
+  BUILT_IN_INBOUND_PRESETS,
+  parseInboundTemplateWorksheet,
+  parseInboundWorksheet,
+  suggestExactInboundLinks,
+  type InboundTemplateVersion,
+} from '@/lib/inbound-import'
 
 describe('built-in inbound template imports', () => {
   it('parses both fixed presets with their source header and true Excel row number', () => {
@@ -26,5 +32,30 @@ describe('built-in inbound template imports', () => {
     expect(suggestExactInboundLinks(rows, new Map([['4:중국 공장 입고:X-1', 9]]), 4, '중국 공장 입고')).toEqual([
       { externalSku: 'X-1', productVariantId: 9 }, { externalSku: 'X-2', productVariantId: null },
     ])
+  })
+
+  it('parses only the selected version sheet, header row, and required columns', () => {
+    const version: InboundTemplateVersion = {
+      templateId: 1, versionNumber: 1,
+      sheetName: '입고', headerRowNumber: 2, headers: ['외부 SKU', '수량', '메모'],
+      mappings: { externalSku: '외부 SKU', quantity: '수량', source: { note: '메모' } },
+    }
+    expect(parseInboundTemplateWorksheet(version, '입고', [
+      ['제목'], ['외부 SKU', '수량', '메모'], ['EXT-1', '3', '검수 전'],
+    ])).toMatchObject({ rows: [{ sourceRowNumber: 3, externalSku: 'EXT-1', quantity: 3, sourceValues: { note: '검수 전' } }] })
+    expect(() => parseInboundTemplateWorksheet(version, '다른 시트', [])).toThrow('선택한 템플릿의 시트가 일치하지 않습니다.')
+    expect(() => parseInboundTemplateWorksheet({ ...version, mappings: { ...version.mappings, quantity: '입고수량' } }, '입고', [
+      ['제목'], ['외부 SKU', '수량', '메모'], ['EXT-1', 3, 'x'],
+    ])).toThrow('선택한 템플릿의 필수 열이 일치하지 않습니다.')
+  })
+
+  it('keeps malformed template rows previewable while marking them non-receivable', () => {
+    const version: InboundTemplateVersion = {
+      templateId: 1, versionNumber: 1,
+      sheetName: '입고', headerRowNumber: 1, headers: ['외부 SKU', '수량'],
+      mappings: { externalSku: '외부 SKU', quantity: '수량', source: {} },
+    }
+    const preview = parseInboundTemplateWorksheet(version, '입고', [['외부 SKU', '수량'], ['', 2], ['EXT-2', '1.5']])
+    expect(preview.rows.map((row) => row.validationError)).toEqual(['외부 SKU를 입력해주세요.', '수량은 양의 정수여야 합니다.'])
   })
 })

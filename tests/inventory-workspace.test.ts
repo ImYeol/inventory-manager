@@ -168,8 +168,9 @@ describe('InventoryWorkspace', () => {
     expect(within(screen.getByRole('table')).queryByText('창고')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '입고' }))
-    expect(screen.getByRole('dialog', { name: '빠른 입고' })).toBeTruthy()
-    expect(screen.getByText('InOutForm:inbound:2')).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: '입고 등록' })).toBeTruthy()
+    expect(screen.getByLabelText('입고 템플릿')).toBeTruthy()
+    expect(screen.getByText('파일을 놓거나 선택하세요')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: '수동 출고' }))
     expect(screen.getByRole('dialog', { name: '수동 출고' })).toBeTruthy()
