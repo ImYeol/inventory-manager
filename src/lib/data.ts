@@ -241,6 +241,20 @@ export type FactoryArrivalsDataResult = {
   arrivals: FactoryArrivalData[]
 }
 
+export type ManualInboundDraftRowData = {
+  id: number
+  draftId: number
+  supplierName: string
+  template: string
+  externalSku: string
+  quantity: number
+  receivedQuantity: number
+  warehouseName: string
+  productVariantId: number | null
+  productName: string | null
+  sellerSku: string | null
+}
+
 export const SOURCING_SCHEMA_MISSING_MESSAGE =
   '소싱 스키마가 아직 배포되지 않았습니다. supabase/schema.sql 적용 후 다시 시도하세요.'
 
@@ -847,6 +861,40 @@ export async function getFactoryArrivalsData(): Promise<FactoryArrivalsDataResul
   }
 }
 
+/** Manual supplier rows remain a separate draft surface until inspected and received. */
+export async function getManualInboundDraftRows(): Promise<ManualInboundDraftRowData[]> {
+  const { supabase } = await getSupabaseWithUser()
+  try {
+    const [draftsRes, rowsRes, factoriesRes, warehousesRes, variantsRes, modelsRes] = await Promise.all([
+      supabase.from('inbound_drafts').select('id, supplier_id, status'),
+      supabase.from('inbound_draft_rows').select('id, inbound_draft_id, template, external_sku, quantity, received_quantity, warehouse_id, product_variant_id'),
+      supabase.from('factories').select('id, name'),
+      supabase.from('warehouses').select('id, name'),
+      supabase.from('product_variants').select('id, model_id, seller_sku'),
+      supabase.from('models').select('id, name'),
+    ])
+    if (rowsRes.error || draftsRes.error) return []
+    const drafts = new Map((draftsRes.data ?? []).map((draft) => [Number(draft.id), draft]))
+    const factoryNames = new Map((factoriesRes.data ?? []).map((factory) => [Number(factory.id), factory.name]))
+    const warehouseNames = new Map((warehousesRes.data ?? []).map((warehouse) => [Number(warehouse.id), warehouse.name]))
+    const modelNames = new Map((modelsRes.data ?? []).map((model) => [Number(model.id), model.name]))
+    const variants = new Map((variantsRes.data ?? []).map((variant) => [Number(variant.id), variant]))
+    return (rowsRes.data ?? []).flatMap((row) => {
+      const draft = drafts.get(Number(row.inbound_draft_id))
+      if (!draft || draft.status === 'received' || Number(row.received_quantity) >= Number(row.quantity)) return []
+      const variant = row.product_variant_id === null ? null : variants.get(Number(row.product_variant_id))
+      return [{
+        id: Number(row.id), draftId: Number(row.inbound_draft_id), supplierName: factoryNames.get(Number(draft.supplier_id)) ?? '공급자',
+        template: row.template, externalSku: row.external_sku, quantity: Number(row.quantity), receivedQuantity: Number(row.received_quantity),
+        warehouseName: warehouseNames.get(Number(row.warehouse_id)) ?? '창고', productVariantId: row.product_variant_id === null ? null : Number(row.product_variant_id),
+        productName: variant ? modelNames.get(Number(variant.model_id)) ?? null : null, sellerSku: variant?.seller_sku ?? null,
+      }]
+    })
+  } catch {
+    return []
+  }
+}
+
 export async function getCurrentStockRow(
   modelId: number,
   sizeId: number,
@@ -1034,6 +1082,20 @@ export async function runReceiveInboundDraftRows(draftId: number, rows: Array<{ 
     p_rows: rows.map((row) => ({ row_id: row.rowId, quantity: row.quantity })),
   })
   if (error) throw new Error(error.message)
+}
+
+export async function attachInternalSkuToInboundDraftRow(draftRowId: number, productVariantId: number) {
+  if (!draftRowId || !productVariantId) throw new Error('입고 초안 행과 내부 SKU를 선택해주세요.')
+  const { supabase } = await getSupabaseWithUser()
+  const { data, error } = await supabase
+    .from('inbound_draft_rows')
+    .update({ product_variant_id: productVariantId })
+    .eq('id', draftRowId)
+    .is('product_variant_id', null)
+    .select('id')
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error('입고 초안 행을 연결할 수 없습니다.')
 }
 
 export async function getModelLookups(modelId: number) {

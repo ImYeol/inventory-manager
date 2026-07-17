@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getCatalogData: vi.fn(),
   getFactoriesData: vi.fn(),
   getFactoryArrivalsData: vi.fn(),
+  getManualInboundDraftRows: vi.fn(),
   arrivalsView: vi.fn(),
 }))
 
@@ -14,6 +15,7 @@ vi.mock('@/lib/data', () => ({
   getCatalogData: mocks.getCatalogData,
   getFactoriesData: mocks.getFactoriesData,
   getFactoryArrivalsData: mocks.getFactoryArrivalsData,
+  getManualInboundDraftRows: mocks.getManualInboundDraftRows,
 }))
 
 vi.mock('@/app/(protected)/sourcing/arrivals/ArrivalsView', () => ({
@@ -21,6 +23,9 @@ vi.mock('@/app/(protected)/sourcing/arrivals/ArrivalsView', () => ({
     mocks.arrivalsView(props)
     return React.createElement('div', { 'data-testid': 'arrivals-view' })
   },
+}))
+vi.mock('@/app/(protected)/sourcing/arrivals/ManualInboundDraftRows', () => ({
+  default: () => React.createElement('div', { 'data-testid': 'manual-inbound-drafts' }),
 }))
 
 import SourcingArrivalsPage from '@/app/(protected)/sourcing/arrivals/page'
@@ -51,6 +56,7 @@ describe('SourcingArrivalsPage', () => {
       schemaState: { status: 'ready', message: null },
       arrivals: [{ id: 100, factoryName: '광주 협력사' }],
     })
+    mocks.getManualInboundDraftRows.mockResolvedValue([])
 
     render(await SourcingArrivalsPage())
 

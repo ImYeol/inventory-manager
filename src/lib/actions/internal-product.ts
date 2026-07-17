@@ -48,6 +48,7 @@ export async function createInternalProduct(input: {
 
   const { supabase, user } = await getSupabaseWithUser()
   let modelId: number | null = null
+  let createdVariants: Array<{ id: number; seller_sku: string }> = []
   try {
     const { data: model, error: modelError } = await supabase.from('models').insert({ name }).select('id').single()
     if (modelError || !model?.id) throw new Error(modelError?.message ?? '내부 상품 등록에 실패했습니다.')
@@ -66,8 +67,9 @@ export async function createInternalProduct(input: {
       user_id: user.id, model_id: modelId, size_id: sizeByName.get(size), color_id: colorByName.get(color),
       seller_sku: sellerSkus[sizeIndex * colors.length + colorIndex],
     })))
-    const { data: createdVariants, error: variantError } = await supabase.from('product_variants').insert(variants).select('id, seller_sku')
-    if (variantError || !createdVariants) throw new Error(variantError?.message ?? '판매 옵션 등록에 실패했습니다.')
+    const { data: insertedVariants, error: variantError } = await supabase.from('product_variants').insert(variants).select('id, seller_sku')
+    if (variantError || !insertedVariants) throw new Error(variantError?.message ?? '판매 옵션 등록에 실패했습니다.')
+    createdVariants = insertedVariants
 
   } catch (error) {
     if (modelId !== null) await supabase.from('models').delete().eq('id', modelId).eq('user_id', user.id)
@@ -75,5 +77,10 @@ export async function createInternalProduct(input: {
   }
 
   revalidatePath('/products')
-  return { success: true, variantCount: sellerSkus.length, sellerSkus }
+  return {
+    success: true,
+    variantCount: sellerSkus.length,
+    sellerSkus,
+    variants: createdVariants.map((variant) => ({ id: Number(variant.id), sellerSku: variant.seller_sku })),
+  }
 }

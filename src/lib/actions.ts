@@ -16,6 +16,7 @@ import {
   runReceiveFactoryArrival,
   createInboundDraft as runCreateInboundDraft,
   runReceiveInboundDraftRows,
+  attachInternalSkuToInboundDraftRow as runAttachInternalSkuToInboundDraftRow,
 } from './data'
 import type { InboundDraftRowInput } from './inbound'
 import { getSupabaseWithUser } from './db'
@@ -643,6 +644,14 @@ export async function receiveManualInboundDraftRows(input: { draftId: number; ro
   await runReceiveInboundDraftRows(input.draftId, input.rows.map(({ rowId, quantity }) => ({ rowId, quantity })))
   revalidateInventoryPaths()
   revalidatePath('/sourcing/arrivals')
+  return { success: true }
+}
+
+export async function attachInternalSkuToInboundDraftRow(input: { draftRowId: number; productVariantId: number }) {
+  if (!input.draftRowId || !input.productVariantId) throw new Error('입고 초안 행과 내부 SKU를 선택해주세요.')
+  await runAttachInternalSkuToInboundDraftRow(input.draftRowId, input.productVariantId)
+  revalidatePath('/sourcing/arrivals')
+  revalidatePath('/products')
   return { success: true }
 }
 
