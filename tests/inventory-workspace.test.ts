@@ -18,15 +18,17 @@ vi.mock('next/link', () => ({
 vi.mock('@/app/(protected)/inout/InOutForm', () => ({
   default: ({
     initialType,
+    operation,
     lockedWarehouseId,
   }: {
     initialType?: string
+    operation?: string
     lockedWarehouseId?: number | null
   }) =>
     React.createElement(
       'div',
       {},
-      `InOutForm:${initialType ?? '입고'}:${lockedWarehouseId ?? 'all'}`,
+      `InOutForm:${operation ?? initialType ?? '입고'}:${lockedWarehouseId ?? 'all'}`,
     ),
 }))
 
@@ -137,7 +139,8 @@ describe('InventoryWorkspace', () => {
     expect(screen.getByLabelText('상태 필터')).toBeTruthy()
     expect(screen.getByRole('button', { name: '컬럼' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '입고' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '출고' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '수동 출고' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '실사 조정' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '재고 추가' })).toBeNull()
     expect(within(screen.getByRole('table')).getByText('On hand')).toBeTruthy()
     expect(within(screen.getByRole('table')).getByText('Committed')).toBeTruthy()
@@ -161,11 +164,15 @@ describe('InventoryWorkspace', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '입고' }))
     expect(screen.getByRole('dialog', { name: '빠른 입고' })).toBeTruthy()
-    expect(screen.getByText('InOutForm:입고:2')).toBeTruthy()
+    expect(screen.getByText('InOutForm:inbound:2')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: '출고' }))
-    expect(screen.getByRole('dialog', { name: '빠른 출고' })).toBeTruthy()
-    expect(screen.getByText('InOutForm:출고:2')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '수동 출고' }))
+    expect(screen.getByRole('dialog', { name: '수동 출고' })).toBeTruthy()
+    expect(screen.getByText('InOutForm:manual-outbound:2')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '실사 조정' }))
+    expect(screen.getByRole('dialog', { name: '실사 수량 조정' })).toBeTruthy()
+    expect(screen.getByText('InOutForm:count-adjustment:2')).toBeTruthy()
   })
 
   it('does not render oversized summary chrome when the table is empty', () => {
@@ -242,7 +249,7 @@ describe('InventoryWorkspace', () => {
     expect(screen.getByText('HistoryEmbedded:yes')).toBeTruthy()
     expect(screen.queryByRole('heading', { name: '이력 필터' })).toBeNull()
     expect(screen.queryByRole('button', { name: '입고' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '출고' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '수동 출고' })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'SetHistoryWarehouse1' }))
     fireEvent.click(screen.getByRole('button', { name: 'SetHistorySearchLP' }))

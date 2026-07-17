@@ -124,7 +124,7 @@ export default function InventoryWorkspace({
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'normal' | 'warning' | 'danger'>('all')
   const [activeView, setActiveView] = useState<ViewMode>('list')
-  const [overlayMode, setOverlayMode] = useState<'입고' | '출고' | null>(null)
+  const [overlayMode, setOverlayMode] = useState<'inbound' | 'manual-outbound' | 'count-adjustment' | null>(null)
   const [historyFilters, setHistoryFilters] = useState<HistoryFilterState>({
     warehouseId: '',
     type: '',
@@ -274,8 +274,9 @@ export default function InventoryWorkspace({
                 columns={ALL_COLUMNS}
                 visibleColumns={visibleColumns}
                 onToggleColumn={toggleColumn}
-                onInbound={() => setOverlayMode('입고')}
-                onOutbound={() => setOverlayMode('출고')}
+                onInbound={() => setOverlayMode('inbound')}
+                onOutbound={() => setOverlayMode('manual-outbound')}
+                onAdjustment={() => setOverlayMode('count-adjustment')}
               />
             }
           >
@@ -297,18 +298,20 @@ export default function InventoryWorkspace({
 
       <FixedSheet
         open={overlayMode !== null}
-        title={overlayMode === '입고' ? '빠른 입고' : '빠른 출고'}
+        title={overlayMode === 'inbound' ? '빠른 입고' : overlayMode === 'manual-outbound' ? '수동 출고' : '실사 수량 조정'}
         description={
-          overlayMode === '입고'
+          overlayMode === 'inbound'
             ? '신규 상품 옵션·창고 조합의 첫 입고와 기존 재고 증가를 처리합니다.'
-            : '현재 보유 재고를 수동으로 차감합니다. 주문 발송 출고는 자동으로 처리됩니다.'
+            : overlayMode === 'manual-outbound'
+              ? '주문 발송과 별도로 현재 보유 재고를 차감합니다. 사유는 이력에 기록됩니다.'
+              : '실사 수량을 기준으로 현재 재고와의 차이를 이력에 기록합니다.'
         }
         onClose={() => setOverlayMode(null)}
       >
         <InOutForm
           models={normalizedModels}
           warehouses={warehouses}
-          initialType={overlayMode ?? '입고'}
+          operation={overlayMode ?? 'inbound'}
           initialWarehouseId={typeof selectedWarehouseId === 'number' ? selectedWarehouseId : warehouses[0]?.id}
           lockedWarehouseId={typeof selectedWarehouseId === 'number' ? selectedWarehouseId : null}
           onSubmitted={() => setOverlayMode(null)}

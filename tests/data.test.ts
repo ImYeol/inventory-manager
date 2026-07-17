@@ -20,6 +20,7 @@ import {
   getTransactionsWithRelations,
   runBulkTransaction,
   runInventoryAdjustment,
+  runManualInventoryOperations,
   runRevertTransaction,
 } from '@/lib/data'
 
@@ -621,6 +622,28 @@ describe('Supabase data mappers', () => {
     expect(rpc).toHaveBeenCalledWith('apply_inventory_adjustment', {
       p_inventory_id: 99,
       p_new_quantity: 12,
+    })
+  })
+
+  it('sends reasoned manual outbound and counted quantity operations through one RPC', async () => {
+    const rpc = vi.fn(async () => ({ error: null }))
+    const supabase = { from: vi.fn(), rpc, auth: { getUser: vi.fn() } }
+    mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
+
+    await runManualInventoryOperations([
+      {
+        kind: 'manual-outbound', date: '2026-07-18', modelId: 1, sizeId: 10, colorId: 20, warehouseId: 1, quantity: 3, reason: '파손 폐기',
+      },
+      {
+        kind: 'count-adjustment', date: '2026-07-18', modelId: 2, sizeId: 11, colorId: 21, warehouseId: 1, quantity: 0, reason: '월말 실사',
+      },
+    ])
+
+    expect(rpc).toHaveBeenCalledWith('apply_manual_inventory_operations', {
+      p_items: [
+        { kind: 'manual-outbound', date: '2026-07-18', model_id: 1, size_id: 10, color_id: 20, warehouse_id: 1, quantity: 3, reason: '파손 폐기' },
+        { kind: 'count-adjustment', date: '2026-07-18', model_id: 2, size_id: 11, color_id: 21, warehouse_id: 1, quantity: 0, reason: '월말 실사' },
+      ],
     })
   })
 

@@ -2,6 +2,8 @@ import { getSupabaseWithUser } from './db'
 import {
   formatDateLabel,
   parseTransactionType,
+  normalizeManualInventoryOperation,
+  type ManualInventoryOperationKind,
   transactionTypeLabels,
   type TransactionTypeValue,
 } from './inventory'
@@ -883,6 +885,37 @@ export async function runInventoryAdjustment(inventoryId: number, newQuantity: n
     p_new_quantity: newQuantity,
   })
 
+  if (error) throw new Error(error.message)
+}
+
+export async function runManualInventoryOperations(
+  items: Array<{
+    kind: ManualInventoryOperationKind
+    date: string
+    modelId: number
+    sizeId: number
+    colorId: number
+    quantity: number
+    warehouseId: number
+    reason: string
+  }>,
+) {
+  const { supabase } = await getSupabaseWithUser()
+  const payload = items.map((item) => {
+    const operation = normalizeManualInventoryOperation(item)
+    return {
+      kind: operation.kind,
+      date: item.date,
+      model_id: item.modelId,
+      size_id: item.sizeId,
+      color_id: item.colorId,
+      quantity: operation.quantity,
+      warehouse_id: item.warehouseId,
+      reason: operation.reason,
+    }
+  })
+
+  const { error } = await supabase.rpc('apply_manual_inventory_operations', { p_items: payload })
   if (error) throw new Error(error.message)
 }
 

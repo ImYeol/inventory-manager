@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getTransactionsWithRelations: vi.fn(),
   runBulkTransaction: vi.fn(),
   runInventoryAdjustment: vi.fn(),
+  runManualInventoryOperations: vi.fn(),
   runRevertTransaction: vi.fn(),
   revalidatePath: vi.fn(),
 }))
@@ -18,6 +19,7 @@ vi.mock('@/lib/data', () => ({
   getTransactionsWithRelations: mocks.getTransactionsWithRelations,
   runBulkTransaction: mocks.runBulkTransaction,
   runInventoryAdjustment: mocks.runInventoryAdjustment,
+  runManualInventoryOperations: mocks.runManualInventoryOperations,
   runRevertTransaction: mocks.runRevertTransaction,
 }))
 
@@ -30,6 +32,7 @@ import {
   addTransaction,
   adjustInventory,
   createTransactions,
+  createManualInventoryOperations,
   getCurrentStock,
   getInventory,
   getModelDetails,
@@ -167,6 +170,17 @@ describe('server action wrappers', () => {
     await expect(createTransactions([])).resolves.toEqual({ success: true })
     await expect(getModelDetails(1)).resolves.toBeUndefined()
     await expect(getCurrentStock(1, 10, 20, 1)).resolves.toBeUndefined()
+  })
+
+  it('delegates manual warehouse operations through the reasoned operation boundary', async () => {
+    mocks.runManualInventoryOperations.mockResolvedValue(undefined)
+    const items = [{
+      kind: 'manual-outbound' as const, date: '2026-07-18', warehouseId: 1, modelId: 1, sizeId: 10, colorId: 20, quantity: 2, reason: '파손 폐기',
+    }]
+
+    await expect(createManualInventoryOperations(items)).resolves.toEqual({ success: true })
+    expect(mocks.runManualInventoryOperations).toHaveBeenCalledWith(items)
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/inventory')
   })
 
   it('reverts a transaction through the stored procedure helper and revalidates inventory paths', async () => {

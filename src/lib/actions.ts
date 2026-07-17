@@ -10,6 +10,7 @@ import {
   getTransactionsWithRelations,
   runBulkTransaction,
   runInventoryAdjustment,
+  runManualInventoryOperations,
   runRevertTransaction,
   runReceiveFactoryArrival,
 } from './data'
@@ -187,6 +188,24 @@ export async function createTransactions(
   }[],
 ) {
   await addBatchTransactions(items)
+  return { success: true }
+}
+
+export async function createManualInventoryOperations(
+  items: Array<{
+    kind: 'manual-outbound' | 'count-adjustment'
+    date: string
+    warehouseId: number
+    modelId: number
+    sizeId: number
+    colorId: number
+    quantity: number
+    reason: string
+  }>,
+) {
+  if (items.length === 0) throw new Error('입력된 항목이 없습니다.')
+  await runManualInventoryOperations(items)
+  revalidateInventoryPaths()
   return { success: true }
 }
 

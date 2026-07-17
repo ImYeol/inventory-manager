@@ -25,6 +25,7 @@ type InventoryTableToolbarProps<T extends string> = {
   onToggleColumn: (column: T) => void
   onInbound: () => void
   onOutbound: () => void
+  onAdjustment: () => void
 }
 
 export function InventoryTableToolbar<T extends string>({
@@ -40,6 +41,7 @@ export function InventoryTableToolbar<T extends string>({
   onToggleColumn,
   onInbound,
   onOutbound,
+  onAdjustment,
 }: InventoryTableToolbarProps<T>) {
   return (
     <FilterToolbar>
@@ -107,7 +109,10 @@ export function InventoryTableToolbar<T extends string>({
           입고
         </Button>
         <Button type="button" variant="outline" onClick={onOutbound} size="sm" className="h-9 gap-2 rounded-lg px-3">
-          출고
+          수동 출고
+        </Button>
+        <Button type="button" variant="outline" onClick={onAdjustment} size="sm" className="h-9 gap-2 rounded-lg px-3">
+          실사 조정
         </Button>
       </div>
     </FilterToolbar>

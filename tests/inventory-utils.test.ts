@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseTransactionType, transactionTypeLabels } from '@/lib/inventory'
+import { normalizeManualInventoryOperation, parseTransactionType, transactionTypeLabels } from '@/lib/inventory'
 
 describe('inventory utility constants', () => {
   it('defines Korean transaction labels', () => {
@@ -16,5 +16,21 @@ describe('inventory utility constants', () => {
 
   it('throws for unsupported transaction values', () => {
     expect(() => parseTransactionType('other')).toThrow('Unsupported transaction type: other')
+  })
+
+  it('keeps manual outbound and count adjustment contracts distinct and requires an audit reason', () => {
+    expect(normalizeManualInventoryOperation({ kind: 'manual-outbound', quantity: 3, reason: '파손 폐기' })).toEqual({
+      kind: 'manual-outbound',
+      type: 'OUTBOUND',
+      quantity: 3,
+      reason: '파손 폐기',
+    })
+    expect(normalizeManualInventoryOperation({ kind: 'count-adjustment', quantity: 12, reason: '월말 실사' })).toEqual({
+      kind: 'count-adjustment',
+      type: 'ADJUSTMENT',
+      quantity: 12,
+      reason: '월말 실사',
+    })
+    expect(() => normalizeManualInventoryOperation({ kind: 'manual-outbound', quantity: 1, reason: '  ' })).toThrow('사유')
   })
 })

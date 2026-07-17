@@ -138,9 +138,33 @@ describe('InOutForm', () => {
 
     expect(screen.getByLabelText('날짜')).toBeTruthy()
     expect(screen.getByText('창고')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '출고 등록 (0건)' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '수동 출고 등록 (0건)' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '입고/출고 전환' })).toBeNull()
     expect(screen.queryByText('표 붙여넣기')).toBeNull()
+  })
+
+  it('requires a reason for manual outbound and exposes counted quantity for stock counts', () => {
+    const { rerender } = render(
+      React.createElement(InOutForm, {
+        warehouses: [{ id: 7, name: '본사 창고' }],
+        models: [],
+        operation: 'manual-outbound',
+      }),
+    )
+
+    expect(screen.getByLabelText('수동 출고 사유')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '수동 출고 등록 (0건)' })).toBeTruthy()
+
+    rerender(
+      React.createElement(InOutForm, {
+        warehouses: [{ id: 7, name: '본사 창고' }],
+        models: [],
+        operation: 'count-adjustment',
+      }),
+    )
+
+    expect(screen.getByLabelText('실사 조정 사유')).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: '실사 수량' })).toBeTruthy()
   })
 
   it('uses product language rather than the legacy model label in the editor', () => {

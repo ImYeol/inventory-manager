@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { createTransactions, getCurrentStock } from '@/lib/actions'
+import { createManualInventoryOperations, createTransactions, getCurrentStock } from '@/lib/actions'
 import { EditableTable } from '@/components/ui/editable-table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cx, ui } from '../../components/ui'
@@ -133,6 +133,7 @@ type InOutFormProps = {
   models: ModelType[]
   warehouses: WarehouseLookup[]
   initialType?: '입고' | '출고'
+  operation?: 'inbound' | 'manual-outbound' | 'count-adjustment'
   initialWarehouseId?: number
   lockedWarehouseId?: number | null
   onSubmitted?: () => void
@@ -142,6 +143,7 @@ export default function InOutForm({
   models,
   warehouses,
   initialType = '입고',
+  operation,
   initialWarehouseId,
   lockedWarehouseId,
   onSubmitted,
@@ -152,6 +154,11 @@ export default function InOutForm({
   const [warehouseId, setWarehouseId] = useState<number>(initialWarehouseId ?? warehouses[0]?.id ?? -1)
   const [rows, setRows] = useState<RowData[]>(() => Array.from({ length: INITIAL_ROW_COUNT }, emptyRow))
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null)
+  const [reason, setReason] = useState('')
+  const resolvedOperation = operation ?? (initialType === '출고' ? 'manual-outbound' : 'inbound')
+  const isManualOperation = resolvedOperation !== 'inbound'
+  const isCountAdjustment = resolvedOperation === 'count-adjustment'
+  const operationLabel = resolvedOperation === 'inbound' ? '입고' : resolvedOperation === 'manual-outbound' ? '수동 출고' : '실사 조정'
 
   const selectedWarehouseId =
     lockedWarehouseId ?? (warehouseId > 0 && warehouses.some((item) => item.id === warehouseId) ? warehouseId : (warehouses[0]?.id ?? -1))
@@ -264,8 +271,10 @@ export default function InOutForm({
 
   const filledRows = useMemo(
     () =>
-      resolvedRows.filter((row) => row.modelId && row.sizeId && row.colorId && row.quantity && Number(row.quantity) > 0),
-    [resolvedRows],
+      resolvedRows.filter((row) =>
+        row.modelId && row.sizeId && row.colorId && row.quantity !== '' && Number(row.quantity) >= (isCountAdjustment ? 0 : 1),
+      ),
+    [isCountAdjustment, resolvedRows],
   )
 
   const rowErrors = useMemo(
@@ -278,10 +287,10 @@ export default function InOutForm({
         if (!row.modelId) errors.push('상품')
         if (!row.sizeId) errors.push('사이즈')
         if (!row.colorId) errors.push('색상')
-        if (!row.quantity || Number(row.quantity) <= 0) errors.push('수량')
+        if (row.quantity === '' || Number(row.quantity) < (isCountAdjustment ? 0 : 1)) errors.push(isCountAdjustment ? '실사 수량' : '수량')
         return errors
       }),
-    [resolvedRows],
+    [isCountAdjustment, resolvedRows],
   )
 
   const invalidRowCount = rowErrors.filter((errors) => errors.length > 0).length
@@ -297,22 +306,34 @@ export default function InOutForm({
       return
     }
 
+    if (isManualOperation && !reason.trim()) {
+      setMessage({ text: '사유를 입력해주세요.', error: true })
+      return
+    }
+
     startTransition(async () => {
       try {
-        await createTransactions(
-          filledRows.map((row) => ({
-            type: initialType,
-            date: formatDateKR(date),
-            warehouseId: selectedWarehouseId,
-            modelId: row.modelId as number,
-            sizeId: row.sizeId as number,
-            colorId: row.colorId as number,
-            quantity: row.quantity as number,
-          })),
-        )
+        const items = filledRows.map((row) => ({
+          date,
+          warehouseId: selectedWarehouseId,
+          modelId: row.modelId as number,
+          sizeId: row.sizeId as number,
+          colorId: row.colorId as number,
+          quantity: row.quantity as number,
+        }))
+        if (isManualOperation) {
+          await createManualInventoryOperations(items.map((item) => ({
+            ...item,
+            kind: resolvedOperation as 'manual-outbound' | 'count-adjustment',
+            reason,
+          })))
+        } else {
+          await createTransactions(items.map((item) => ({ ...item, date: formatDateKR(item.date), type: initialType })))
+        }
 
         setMessage({ text: `${filledRows.length}건이 성공적으로 등록되었습니다.`, error: false })
         setRows(Array.from({ length: INITIAL_ROW_COUNT }, emptyRow))
+        setReason('')
         router.refresh()
         onSubmitted?.()
       } catch {
@@ -359,12 +380,27 @@ export default function InOutForm({
         </div>
       </div>
 
+      {isManualOperation ? (
+        <div>
+          <label className={ui.label} htmlFor="manual-operation-reason">
+            {isCountAdjustment ? '실사 조정 사유' : '수동 출고 사유'}
+          </label>
+          <input
+            id="manual-operation-reason"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            className={ui.controlSm}
+            placeholder={isCountAdjustment ? '예: 월말 실사' : '예: 파손 폐기'}
+          />
+        </div>
+      ) : null}
+
       <EditableTable
         columns={[
           { key: 'model', header: '상품' },
           { key: 'size', header: '사이즈' },
           { key: 'color', header: '색상' },
-          { key: 'quantity', header: '수량', align: 'right' },
+          { key: 'quantity', header: isCountAdjustment ? '실사 수량' : '수량', align: 'right' },
           { key: 'stock', header: '재고', align: 'right' },
         ]}
         rows={resolvedRows}
@@ -426,7 +462,7 @@ export default function InOutForm({
               return (
                 <input
                   type="number"
-                  min={1}
+                  min={isCountAdjustment ? 0 : 1}
                   value={row.quantity}
                   onChange={(event) => updateRow(row.key, { quantity: event.target.value ? Number(event.target.value) : '' })}
                   className={cx(ui.controlSm, 'text-right font-semibold')}
@@ -481,7 +517,7 @@ export default function InOutForm({
             disabled={isPending || filledRows.length === 0 || !canInput}
             className={cx(ui.buttonPrimary, 'h-12 justify-center text-base')}
           >
-            {isPending ? '등록 중…' : `${initialType} 등록 (${filledRows.length}건)`}
+            {isPending ? '등록 중…' : `${operationLabel} 등록 (${filledRows.length}건)`}
           </button>
         </div>
       </div>
