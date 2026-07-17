@@ -125,6 +125,10 @@
     {
       "dir": "inbound-template-file-upload",
       "status": "completed"
+    },
+    {
+      "dir": "unified-inbound-template-operations",
+      "status": "pending"
     }
   ]
 }
