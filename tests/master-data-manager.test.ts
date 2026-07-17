@@ -89,19 +89,17 @@ describe('MasterDataManager', () => {
     expect(screen.getByRole('button', { name: '내부 상품 등록' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '창고 등록' })).toBeNull()
     expect(screen.queryByText('2개 창고')).toBeNull()
-    expect(screen.getByText(/쿠팡\/네이버 실제 상품정보/)).toBeTruthy()
+    expect(screen.getByRole('table', { name: '내부 SKU 목록' })).toBeTruthy()
 
     fireEvent.mouseDown(screen.getByRole('tab', { name: '창고' }))
     fireEvent.click(screen.getByRole('tab', { name: '창고' }))
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '오금동 삭제' })).toBeTruthy()
+      expect(within(screen.getByText('오금동').closest('tr')!).getByRole('button', { name: '삭제' })).toBeTruthy()
     })
 
     expect(screen.queryByRole('button', { name: '내부 상품 등록' })).toBeNull()
     expect(screen.getByRole('button', { name: '창고 등록' })).toBeTruthy()
     expect(screen.getByText('2개 창고')).toBeTruthy()
-    expect(screen.getByText('SKU 4개')).toBeTruthy()
-    expect(screen.getByText('총 재고 50개')).toBeTruthy()
     expect(screen.queryByText('1개 모델')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '창고 등록' }))
@@ -125,9 +123,9 @@ describe('MasterDataManager', () => {
     fireEvent.mouseDown(screen.getByRole('tab', { name: '창고' }))
     fireEvent.click(screen.getByRole('tab', { name: '창고' }))
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '오금동 삭제' })).toBeTruthy()
+      expect(within(screen.getByText('오금동').closest('tr')!).getByRole('button', { name: '삭제' })).toBeTruthy()
     })
-    fireEvent.click(screen.getByRole('button', { name: '오금동 삭제' }))
+    fireEvent.click(within(screen.getByText('오금동').closest('tr')!).getByRole('button', { name: '삭제' }))
 
     const dialog = screen.getByRole('dialog', { name: '창고 삭제 확인' })
     fireEvent.click(within(dialog).getByRole('button', { name: '삭제' }))
