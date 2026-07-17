@@ -2,7 +2,7 @@
 
 ## Design composition contracts
 
-공유 component composition은 vendor-neutral artifact로 관리한다. [Card contract](../design-system/contracts/card.composition.json)는 React primitive와 Figma library가 같은 `Card`, `surface`, `contentLayout` 이름을 쓰게 하는 source of truth이며, 문서는 의도를 설명하고 code와 harness가 alignment를 검증한다.
+공유 component composition은 vendor-neutral artifact로 관리한다. [Card contract](../../design-system/contracts/card.composition.json)는 React primitive와 Figma library가 같은 `Card`, `surface`, `contentLayout` 이름을 쓰게 하는 source of truth이며, 문서는 의도를 설명하고 code와 harness가 alignment를 검증한다.
 
 ## Channel-first product catalog
 
@@ -299,8 +299,8 @@ shipping_preview_rows
 - `@/*` alias가 있으므로 shadcn-style shared primitive 경로는 root `/components/ui`가 아니라 `src/components/ui`가 맞다.
 - `components.json`이 아직 없어도 경로 기준은 바꾸지 않는다.
 - UI 구현은 shared theme, component, primitive, design token을 우선 재사용한다.
-- 토큰 계층의 소유권은 primitive/semantic=`src/app/globals.css`, component preset bridge=`src/app/components/ui.tsx`, shared primitive=`src/components/ui/*`다. UI 검토 대상 문서에는 `docs/DESIGN.md`와 `docs/MOTION.md`를 포함한다.
-- 새 컴포넌트가 필요하면 먼저 existing shared source로 수렴할 수 있는지 검토하고, 검토 결과는 `docs/UI_GUIDE.md`와 hooks 검사 규칙과 맞춰 본다.
+- 토큰 계층의 소유권은 primitive/semantic=`src/app/globals.css`, component preset bridge=`src/app/components/ui.tsx`, shared primitive=`src/components/ui/*`다. UI 검토 대상 문서에는 `docs/design/tokens.md`와 `docs/design/motion.md`를 포함한다.
+- 새 컴포넌트가 필요하면 먼저 existing shared source로 수렴할 수 있는지 검토하고, 검토 결과는 `docs/design/ui-guide.md`와 hooks 검사 규칙과 맞춰 본다.
 - page-level UI에서 임의의 색상/보더/배경 inline style을 직접 넣지 않는다. 필요한 시맨틱은 `src/app/components/ui.tsx`, `src/app/globals.css`, `src/components/ui/*`에 variant나 token으로 올린다.
 - hooks는 UI 변경 명령 payload의 `command`와 `cmd`를 모두 해석해 docs 동반 검토를 확인한다.
 - strong card가 header/body를 함께 담는 경우, 절반만 살아 있는 seam이나 corner gap을 page-local border patch로 메우지 않는다. shared card/surface primitive의 variant와 padding/token을 고쳐서 하나의 clipped surface로 정리한다.

@@ -74,7 +74,7 @@ purple SaaS gradient, glassmorphism, decorative glow는 금지한다.
 
 ### Card composition contract
 
-Card의 구성과 token 참조는 [card.composition.json](../design-system/contracts/card.composition.json)이 정의한다. 이 문서는 의도를 설명하고, contract는 Figma와 React가 공유하는 component/property 이름 및 조합을 정의하며, 코드와 harness가 이를 검증한다.
+Card의 구성과 token 참조는 [card.composition.json](../../design-system/contracts/card.composition.json)이 정의한다. 이 문서는 의도를 설명하고, contract는 Figma와 React가 공유하는 component/property 이름 및 조합을 정의하며, 코드와 harness가 이를 검증한다.
 
 ## Radius
 
@@ -131,6 +131,6 @@ one-off shadow는 금지한다.
 - 새 값 하드코딩을 금지하고 이 스케일의 토큰만 사용한다.
 - dense는 표·toolbar처럼 정보 밀도가 핵심인 경우에만, sm/md/default/lg는 control의 역할과 tap target에 맞춰 고른다.
 - 페이지가 새 시각 언어를 필요로 하면 `src/app/components/ui.tsx` preset 또는 `src/components/ui/*` primitive로 올린다.
-- 모션 값과 사용 규칙은 [MOTION.md](./MOTION.md)를 따른다.
+- 모션 값과 사용 규칙은 [MOTION.md](./motion.md)를 따른다.
 
 _조사 근거: 3-tier 토큰 아키텍처, 4px base, 역할 기반 elevation, AI 에이전트용 DESIGN.md 토큰 스펙 포맷을 채택한다._

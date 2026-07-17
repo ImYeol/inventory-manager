@@ -16,9 +16,10 @@ Use this skill for repo-specific review passes.
 - `AGENTS.md`
 - `.codex/config.toml`
 - `.codex/hooks.json`
-- `docs/ARCHITECTURE.md`
-- `docs/ADR.md`
-- `docs/UI_GUIDE.md`
+- `CONTEXT.md`
+- `docs/architecture/overview.md`
+- relevant files in `docs/adr/`
+- `docs/design/ui-guide.md`
 - `phases/index.json`
 - The active phase index under `phases/`
 - The current `step*.md` file for the work being reviewed

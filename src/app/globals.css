@@ -2,7 +2,7 @@
 
 /*
  * Visual foundation tokens.
- * Source of truth + rationale: docs/DESIGN.md (color/scale) and docs/MOTION.md (motion).
+ * Source of truth + rationale: docs/design/tokens.md (color/scale) and docs/design/motion.md (motion).
  * Layers: primitive (raw warm neutral / status hues) -> semantic (role) -> component classes below.
  * Never hardcode a new color/size/radius/duration in a component. Add or reuse a token.
  */
@@ -90,7 +90,7 @@
   --elevation-4: 0 28px 70px rgba(28, 25, 23, 0.16);
   --shadow: var(--elevation-1); /* legacy alias */
 
-  /* --- motion (see docs/MOTION.md) --- */
+  /* --- motion (see docs/design/motion.md) --- */
   --duration-instant: 80ms;
   --duration-fast: 120ms;
   --duration-base: 180ms;

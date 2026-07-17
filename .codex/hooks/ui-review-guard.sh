@@ -31,12 +31,12 @@ UI_ROOTS = (
 )
 
 DOC_ROOTS = (
-    "docs/UI_GUIDE.md",
-    "docs/ARCHITECTURE.md",
-    "docs/ADR.md",
-    "docs/DESIGN.md",
-    "docs/MOTION.md",
-    "docs/COMPONENTS.md",
+    "docs/design/ui-guide.md",
+    "docs/architecture/overview.md",
+    "docs/adr/",
+    "docs/design/tokens.md",
+    "docs/design/motion.md",
+    "docs/design/components.md",
 )
 
 
@@ -77,7 +77,7 @@ path_candidates.extend(
 normalized_paths = {candidate.lstrip("./") for candidate in path_candidates}
 
 ui_targets = [path for path in normalized_paths if any(path.startswith(root) for root in UI_ROOTS)]
-doc_targets = [path for path in normalized_paths if path in DOC_ROOTS]
+doc_targets = [path for path in normalized_paths if any(path.startswith(root) for root in DOC_ROOTS)]
 
 if not ui_targets:
     silent()
@@ -92,7 +92,7 @@ print(
         {
             "systemMessage": (
                 "UI 변경은 shared theme/component/primitive/design token 기준을 "
-                "docs/UI_GUIDE.md, docs/ARCHITECTURE.md, docs/ADR.md와 함께 검토하고, "
+                "docs/design/ui-guide.md, docs/architecture/overview.md, 관련 docs/adr/ 결정과 함께 검토하고, "
                 "design composition contract가 component/property 이름과 token 참조를 지키는지 확인하세요."
             ),
         }

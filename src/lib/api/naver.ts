@@ -71,38 +71,42 @@ function asNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-function normalizeNaverProduct(product: unknown): ChannelProductSnapshot | null {
+function normalizeNaverProduct(product: unknown): ChannelProductSnapshot[] {
   const raw = asRecord(product)
-  const originProduct = asRecord(raw.originProduct)
-  const channelProduct = asRecord(raw.smartstoreChannelProduct ?? raw.channelProduct)
-  const externalProductId = asNumber(originProduct.originProductNo)
-  const externalVariantId = asNumber(channelProduct.channelProductNo) ?? externalProductId
+  const externalProductId = asIdentifier(raw.originProductNo)
+  const channelProducts = Array.isArray(raw.channelProducts) ? raw.channelProducts : []
 
-  if (externalProductId === null || externalVariantId === null) return null
+  if (externalProductId === null) return []
 
-  const displayStatus = asString(channelProduct.channelProductDisplayStatusType)
-  const status = asString(originProduct.statusType)
-  const isDisplayed = !displayStatus || ['ON', 'ACTIVE', 'SALE'].includes(displayStatus)
-  const isSellable = !status || ['SALE', 'ON', 'ACTIVE'].includes(status)
-  const stockQuantity = asNumber(originProduct.stockQuantity)
-  const images = Array.isArray(originProduct.images) ? originProduct.images : []
-  const firstImage = asRecord(images[0])
+  return channelProducts.flatMap((channelProductValue) => {
+    const channelProduct = asRecord(channelProductValue)
+    const externalVariantId = asIdentifier(channelProduct.channelProductNo)
 
-  return {
-    channel: 'naver',
-    externalProductId: String(externalProductId),
-    externalVariantId: String(externalVariantId),
-    sellerSku: asString(originProduct.sellerManagementCode),
-    productName: asString(originProduct.name),
-    optionName: null,
-    listingStatus: isDisplayed && isSellable
-      ? stockQuantity === 0 ? 'sold-out' : 'active'
-      : 'paused',
-    stockQuantity,
-    price: asNumber(originProduct.salePrice ?? originProduct.price),
-    imageUrl: asString(firstImage.url ?? firstImage.imageUrl),
-    rawAttributes: raw,
-  }
+    if (externalVariantId === null) return []
+
+    const displayStatus = asString(channelProduct.channelProductDisplayStatusType)
+    const status = asString(channelProduct.statusType)
+    const isDisplayed = !displayStatus || displayStatus === 'ON'
+    const isSellable = !status || ['SALE', 'OUTOFSTOCK'].includes(status)
+    const stockQuantity = asNumber(channelProduct.stockQuantity)
+    const representativeImage = asRecord(channelProduct.representativeImage)
+
+    return [{
+      channel: 'naver' as const,
+      externalProductId,
+      externalVariantId,
+      sellerSku: asString(channelProduct.sellerManagementCode),
+      productName: asString(channelProduct.name),
+      optionName: null,
+      listingStatus: isDisplayed && isSellable
+        ? stockQuantity === 0 ? 'sold-out' : 'active'
+        : 'paused',
+      stockQuantity,
+      price: asNumber(channelProduct.discountedPrice ?? channelProduct.salePrice),
+      imageUrl: asString(representativeImage.url),
+      rawAttributes: raw,
+    }]
+  })
 }
 
 export async function fetchNaverProductSnapshots(
@@ -122,13 +126,11 @@ export async function fetchNaverProductSnapshots(
 
     if (!res.ok) throw new Error(`네이버 상품 조회 실패: ${res.status}`)
 
-    const data = asRecord(await res.json())
-    const payload = asRecord(data.data)
+    const payload = asRecord(await res.json())
     const contents = Array.isArray(payload.contents) ? payload.contents : []
-    snapshots.push(...contents.map(normalizeNaverProduct).filter((item): item is ChannelProductSnapshot => item !== null))
+    snapshots.push(...contents.flatMap(normalizeNaverProduct))
 
-    const pagination = asRecord(payload.pagination)
-    const nextTotalPages = asNumber(pagination.totalPages)
+    const nextTotalPages = asNumber(payload.totalPages)
     totalPages = nextTotalPages ?? (contents.length === 500 ? page + 1 : page)
     page += 1
   }

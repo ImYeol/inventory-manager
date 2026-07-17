@@ -53,9 +53,9 @@ afterEach(() => {
 describe('shared action and status primitives', () => {
   it('keeps the approved commerce IA and inventory invariants in the document contract', () => {
     const readDocument = (relativePath: string) => fs.readFileSync(path.resolve(process.cwd(), relativePath), 'utf8')
-    const prd = readDocument('docs/PRD.md')
-    const architecture = readDocument('docs/ARCHITECTURE.md')
-    const adr = readDocument('docs/ADR.md')
+    const prd = readDocument('docs/product/prd.md')
+    const architecture = readDocument('docs/architecture/overview.md')
+    const adr = readDocument('docs/adr/0029-orders-inventory-state-model.md')
 
     for (const document of [prd, architecture, adr]) {
       expect(document).toContain('ProductVariant')

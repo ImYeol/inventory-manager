@@ -1,7 +1,7 @@
 # UI Guide
 
 ## Source Of Truth
-- UI/UX 원칙과 shared primitive 규칙의 source of truth는 이 문서다. 시각 토큰 값과 스케일의 source of truth는 [DESIGN.md](./DESIGN.md), 모션의 source of truth는 [MOTION.md](./MOTION.md)다.
+- UI/UX 원칙과 shared primitive 규칙의 source of truth는 이 문서다. 시각 토큰 값과 스케일의 source of truth는 [DESIGN.md](./tokens.md), 모션의 source of truth는 [MOTION.md](./motion.md)다.
 - 토큰은 `src/app/globals.css`에, page-level preset은 `src/app/components/ui.tsx`에, shared primitive는 `src/components/ui`에 둔다.
 
 ## 컴포넌트 경로 규칙
@@ -59,7 +59,7 @@
 - 새 액션이 들어오면 새 줄을 만들기 전에 폭, padding, 라벨 길이, 비핵심 텍스트를 먼저 압축한다.
 - 성공/실패/상태 메시지는 toolbar 높이를 밀어 올리면 안 된다. toolbar 폭 계산에 참여하지 않게 하거나, 별도 dense strip으로 보낸다.
 - 운영 화면에서는 multi-row 정렬보다 action row 높이 안정성을 우선한다.
-- 외부 패턴 근거는 [ADR-024](./ADR.md#adr-024-운영-콘솔의-기본-필터는-intent-ranked-minimal-set으로-제한한다)를 참조한다.
+- 외부 패턴 근거는 [ADR-024](../adr/0024-minimal-intent-ranked-filters.md)를 참조한다.
 
 ## Component Budget Checklist
 - 아래 항목은 [Compact Action Doctrine](#compact-action-doctrine)을 기준으로 검토한다.
@@ -89,7 +89,7 @@
   - `meta cluster`: reset, result count, compact status
 
 ## 디자인 토큰
-값과 스케일의 SoT는 [DESIGN.md](./DESIGN.md), 모션은 [MOTION.md](./MOTION.md)다. 아래 목록은 token 이름만 유지하며 구체적 값은 DESIGN.md를 참조한다.
+값과 스케일의 SoT는 [DESIGN.md](./tokens.md), 모션은 [MOTION.md](./motion.md)다. 아래 목록은 token 이름만 유지하며 구체적 값은 DESIGN.md를 참조한다.
 
 - `--background`
 - `--foreground`
@@ -189,7 +189,7 @@ src/components/ui/
 
 ## Review Contract
 - UI work를 할 때는 shared theme, component, primitive, design token 사용 여부를 먼저 확인한다.
-- hooks와 검사 스크립트는 UI 변경을 감지하면 이 문서와 `docs/ARCHITECTURE.md`, `docs/ADR.md`의 원칙을 함께 점검해야 한다.
+- hooks와 검사 스크립트는 UI 변경을 감지하면 이 문서와 `docs/architecture/overview.md`, `docs/adr/`의 원칙을 함께 점검해야 한다.
 - theme, tokens, primitive, component가 분리되어 보이면 우선 shared source로 수렴시킨다.
 - hook은 UI 변경 payload에서 `command`와 `cmd` 둘 다 읽을 수 있어야 하며, UI 파일 수정 시 docs 검토를 같이 강제한다.
 
@@ -371,7 +371,7 @@ src/components/ui/
 - 넓은 빈 여백보다 table viewport를 우선한다.
 
 ## Sizing / Density 계약
-- control/button/tab/badge는 [DESIGN.md](./DESIGN.md)의 정의된 size tier만 사용한다.
+- control/button/tab/badge는 [DESIGN.md](./tokens.md)의 정의된 size tier만 사용한다.
 - 임의 height를 추가하지 않는다.
 
 ## 버튼과 드롭다운
@@ -390,10 +390,10 @@ src/components/ui/
 - strong card는 header와 body가 나뉘어도 하나의 clipped surface로 읽혀야 한다.
 - hollow corner, segmented seam, 이질적인 border split이 보이면 card variant가 아니라 shared primitive 구조를 다시 봐야 한다.
 - page-local border patch로 임시 봉합하지 말고 shared card/surface primitive의 variant와 padding/token을 고쳐서 해결한다.
-- Card의 divider/body 관계는 [card composition contract](../design-system/contracts/card.composition.json)가 정의한다. 이 문서는 의도를 설명하고, contract는 component composition을 정의하며, code와 harness가 이를 검증한다.
+- Card의 divider/body 관계는 [card composition contract](../../design-system/contracts/card.composition.json)가 정의한다. 이 문서는 의도를 설명하고, contract는 component composition을 정의하며, code와 harness가 이를 검증한다.
 
 ## 모션
-- duration, easing, reduced-motion의 SoT는 [MOTION.md](./MOTION.md)다.
+- duration, easing, reduced-motion의 SoT는 [MOTION.md](./motion.md)다.
 - 허용:
   - dropdown 열림/닫힘
   - table row 초기 진입

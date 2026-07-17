@@ -1,6 +1,6 @@
 # Component Inventory
 
-이 문서는 Seleccase Inventory의 컴포넌트 재사용을 위한 canonical source of truth다. 시각 토큰 값과 스케일은 [DESIGN.md](./DESIGN.md), UI 원칙과 경로 규칙은 [UI_GUIDE.md](./UI_GUIDE.md)의 [Shared Primitive](./UI_GUIDE.md#shared-primitive) 및 [컴포넌트 경로 규칙](./UI_GUIDE.md#컴포넌트-경로-규칙)을 따른다.
+이 문서는 Seleccase Inventory의 컴포넌트 재사용을 위한 canonical source of truth다. 시각 토큰 값과 스케일은 [DESIGN.md](./tokens.md), UI 원칙과 경로 규칙은 [UI_GUIDE.md](./ui-guide.md)의 [Shared Primitive](./ui-guide.md#shared-primitive) 및 [컴포넌트 경로 규칙](./ui-guide.md#컴포넌트-경로-규칙)을 따른다.
 
 ## 계층 경계
 
@@ -17,7 +17,7 @@
 | `ProductVariantCombobox` | `product-variant-combobox.tsx` | 내부 판매 옵션을 검색·명시 선택하는 combobox | `variants`, `value`, `onValueChange` | 미연결 채널 상품의 수동 variant 연결 | 상품명으로 자동 선택하거나 free-text 상품 생성을 넣지 않는다. |
 | `BasicDataTable` | `basic-data-table.tsx` | generic 조회·preview table | `columns`, `rows`, `rowKey`, `renderCell`, `emptyState`; 선택적으로 `onRowClick`, `rowAriaLabel`, `getRowClassName`, `bare` | 열과 셀 렌더러를 화면이 제공하는 조회 table. `bare`는 자체 border를 빼고 `TableSurface` 안에서 seamless하게 쓴다 | 편집 input table이나 화면별 `<table>`을 만들지 않는다. |
 | `Button`, `buttonVariants`, `ButtonProps` | `button.tsx` | tokenized action/button | `variant`: `default`, `success`, `warning`, `destructive`, `outline`, `secondary`, `ghost`, `link`; `size`: `default`, `sm`, `lg`, `icon`; `asChild` | 링크/행동을 구분한 모든 공용 버튼 | page-local 색상·border 버튼을 만들지 않는다. |
-| `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter` | `card.tsx` | bordered surface 구조 | `Card.surface`: `default`, `muted`, `strong`; `CardContent.contentLayout`: `inset`, `continuous` | 필요한 card/surface와 header-body-footer 구조 | [card composition contract](../design-system/contracts/card.composition.json)를 따르고, 화면에서 divider/body spacing을 className으로 재정의하지 않는다. |
+| `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter` | `card.tsx` | bordered surface 구조 | `Card.surface`: `default`, `muted`, `strong`; `CardContent.contentLayout`: `inset`, `continuous` | 필요한 card/surface와 header-body-footer 구조 | [card composition contract](../../design-system/contracts/card.composition.json)를 따르고, 화면에서 divider/body spacing을 className으로 재정의하지 않는다. |
 | `ColumnVisibilityMenu`, `ColumnOption` | `column-visibility-menu.tsx` | 컬럼 토글 dropdown | `columns`, `visibleColumns`, `onToggle` | `InventoryTableToolbar`의 재고 조회 컬럼 표시 control | 화면별 컬럼 토글 dropdown을 새로 만들지 않는다. |
 | `DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuCheckboxItem`, `DropdownMenuRadioItem`, `DropdownMenuLabel`, `DropdownMenuSeparator`, `DropdownMenuGroup`, `DropdownMenuPortal`, `DropdownMenuSub`, `DropdownMenuSubTrigger`, `DropdownMenuSubContent`, `DropdownMenuRadioGroup`, `DropdownMenuShortcut` | `dropdown-menu.tsx` | Radix 기반 action/selection menu | Radix props; 일부 item/label/sub-trigger는 `inset`; content는 `sideOffset` | menu, checkbox/radio 선택, sub-menu | native menu 또는 페이지별 popup menu를 만들지 않는다. |
 | `EditableTable`, `EditableTableColumn`, `EditableTableProps` | `editable-table.tsx` | compact editable input table chrome | `columns`, `rows`, `getRowKey`, `renderCell`; 선택적으로 add/duplicate/delete, `rowError`, `minRows`, `disabled` | 소비자가 도메인 셀을 렌더하는 다건 입력 table | 조회 table의 정렬·컬럼 가시성·empty-state 역할을 중복하지 않는다. |
@@ -74,4 +74,4 @@
 
 ## 사용 규칙
 
-새 화면이나 기능은 hand-roll 전에 이 카탈로그에서 canonical primitive를 먼저 찾는다. 없으면 새 primitive를 바로 만들지 말고 기존 variant 또는 props 확장을 우선 검토한다. 운영 surface와 action 배치는 [UI_GUIDE.md §17](./UI_GUIDE.md#핵심-원칙) 및 [§22](./UI_GUIDE.md#핵심-원칙)를 따른다.
+새 화면이나 기능은 hand-roll 전에 이 카탈로그에서 canonical primitive를 먼저 찾는다. 없으면 새 primitive를 바로 만들지 말고 기존 variant 또는 props 확장을 우선 검토한다. 운영 surface와 action 배치는 [UI_GUIDE.md §17](./ui-guide.md#핵심-원칙) 및 [§22](./ui-guide.md#핵심-원칙)를 따른다.

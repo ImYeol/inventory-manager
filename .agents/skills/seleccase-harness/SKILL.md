@@ -1,6 +1,6 @@
 ---
 name: seleccase-harness
-description: 이 프로젝트의 Harness 워크플로우를 Codex CLI 기준으로 진행한다. 구현 전 `AGENTS.md`와 `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/UI_GUIDE.md`, `docs/ADR.md`, `phases/`를 읽고, 각 step은 별도의 headless Codex CLI 세션에서 `execute_codex.py`로 실행한다.
+description: 이 프로젝트의 Harness 워크플로우를 Codex CLI 기준으로 진행한다. 구현 전 `AGENTS.md`와 제품·구조·UI·ADR 문서, `phases/`를 읽고, 각 step은 별도의 headless Codex CLI 세션에서 `execute_codex.py`로 실행한다.
 ---
 
 # Seleccase Harness
@@ -11,13 +11,14 @@ description: 이 프로젝트의 Harness 워크플로우를 Codex CLI 기준으�
 - `AGENTS.md`
 - `.codex/config.toml`
 - `.codex/hooks.json`
-- `docs/PRD.md`
-- `docs/ARCHITECTURE.md`
-- `docs/UI_GUIDE.md`
-- `docs/COMPONENTS.md`
-- `docs/DESIGN.md`
-- `docs/MOTION.md`
-- `docs/ADR.md`
+- `CONTEXT.md`
+- `docs/product/prd.md`
+- `docs/architecture/overview.md`
+- `docs/design/ui-guide.md`
+- `docs/design/components.md`
+- `docs/design/tokens.md`
+- `docs/design/motion.md`
+- relevant files in `docs/adr/`
 - `phases/index.json`
 
 `AGENTS.md`와 `docs/`가 저장소 계약의 source of truth다. 이 스킬과 충돌하면 문서를 따른다.

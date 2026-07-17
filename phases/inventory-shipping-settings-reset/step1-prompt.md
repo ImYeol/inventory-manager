@@ -49,9 +49,9 @@
 
 ## 읽어야 할 파일
 - `/Users/yeol-mac/Development/seleccase-inventory/AGENTS.md`
-- `/Users/yeol-mac/Development/seleccase-inventory/docs/PRD.md`
-- `/Users/yeol-mac/Development/seleccase-inventory/docs/ARCHITECTURE.md`
-- `/Users/yeol-mac/Development/seleccase-inventory/docs/UI_GUIDE.md`
+- `/Users/yeol-mac/Development/seleccase-inventory/docs/product/prd.md`
+- `/Users/yeol-mac/Development/seleccase-inventory/docs/architecture/overview.md`
+- `/Users/yeol-mac/Development/seleccase-inventory/docs/design/ui-guide.md`
 - `/Users/yeol-mac/Development/seleccase-inventory/src/app/components/Nav.tsx`
 - `/Users/yeol-mac/Development/seleccase-inventory/src/app/(protected)/settings/page.tsx`
 - `/Users/yeol-mac/Development/seleccase-inventory/src/app/(protected)/settings/SettingsView.tsx`

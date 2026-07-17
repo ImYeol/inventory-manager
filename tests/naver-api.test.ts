@@ -54,37 +54,46 @@ describe('naver product API helper', () => {
     expect(String(tokenRequest[1].body)).not.toContain(credentials.clientSecret)
   })
 
-  it('pages product search at the maximum supported size and normalizes typed snapshots', async () => {
+  it('pages the current product-search response and emits one snapshot per channel product', async () => {
     fetchMock
       .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'access-token' }) })
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          data: {
-            contents: [
-              {
-                originProduct: {
-                  originProductNo: 101,
+          contents: [
+            {
+              originProductNo: 101,
+              channelProducts: [
+                {
+                  channelProductNo: 202,
                   sellerManagementCode: 'SKU-NAV-1',
                   name: '네이버 상품',
                   statusType: 'SALE',
+                  channelProductDisplayStatusType: 'ON',
                   stockQuantity: 12,
                   salePrice: 18000,
-                  images: [{ url: 'https://image.example/naver.jpg' }],
+                  discountedPrice: 16000,
+                  representativeImage: { url: 'https://image.example/naver.jpg' },
                 },
-                smartstoreChannelProduct: {
-                  channelProductNo: 202,
+                {
+                  channelProductNo: 203,
+                  sellerManagementCode: 'SKU-NAV-2',
+                  name: '네이버 상품 2',
+                  statusType: 'OUTOFSTOCK',
                   channelProductDisplayStatusType: 'ON',
+                  stockQuantity: 0,
+                  salePrice: 20000,
                 },
-              },
-            ],
-            pagination: { page: 1, totalPages: 2 },
-          },
+              ],
+            },
+          ],
+          page: 1,
+          totalPages: 2,
         }),
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ data: { contents: [], pagination: { page: 2, totalPages: 2 } } }),
+        json: async () => ({ contents: [], page: 2, totalPages: 2 }),
       })
 
     await expect(
@@ -99,10 +108,25 @@ describe('naver product API helper', () => {
         optionName: null,
         listingStatus: 'active',
         stockQuantity: 12,
-        price: 18000,
+        price: 16000,
         imageUrl: 'https://image.example/naver.jpg',
         rawAttributes: expect.objectContaining({
-          originProduct: expect.objectContaining({ originProductNo: 101 }),
+          originProductNo: 101,
+        }),
+      },
+      {
+        channel: 'naver',
+        externalProductId: '101',
+        externalVariantId: '203',
+        sellerSku: 'SKU-NAV-2',
+        productName: '네이버 상품 2',
+        optionName: null,
+        listingStatus: 'sold-out',
+        stockQuantity: 0,
+        price: 20000,
+        imageUrl: null,
+        rawAttributes: expect.objectContaining({
+          originProductNo: 101,
         }),
       },
     ])
