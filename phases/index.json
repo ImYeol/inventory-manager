@@ -113,6 +113,10 @@
       "dir": "warehouse-transfer-operations",
       "status": "completed",
       "completed_at": "2026-07-18T00:32:28+0900"
+    },
+    {
+      "dir": "inbound-drafts-and-supplier-sku-links",
+      "status": "completed"
     }
   ]
 }
