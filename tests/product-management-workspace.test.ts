@@ -5,13 +5,11 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 
 const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
-  syncProducts: vi.fn(),
   linkVariant: vi.fn(),
   createInternalProduct: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh }) }))
-vi.mock('@/lib/actions/channel-product-sync', () => ({ syncProducts: mocks.syncProducts }))
 vi.mock('@/lib/actions/channel-product-link', () => ({ linkVariant: mocks.linkVariant }))
 vi.mock('@/lib/actions/internal-product', () => ({ createInternalProduct: mocks.createInternalProduct }))
 vi.mock('@/lib/actions', () => ({
@@ -83,9 +81,9 @@ describe('Product management workspace', () => {
     expect(mocks.linkVariant).not.toHaveBeenCalled()
   })
 
-  it('always renders the channel-first empty state and internal product creation preview', () => {
+  it('renders the internal SKU empty state and internal product creation preview', () => {
     render(React.createElement(MasterDataManager, { ...props, variants: [], channelProductRefs: [] }))
-    expect(screen.getByText(/쿠팡\/네이버 실제 상품정보/)).toBeTruthy()
+    expect(screen.getByText(/등록된 내부 판매 옵션이 없습니다/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '내부 상품 등록' }))
     const dialog = screen.getByRole('dialog', { name: '내부 상품 등록' })
     fireEvent.change(within(dialog).getByLabelText(/사이즈/), { target: { value: 'S, M' } })
@@ -104,27 +102,4 @@ describe('Product management workspace', () => {
     expect(within(dialog).getAllByText(/옵션이 없으면 비워두세요/)).toHaveLength(2)
   })
 
-  it('runs sync from the product toolbar and shows inline result metadata', async () => {
-    mocks.syncProducts.mockResolvedValue({ added: 2, updated: 1, mappingRequired: 1, failed: 0, providerFailures: [] })
-    render(React.createElement(MasterDataManager, props))
-
-    fireEvent.click(screen.getByRole('button', { name: '동기화' }))
-    await waitFor(() => expect(mocks.syncProducts).toHaveBeenCalledWith())
-    expect(screen.getByText('추가 2 · 갱신 1 · 연결 필요 1')).toBeTruthy()
-  })
-
-  it('shows a safe provider failure summary in the product toolbar', async () => {
-    mocks.syncProducts.mockResolvedValue({
-      added: 0,
-      updated: 0,
-      mappingRequired: 0,
-      failed: 1,
-      providerFailures: [{ channel: 'coupang', message: '쿠팡 인증 정보를 확인해 주세요.' }],
-    })
-    render(React.createElement(MasterDataManager, props))
-
-    fireEvent.click(screen.getByRole('button', { name: '동기화' }))
-
-    expect(await screen.findByText('추가 0 · 갱신 0 · 연결 필요 0 · 실패 1 · 쿠팡 인증 정보를 확인해 주세요.')).toBeTruthy()
-  })
 })

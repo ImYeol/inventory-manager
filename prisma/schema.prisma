@@ -220,6 +220,7 @@ model ChannelProductRef {
   channelReported   Int?               @map("channel_reported")
   lastSyncedAt      DateTime?          @map("last_synced_at") @db.Timestamptz(6)
   lastSyncError     String?            @map("last_sync_error")
+  verificationStatus String             @default("unverified") @map("verification_status")
   createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime           @default(now()) @map("updated_at") @db.Timestamptz(6)
   variant           ProductVariant?    @relation(fields: [variantId, userId], references: [id, userId], onDelete: NoAction)

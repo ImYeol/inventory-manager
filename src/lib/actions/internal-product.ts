@@ -69,11 +69,6 @@ export async function createInternalProduct(input: {
     const { data: createdVariants, error: variantError } = await supabase.from('product_variants').insert(variants).select('id, seller_sku')
     if (variantError || !createdVariants) throw new Error(variantError?.message ?? '판매 옵션 등록에 실패했습니다.')
 
-    for (const variant of createdVariants) {
-      const { error } = await supabase.from('channel_product_refs').update({ variant_id: variant.id })
-        .eq('user_id', user.id).eq('seller_sku', variant.seller_sku).is('variant_id', null)
-      if (error) throw new Error('채널 상품 연결에 실패했습니다.')
-    }
   } catch (error) {
     if (modelId !== null) await supabase.from('models').delete().eq('id', modelId).eq('user_id', user.id)
     throw error instanceof Error ? error : new Error('내부 상품 등록에 실패했습니다.')

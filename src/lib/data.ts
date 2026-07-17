@@ -447,6 +447,7 @@ export type ProductWorkspaceChannelRef = {
   channelReported: number | null
   lastSyncedAt: string | null
   lastSyncError: string | null
+  verificationStatus: 'verified' | 'unverified'
   imageUrl: string | null
   price: number | null
 }
@@ -463,7 +464,7 @@ export async function getProductWorkspaceData(): Promise<{
     supabase.from('colors').select('id, name'),
     supabase.from('inventory').select('model_id, size_id, color_id, quantity'),
     supabase.from('inventory_reservations').select('product_variant_id, quantity').eq('status', 'active'),
-    supabase.from('channel_product_refs').select('id, variant_id, channel, external_product_id, external_variant_id, product_name, option_name, seller_sku, listing_status, channel_attributes, channel_reported, last_synced_at, last_sync_error'),
+    supabase.from('channel_product_refs').select('id, variant_id, channel, external_product_id, external_variant_id, product_name, option_name, seller_sku, listing_status, channel_attributes, channel_reported, last_synced_at, last_sync_error, verification_status'),
   ])
   if ([variantsRes, reservationsRes, refsRes].some((response) => isMissingSchemaError(response.error))) {
     return { variants: [], channelProductRefs: [] }
@@ -499,6 +500,7 @@ export async function getProductWorkspaceData(): Promise<{
       externalProductId: row.external_product_id, externalVariantId: row.external_variant_id, productName: row.product_name,
       optionName: row.option_name, sellerSku: row.seller_sku, listingStatus: row.listing_status as ProductWorkspaceChannelRef['listingStatus'],
       channelReported: row.channel_reported, lastSyncedAt: row.last_synced_at, lastSyncError: row.last_sync_error,
+      verificationStatus: row.verification_status === 'verified' ? 'verified' : 'unverified',
       imageUrl: typeof attributes.imageUrl === 'string' ? attributes.imageUrl : null,
       price: typeof attributes.price === 'number' ? attributes.price : null,
     }

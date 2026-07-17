@@ -13,13 +13,12 @@ function query(data: unknown, error: unknown = null) {
 
 describe('createInternalProduct', () => {
   beforeEach(() => Object.values(mocks).forEach((mock) => mock.mockReset()))
-  it('creates variants with unique seller SKUs and links only exact existing channel SKU refs', async () => {
+  it('creates variants with unique seller SKUs without automatically linking channel refs', async () => {
     const models = query({ id: 1 }); const sizes = query([{ id: 11, name: 'S' }, { id: 12, name: 'M' }]); const colors = query([{ id: 21, name: '블랙' }]); const variants = query([{ id: 101, seller_sku: 'LP-S-블랙' }, { id: 102, seller_sku: 'LP-M-블랙' }]); const refs = query(null)
     const supabase = { from: vi.fn((table: string) => ({ models, sizes, colors, product_variants: variants, channel_product_refs: refs }[table])) }
     mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
     await expect(createInternalProduct({ name: '내부 상품', sizes: ['S', 'M'], colors: ['블랙'], skuPrefix: 'LP' })).resolves.toMatchObject({ variantCount: 2, sellerSkus: ['LP-S-블랙', 'LP-M-블랙'] })
-    expect(refs.eq).toHaveBeenCalledWith('seller_sku', 'LP-S-블랙')
-    expect(refs.is).toHaveBeenCalledWith('variant_id', null)
+    expect(refs.update).not.toHaveBeenCalled()
   })
   it('rejects combination explosions before writing', async () => {
     await expect(createInternalProduct({ name: '내부 상품', sizes: Array.from({ length: 11 }, (_, index) => `${index}`), colors: Array.from({ length: 10 }, (_, index) => `${index}`), skuPrefix: 'LP' })).rejects.toThrow('최대 100개')

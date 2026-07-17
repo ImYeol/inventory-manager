@@ -15,7 +15,6 @@ import { ActionToolbar } from '@/components/ui/toolbar'
 import { FilterToolbar } from '@/components/ui/filter-toolbar'
 import { TableSurface } from '@/components/ui/table-surface'
 import { cx, ui } from '../../components/ui'
-import { syncProducts } from '@/lib/actions/channel-product-sync'
 import { linkVariant } from '@/lib/actions/channel-product-link'
 import { createInternalProduct } from '@/lib/actions/internal-product'
 import type { ProductWorkspaceChannelRef, ProductWorkspaceVariant } from '@/lib/data'
@@ -117,7 +116,6 @@ export default function MasterDataManager({
   const [productView, setProductView] = useState<ProductView>('all')
   const [selectedChannelRef, setSelectedChannelRef] = useState<ProductWorkspaceChannelRef | null>(null)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
-  const [syncMeta, setSyncMeta] = useState<string | null>(null)
 
   const showToast = (next: { type: 'success' | 'error'; text: string }) => {
     setMessage(next)
@@ -261,19 +259,6 @@ export default function MasterDataManager({
     return true
   })
 
-  const runSync = () => {
-    setSyncMeta(null)
-    startTransition(async () => {
-      try {
-        const result = await syncProducts()
-        setSyncMeta(`추가 ${result.added} · 갱신 ${result.updated} · 연결 필요 ${result.mappingRequired}${result.failed ? ` · 실패 ${result.failed}` : ''}${result.providerFailures.map((failure) => ` · ${failure.message}`).join('')}`)
-        router.refresh()
-      } catch (error) {
-        setSyncMeta(error instanceof Error ? error.message : '동기화에 실패했습니다.')
-      }
-    })
-  }
-
   const toggleSelectedRefLink = () => {
     if (!selectedChannelRef) return
     const nextVariantId = selectedChannelRef.variantId === null && selectedVariantId ? Number(selectedVariantId) : null
@@ -350,9 +335,7 @@ export default function MasterDataManager({
                     </div>
                   </div>
                   <ActionToolbar className="shrink-0">
-                    {syncMeta ? <span role="status" className="text-xs text-[color:var(--muted-foreground)]">{syncMeta}</span> : null}
                     <Button type="button" variant="secondary" size="sm" className="h-10 px-3" onClick={openInternalProductModal}>내부 상품 등록</Button>
-                    <Button type="button" size="sm" className="h-10 px-3" onClick={runSync} disabled={isPending}>동기화</Button>
                   </ActionToolbar>
                 </FilterToolbar>
               }
@@ -367,7 +350,7 @@ export default function MasterDataManager({
                 ]}
                 rows={filteredChannelRows}
                 rowKey={(row) => row.kind === 'variant' ? `variant-${row.variant.id}` : `ref-${row.ref.id}`}
-                emptyState="채널 상품이 없습니다. 동기화를 실행해 쿠팡/네이버 실제 상품정보를 가져오거나 내부 상품을 등록하세요."
+                emptyState="등록된 내부 판매 옵션이 없습니다. 내부 상품을 등록한 뒤 채널 옵션을 명시적으로 연결하세요."
                 renderCell={(row, columnKey) => {
                   const variant = row.kind === 'variant' ? row.variant : null
                   const onlyRef = row.kind === 'unlinked-ref' ? row.ref : null
