@@ -32,6 +32,10 @@ vi.mock('@/app/(protected)/inout/InOutForm', () => ({
     ),
 }))
 
+vi.mock('@/app/components/inventory/WarehouseTransferForm', () => ({
+  default: () => React.createElement('div', {}, 'WarehouseTransferForm'),
+}))
+
 vi.mock('@/app/(protected)/history/HistoryView', () => ({
   default: ({
     filters,
@@ -141,6 +145,7 @@ describe('InventoryWorkspace', () => {
     expect(screen.getByRole('button', { name: '입고' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '수동 출고' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '실사 조정' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '창고 이동' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '재고 추가' })).toBeNull()
     expect(within(screen.getByRole('table')).getByText('On hand')).toBeTruthy()
     expect(within(screen.getByRole('table')).getByText('Committed')).toBeTruthy()
@@ -173,6 +178,10 @@ describe('InventoryWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: '실사 조정' }))
     expect(screen.getByRole('dialog', { name: '실사 수량 조정' })).toBeTruthy()
     expect(screen.getByText('InOutForm:count-adjustment:2')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '창고 이동' }))
+    expect(screen.getByRole('dialog', { name: '창고 이동' })).toBeTruthy()
+    expect(screen.getByText('WarehouseTransferForm')).toBeTruthy()
   })
 
   it('does not render oversized summary chrome when the table is empty', () => {

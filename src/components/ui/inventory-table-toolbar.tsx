@@ -26,6 +26,7 @@ type InventoryTableToolbarProps<T extends string> = {
   onInbound: () => void
   onOutbound: () => void
   onAdjustment: () => void
+  onTransfer: () => void
 }
 
 export function InventoryTableToolbar<T extends string>({
@@ -42,6 +43,7 @@ export function InventoryTableToolbar<T extends string>({
   onInbound,
   onOutbound,
   onAdjustment,
+  onTransfer,
 }: InventoryTableToolbarProps<T>) {
   return (
     <FilterToolbar>
@@ -113,6 +115,9 @@ export function InventoryTableToolbar<T extends string>({
         </Button>
         <Button type="button" variant="outline" onClick={onAdjustment} size="sm" className="h-9 gap-2 rounded-lg px-3">
           실사 조정
+        </Button>
+        <Button type="button" variant="outline" onClick={onTransfer} size="sm" className="h-9 gap-2 rounded-lg px-3">
+          창고 이동
         </Button>
       </div>
     </FilterToolbar>

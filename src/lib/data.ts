@@ -919,6 +919,40 @@ export async function runManualInventoryOperations(
   if (error) throw new Error(error.message)
 }
 
+export async function runWarehouseTransfer(transfer: {
+  date: string
+  modelId: number
+  sizeId: number
+  colorId: number
+  fromWarehouseId: number
+  toWarehouseId: number
+  quantity: number
+  reason: string
+}) {
+  const { supabase } = await getSupabaseWithUser()
+  const reason = transfer.reason.trim()
+  if (!transfer.modelId || !transfer.sizeId || !transfer.colorId || !transfer.fromWarehouseId || !transfer.toWarehouseId) {
+    throw new Error('상품 옵션과 출발·도착 창고를 모두 선택해주세요.')
+  }
+  if (transfer.fromWarehouseId === transfer.toWarehouseId) throw new Error('출발 창고와 도착 창고는 달라야 합니다.')
+  if (!Number.isInteger(transfer.quantity) || transfer.quantity <= 0) throw new Error('이동 수량은 양수여야 합니다.')
+  if (!reason) throw new Error('이동 사유를 입력해주세요.')
+
+  const { error } = await supabase.rpc('transfer_inventory_between_warehouses', {
+    p_transfer: {
+      date: transfer.date,
+      model_id: transfer.modelId,
+      size_id: transfer.sizeId,
+      color_id: transfer.colorId,
+      from_warehouse_id: transfer.fromWarehouseId,
+      to_warehouse_id: transfer.toWarehouseId,
+      quantity: transfer.quantity,
+      reason,
+    },
+  })
+  if (error) throw new Error(error.message)
+}
+
 export async function runRevertTransaction(transactionId: number, memo?: string | null) {
   const { supabase } = await getSupabaseWithUser()
   const normalizedMemo = memo?.trim() ? memo.trim() : null

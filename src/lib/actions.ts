@@ -11,6 +11,7 @@ import {
   runBulkTransaction,
   runInventoryAdjustment,
   runManualInventoryOperations,
+  runWarehouseTransfer,
   runRevertTransaction,
   runReceiveFactoryArrival,
 } from './data'
@@ -205,6 +206,21 @@ export async function createManualInventoryOperations(
 ) {
   if (items.length === 0) throw new Error('입력된 항목이 없습니다.')
   await runManualInventoryOperations(items)
+  revalidateInventoryPaths()
+  return { success: true }
+}
+
+export async function createWarehouseTransfer(transfer: {
+  date: string
+  modelId: number
+  sizeId: number
+  colorId: number
+  fromWarehouseId: number
+  toWarehouseId: number
+  quantity: number
+  reason: string
+}) {
+  await runWarehouseTransfer(transfer)
   revalidateInventoryPaths()
   return { success: true }
 }

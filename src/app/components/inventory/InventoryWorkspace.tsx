@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import HistoryView, { type HistoryFilterState } from '@/app/(protected)/history/HistoryView'
 import InOutForm from '@/app/(protected)/inout/InOutForm'
+import WarehouseTransferForm from '@/app/components/inventory/WarehouseTransferForm'
 import { PageHeader, ui } from '@/app/components/ui'
 import { ChannelBadge, type ChannelListingStatus } from '@/components/ui/channel-badge'
 import { FixedSheet } from '@/components/ui/fixed-sheet'
@@ -124,7 +125,7 @@ export default function InventoryWorkspace({
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'normal' | 'warning' | 'danger'>('all')
   const [activeView, setActiveView] = useState<ViewMode>('list')
-  const [overlayMode, setOverlayMode] = useState<'inbound' | 'manual-outbound' | 'count-adjustment' | null>(null)
+  const [overlayMode, setOverlayMode] = useState<'inbound' | 'manual-outbound' | 'count-adjustment' | 'transfer' | null>(null)
   const [historyFilters, setHistoryFilters] = useState<HistoryFilterState>({
     warehouseId: '',
     type: '',
@@ -277,6 +278,7 @@ export default function InventoryWorkspace({
                 onInbound={() => setOverlayMode('inbound')}
                 onOutbound={() => setOverlayMode('manual-outbound')}
                 onAdjustment={() => setOverlayMode('count-adjustment')}
+                onTransfer={() => setOverlayMode('transfer')}
               />
             }
           >
@@ -298,24 +300,29 @@ export default function InventoryWorkspace({
 
       <FixedSheet
         open={overlayMode !== null}
-        title={overlayMode === 'inbound' ? '빠른 입고' : overlayMode === 'manual-outbound' ? '수동 출고' : '실사 수량 조정'}
+        title={overlayMode === 'inbound' ? '빠른 입고' : overlayMode === 'manual-outbound' ? '수동 출고' : overlayMode === 'transfer' ? '창고 이동' : '실사 수량 조정'}
         description={
           overlayMode === 'inbound'
             ? '신규 상품 옵션·창고 조합의 첫 입고와 기존 재고 증가를 처리합니다.'
             : overlayMode === 'manual-outbound'
               ? '주문 발송과 별도로 현재 보유 재고를 차감합니다. 사유는 이력에 기록됩니다.'
-              : '실사 수량을 기준으로 현재 재고와의 차이를 이력에 기록합니다.'
+              : overlayMode === 'transfer' ? '출발 재고를 차감하고 도착 창고에 같은 수량을 원자적으로 반영합니다.' : '실사 수량을 기준으로 현재 재고와의 차이를 이력에 기록합니다.'
         }
         onClose={() => setOverlayMode(null)}
       >
-        <InOutForm
+        {overlayMode === 'transfer' ? <WarehouseTransferForm
+          models={normalizedModels}
+          warehouses={warehouses}
+          initialWarehouseId={typeof selectedWarehouseId === 'number' ? selectedWarehouseId : undefined}
+          onSubmitted={() => setOverlayMode(null)}
+        /> : <InOutForm
           models={normalizedModels}
           warehouses={warehouses}
           operation={overlayMode ?? 'inbound'}
           initialWarehouseId={typeof selectedWarehouseId === 'number' ? selectedWarehouseId : warehouses[0]?.id}
           lockedWarehouseId={typeof selectedWarehouseId === 'number' ? selectedWarehouseId : null}
           onSubmitted={() => setOverlayMode(null)}
-        />
+        />}
       </FixedSheet>
     </div>
   )

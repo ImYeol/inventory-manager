@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   runBulkTransaction: vi.fn(),
   runInventoryAdjustment: vi.fn(),
   runManualInventoryOperations: vi.fn(),
+  runWarehouseTransfer: vi.fn(),
   runRevertTransaction: vi.fn(),
   revalidatePath: vi.fn(),
 }))
@@ -20,6 +21,7 @@ vi.mock('@/lib/data', () => ({
   runBulkTransaction: mocks.runBulkTransaction,
   runInventoryAdjustment: mocks.runInventoryAdjustment,
   runManualInventoryOperations: mocks.runManualInventoryOperations,
+  runWarehouseTransfer: mocks.runWarehouseTransfer,
   runRevertTransaction: mocks.runRevertTransaction,
 }))
 
@@ -33,6 +35,7 @@ import {
   adjustInventory,
   createTransactions,
   createManualInventoryOperations,
+  createWarehouseTransfer,
   getCurrentStock,
   getInventory,
   getModelDetails,
@@ -186,6 +189,19 @@ describe('server action wrappers', () => {
     await expect(createManualInventoryOperations(items)).resolves.toEqual({ success: true })
     expect(mocks.runManualInventoryOperations).toHaveBeenCalledWith(items)
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/inventory')
+  })
+
+  it('delegates one warehouse transfer through the atomic transfer boundary and revalidates inventory paths', async () => {
+    mocks.runWarehouseTransfer.mockResolvedValue(undefined)
+    const transfer = {
+      date: '2026-07-18', modelId: 1, sizeId: 10, colorId: 20,
+      fromWarehouseId: 1, toWarehouseId: 2, quantity: 3, reason: '창고 재배치',
+    }
+
+    await expect(createWarehouseTransfer(transfer)).resolves.toEqual({ success: true })
+    expect(mocks.runWarehouseTransfer).toHaveBeenCalledWith(transfer)
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/inventory')
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/history')
   })
 
   it('reverts a transaction through the stored procedure helper and revalidates inventory paths', async () => {

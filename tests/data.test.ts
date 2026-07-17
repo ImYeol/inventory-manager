@@ -21,6 +21,7 @@ import {
   runBulkTransaction,
   runInventoryAdjustment,
   runManualInventoryOperations,
+  runWarehouseTransfer,
   runRevertTransaction,
 } from '@/lib/data'
 
@@ -648,6 +649,24 @@ describe('Supabase data mappers', () => {
         { kind: 'manual-outbound', date: '2026-07-18', model_id: 1, size_id: 10, color_id: 20, warehouse_id: 1, quantity: 3, reason: '파손 폐기' },
         { kind: 'count-adjustment', date: '2026-07-18', model_id: 2, size_id: 11, color_id: 21, warehouse_id: 1, quantity: 0, reason: '월말 실사' },
       ],
+    })
+  })
+
+  it('sends a warehouse transfer as one RPC with both warehouse contexts and no inventory delta payload', async () => {
+    const rpc = vi.fn(async () => ({ error: null }))
+    const supabase = { from: vi.fn(), rpc, auth: { getUser: vi.fn() } }
+    mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
+
+    await runWarehouseTransfer({
+      date: '2026-07-18', modelId: 3, sizeId: 12, colorId: 22,
+      fromWarehouseId: 1, toWarehouseId: 2, quantity: 5, reason: '창고 재배치',
+    })
+
+    expect(rpc).toHaveBeenCalledWith('transfer_inventory_between_warehouses', {
+      p_transfer: {
+        date: '2026-07-18', model_id: 3, size_id: 12, color_id: 22,
+        from_warehouse_id: 1, to_warehouse_id: 2, quantity: 5, reason: '창고 재배치',
+      },
     })
   })
 
