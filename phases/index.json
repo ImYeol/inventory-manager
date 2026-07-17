@@ -117,6 +117,10 @@
     {
       "dir": "inbound-drafts-and-supplier-sku-links",
       "status": "completed"
+    },
+    {
+      "dir": "inbound-draft-inline-sku-creation",
+      "status": "completed"
     }
   ]
 }
