@@ -4,11 +4,13 @@
 
 공유 component composition은 vendor-neutral artifact로 관리한다. [Card contract](../../design-system/contracts/card.composition.json)는 React primitive와 Figma library가 같은 `Card`, `surface`, `contentLayout` 이름을 쓰게 하는 source of truth이며, 문서는 의도를 설명하고 code와 harness가 alignment를 검증한다.
 
-## Channel-first product catalog
+## SKU-first channel mapping
 
-`/products` owns the channel-first product workspace. `ChannelProductRef` retains provider identifiers and raw option data, including unlinked refs; it is never cloned into `ProductVariant`. Sync runs only in the authenticated `syncProducts` server action. A manually selected internal variant may be linked through `linkVariant`; sync preserves an existing non-null manual mapping, while only new or unlinked refs may use an exact single seller SKU match. Seller SKU is never a product-name fallback.
+`/products` owns an internal SKU workspace. The seller SKU and actual warehouse quantity of `ProductVariant` are the source of truth; channel product registration, modification, and full collection are outside Seleccase scope. Full channel product collection is not a canonical flow.
 
-`createInternalProduct` is the authenticated local-only companion action. It creates `models`, `sizes`, `colors`, and bounded `product_variants`, rolls back the created model on failure, and links pre-existing refs only by exact seller SKU. It does not contact a provider API.
+`ChannelProductRef` is a user-entered, explicit mapping from a channel sales option to an internal SKU. One internal SKU may have multiple options per channel. The authenticated server action accepts seller SKU, channel product ID, and channel option ID, and validates that the referenced option exists. It never uses product-name similarity or automatic SKU linking. `ChannelProductRef` retains provider identifiers and mapping verification/sync state; it is never cloned into `ProductVariant`.
+
+`createInternalProduct` remains an authenticated local-only companion action. It creates `models`, `sizes`, `colors`, and bounded `product_variants`, rolls back the created model on failure, and does not contact a provider API.
 
 ## 현재 코드베이스 기준선
 ```text
@@ -158,16 +160,17 @@ src/
 
 ## Commerce Inventory Invariants
 
-- `ProductVariant`는 SKU와 옵션 조합의 판매·재고 단위다.
-- `ChannelProductRef`는 각 채널의 판매상품/옵션 ID를 `ProductVariant`에 연결하고, 채널 listing 상태와 마지막 동기화 결과를 소유한다.
+- `ProductVariant`의 seller SKU와 실제 창고 수량은 source of truth다.
+- `ChannelProductRef`는 사용자가 입력한 채널 판매 옵션 식별자와 `ProductVariant`를 연결하는 명시적 매핑이다. 하나의 내부 SKU는 채널별 옵션을 여러 개 가질 수 있다. 매핑 입력은 판매자 SKU, 채널 상품 ID, 채널 옵션 ID를 받고 server action에서 존재를 검증하며, 상품명 유사도나 SKU 자동 연결을 하지 않는다.
+- 채널 상품 등록·수정·전량 수집은 Seleccase 범위 밖이며, 전량 채널 상품 수집은 canonical flow가 아니다.
 - 수량 원장은 다음 다섯 상태를 구분한다.
   - `onHand`: 실제 보유 수량
   - `committed`: 확정 주문이 점유한 예약 수량
   - `available = onHand - committed`: 신규 판매에 노출할 수량
-  - `incoming`: 입고 예정 수량이며 `onHand`에 포함하지 않는다
+  - `incoming`: 공장 공급 참고 수량이며 검수 전에는 `available` 및 채널 재고에 포함하지 않는다
   - `channelReported`: 마지막으로 채널에 성공 보고한 절대 수량
-- 주문 확정은 `committed`를 원자적으로 증가시킨다. 외부 발송 성공은 같은 원자적 작업에서 예약을 해제하고 `onHand`를 차감한다. 외부 요청 실패 또는 재시도는 이 차감을 실행하지 않는다.
-- 채널 재고 동기화는 delta가 아니라 현재 `available`의 절대 수량을 보낸다. 채널 성공 응답 뒤에만 `channelReported`를 해당 절대 수량으로 저장한다.
+- 주문 확정은 `committed`를 원자적으로 증가시키고 현재 `available` 절대 수량을 두 채널의 모든 매핑 옵션에 반영한다. 외부 발송 성공은 같은 원자적 작업에서 예약을 해제하고 `onHand`를 차감한다. 취소는 예약만 해제한다. 반품은 검수 입고 뒤에만 `onHand`를 복구한다.
+- 채널 재고 동기화는 delta가 아니라 최신 `available`의 절대 수량을 보낸다. 동기화 실패는 내부 원장을 되돌리지 않고 최신 absolute quantity를 재시도·재조정한다. 채널 성공 응답 뒤에만 `channelReported`를 해당 절대 수량으로 저장한다.
 
 ## Dashboard-Owned Analytics Architecture
 

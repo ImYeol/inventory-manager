@@ -99,10 +99,11 @@ Seleccase Inventory를 `dashboard 내부 분석 + 주문·송장 작업 + 상품
   - `상품`: SKU, 옵션, 상태, 상품명 등 실제 재고 운영에서 참조되는 상품 속성
   - `창고`: 창고명, 사용 여부, 식별 정보, 운영 메모 등 재고가 머무는 장소 속성
 - `상품 관리`는 `재고 운영`의 조회 대상 데이터를 제공하지만, 재고 수량 자체를 소유하지는 않는다.
-- 상품 탭의 canonical owner는 채널 상품 table이다. 쿠팡/네이버 실제 상품정보를 `동기화` server action으로 가져오며, 미연결 채널 ref도 `연결 필요` 행으로 남긴다. 상품명 유사도 자동 연결은 하지 않는다.
+- 내부 `ProductVariant`의 seller SKU와 실제 창고 수량이 source of truth다. 채널 상품 등록·수정·전량 수집은 Seleccase 범위 밖이며, 상품 탭의 canonical owner는 내부 SKU 목록이다.
+- `ChannelProductRef`는 사용자가 입력한 채널 판매 옵션 식별자와 내부 SKU의 명시적 매핑이다. 내부 SKU 하나는 채널별 옵션을 여러 개 가질 수 있다. 매핑 입력은 판매자 SKU, 채널 상품 ID, 채널 옵션 ID를 받고 server action에서 존재를 검증한다. 상품명 유사도나 SKU 자동 연결을 하지 않는다.
 - `내부 상품 등록`은 채널에 없는 로컬 상품을 만드는 보조 modal이다. 상품명과 SKU prefix는 필수이고 사이즈·색상은 선택값이다. 옵션이 없으면 단일 판매 옵션과 prefix 자체를 판매자 SKU로 만든다.
 - `기준 데이터`는 내부 설명이 아니라 `상품 관리`를 가리키는 과거 표현으로만 취급한다.
-- `상품` 탭은 `검색 + 고정 보기 + 채널 동기화 + 내부 상품 등록`이 가능한 channel-first table workspace다.
+- `상품` 탭은 `검색 + 고정 보기 + 내부 상품 등록`이 가능한 SKU 중심 table workspace다. 전량 채널 상품 수집은 canonical flow가 아니다.
 - 채널에 없는 상품만 `내부 상품 등록` modal에서 생성한다. 사이즈·색상은 실제 판매 옵션이 있을 때만 입력한다.
 - `창고` 탭도 같은 toolbar + table 패턴을 사용한다.
 
@@ -211,15 +212,15 @@ Seleccase Inventory를 `dashboard 내부 분석 + 주문·송장 작업 + 상품
 
 ### 9. 채널 상품과 재고 상태 모델
 - `ProductVariant`는 실제 판매·재고 단위이며, 옵션 조합마다 하나의 재고 상태를 가진다.
-- `ChannelProductRef`는 채널 판매상품/옵션 식별자와 `ProductVariant`를 연결하는 참조다. 채널별 등록 상태와 동기화 오류도 이 참조에 귀속한다.
+- 내부 `ProductVariant`의 seller SKU와 실제 창고 수량이 source of truth다. `ChannelProductRef`는 사용자가 입력한 채널 판매 옵션 식별자와 `ProductVariant`를 연결하는 명시적 매핑이며, 하나의 내부 SKU는 채널별 옵션을 여러 개 가질 수 있다. 매핑 입력은 판매자 SKU, 채널 상품 ID, 채널 옵션 ID를 받고 server action에서 존재를 검증하며, 상품명 유사도나 SKU 자동 연결을 하지 않는다.
 - 재고 상태는 다음 값을 분리한다.
   - `onHand`: 실제 보유 수량
   - `committed`: 접수된 주문으로 예약된 수량
   - `available`: 판매 가능한 수량(`onHand - committed`)
-  - `incoming`: 입고 예정이지만 아직 보유되지 않은 수량
+  - `incoming`: 공장 공급 참고 수량이다. 검수 전에는 available 및 채널 재고에 포함하지 않는다.
   - `channelReported`: 가장 최근 채널에 절대 수량으로 보고한 값
-- 주문이 확정되면 `committed`를 증가시켜 예약하고, 외부 발송 성공 후에만 같은 트랜잭션에서 `onHand`를 차감하고 예약을 해제한다. 실패·재시도는 재고를 중복 차감하지 않는다.
-- 채널 동기화는 증감값이 아닌 현재 `available`의 절대 수량을 전송한다. 성공 응답 뒤에만 `channelReported`를 그 절대 수량으로 갱신한다.
+- 주문이 확정되면 `committed`를 증가시켜 예약하고, 현재 `available` 절대 수량을 두 채널의 모든 매핑 옵션에 반영한다. 외부 발송 성공 후에만 같은 트랜잭션에서 `onHand`를 차감하고 예약을 해제한다. 취소는 예약만 해제하며, 반품은 검수 입고 뒤에만 `onHand`를 복구한다.
+- 채널 동기화는 증감값이 아닌 현재 `available`의 절대 수량을 전송한다. 동기화 실패는 내부 원장을 되돌리지 않고 최신 absolute quantity를 재시도·재조정하며, 성공 응답 뒤에만 `channelReported`를 그 절대 수량으로 갱신한다.
 
 ### 9. 소싱 > 외부 공장 / 입고 예정
 - `외부 공장`은 카드형 목록이 아니라 `검색 + 상태 필터 + 등록 버튼 + table` 구조를 쓴다.

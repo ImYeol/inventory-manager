@@ -35,3 +35,4 @@ Read only the decisions relevant to the change. A proposal that conflicts with a
 | [028](0028-component-inventory-source-of-truth.md) | Component inventory as SoT |
 | [029](0029-orders-inventory-state-model.md) | Orders and inventory state model |
 | [030](0030-channel-first-product-management.md) | Channel-first product management |
+| [031](0031-sku-channel-mapping-and-inventory-operations.md) | Internal SKU-first explicit channel mapping and inventory operations (supersedes ADR-030) |
