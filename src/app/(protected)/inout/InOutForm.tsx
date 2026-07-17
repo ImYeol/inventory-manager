@@ -389,7 +389,8 @@ export default function InOutForm({
           { key: 'size', header: '사이즈' },
           { key: 'color', header: '색상' },
           { key: 'quantity', header: isCountAdjustment ? '실사 수량' : '수량', align: 'right' },
-          { key: 'stock', header: '재고', align: 'right' },
+          { key: 'stock', header: isCountAdjustment ? '현재 재고' : '재고', align: 'right' },
+          ...(isCountAdjustment ? [{ key: 'adjustment', header: '조정 수량', align: 'right' as const }] : []),
         ]}
         rows={resolvedRows}
         getRowKey={(row) => row.key}
@@ -466,6 +467,18 @@ export default function InOutForm({
               ) : (
                 <span className="text-xs text-[color:var(--muted-foreground)]">-</span>
               )
+            case 'adjustment': {
+              if (row.currentStock === null || row.quantity === '') {
+                return <span className="text-xs text-[color:var(--muted-foreground)]">-</span>
+              }
+
+              const adjustment = Number(row.quantity) - row.currentStock
+              return (
+                <span className="font-semibold text-[color:var(--foreground)]">
+                  {adjustment > 0 ? `+${adjustment}` : adjustment}
+                </span>
+              )
+            }
             default:
               return null
           }

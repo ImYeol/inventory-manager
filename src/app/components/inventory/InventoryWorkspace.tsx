@@ -91,10 +91,10 @@ const ALL_COLUMNS: Array<{ key: InventoryColumnKey; label: string }> = [
   { key: 'modelName', label: '상품' },
   { key: 'skuOption', label: 'SKU / 옵션' },
   { key: 'warehouseName', label: '창고' },
-  { key: 'onHand', label: 'On hand' },
-  { key: 'committed', label: 'Committed' },
-  { key: 'available', label: 'Available' },
-  { key: 'incoming', label: 'Incoming' },
+  { key: 'onHand', label: '현재 재고' },
+  { key: 'committed', label: '예약 재고' },
+  { key: 'available', label: '출고 가능' },
+  { key: 'incoming', label: '입고 예정' },
   { key: 'status', label: '상태' },
 ]
 

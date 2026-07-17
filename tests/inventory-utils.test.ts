@@ -38,5 +38,7 @@ describe('inventory utility constants', () => {
       reason: '월말 실사',
     })
     expect(() => normalizeManualInventoryOperation({ kind: 'manual-outbound', quantity: 1, reason: '  ' })).toThrow('사유')
+    expect(() => normalizeManualInventoryOperation({ kind: 'count-adjustment', quantity: -1, reason: '월말 실사' })).toThrow('수량')
+    expect(() => normalizeManualInventoryOperation({ kind: 'count-adjustment', quantity: 1.5, reason: '월말 실사' })).toThrow('수량')
   })
 })

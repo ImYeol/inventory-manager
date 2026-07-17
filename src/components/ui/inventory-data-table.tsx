@@ -50,10 +50,10 @@ const tableHeaders: Array<{ key: InventoryColumnKey; label: string; className?: 
   { key: 'modelName', label: '상품' },
   { key: 'skuOption', label: 'SKU / 옵션' },
   { key: 'warehouseName', label: '창고' },
-  { key: 'onHand', label: 'On hand', className: 'text-right' },
-  { key: 'committed', label: 'Committed', className: 'text-right' },
-  { key: 'available', label: 'Available', className: 'text-right' },
-  { key: 'incoming', label: 'Incoming', className: 'text-right' },
+  { key: 'onHand', label: '현재 재고', className: 'text-right' },
+  { key: 'committed', label: '예약 재고', className: 'text-right' },
+  { key: 'available', label: '출고 가능', className: 'text-right' },
+  { key: 'incoming', label: '입고 예정', className: 'text-right' },
   { key: 'status', label: '상태' },
 ]
 

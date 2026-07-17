@@ -332,6 +332,10 @@ describe('shared action and status primitives', () => {
     expect(overlay?.className).toContain('z-0')
     expect(sheet?.className).toContain('z-10')
     expect(sheet?.className).toContain('rounded-t-[var(--radius-lg)]')
+    expect(screen.getByRole('button', { name: '닫기' }).parentElement?.className).toContain('w-full')
+    expect(screen.getByRole('button', { name: '닫기' }).parentElement?.className).toContain('justify-between')
+    expect(screen.getByText('빠른 입고').parentElement?.className).toContain('min-w-0')
+    expect(screen.getByRole('button', { name: '닫기' }).className).toContain('shrink-0')
     expect(document.body.style.overflow).toBe('hidden')
 
     fireEvent.keyDown(document, { key: 'Escape' })

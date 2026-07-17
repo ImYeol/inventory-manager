@@ -53,14 +53,14 @@ export function FixedSheet({ open, title, description, onClose, children, classN
       >
         <div className="flex h-full flex-col">
           <div className={ui.modalHeader}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
+            <div className="flex w-full items-start justify-between gap-4">
+              <div className="min-w-0">
                 <h2 id={titleId} className="text-sm font-semibold tracking-tight text-[color:var(--foreground)]">
                   {title}
                 </h2>
                 {description ? <p id={descriptionId} className="mt-1 text-sm leading-6 text-[color:var(--muted-foreground)]">{description}</p> : null}
               </div>
-              <Button type="button" variant="ghost" className="h-11 min-w-11 px-3" onClick={onClose} aria-label="닫기">
+              <Button type="button" variant="ghost" className="h-11 min-w-11 shrink-0 px-3" onClick={onClose} aria-label="닫기">
                 <X className="h-4 w-4" />
               </Button>
             </div>

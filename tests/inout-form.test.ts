@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
+  getCurrentStock: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -14,13 +15,14 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/lib/actions', () => ({
   createTransactions: vi.fn(),
   createManualInventoryOperations: vi.fn(),
-  getCurrentStock: vi.fn(),
+  getCurrentStock: mocks.getCurrentStock,
 }))
 
 import InOutForm from '@/app/(protected)/inout/InOutForm'
 
 beforeEach(() => {
   mocks.refresh.mockReset()
+  mocks.getCurrentStock.mockReset()
 })
 
 afterEach(() => {
@@ -177,6 +179,40 @@ describe('InOutForm', () => {
 
     expect(screen.getByLabelText('실사 조정 사유')).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: '실사 수량' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: '현재 재고' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: '조정 수량' })).toBeTruthy()
+  })
+
+  it('shows the absolute physical count and signed adjustment preview before a count adjustment is submitted', async () => {
+    mocks.getCurrentStock.mockResolvedValue(7)
+
+    render(
+      React.createElement(InOutForm, {
+        warehouses: [{ id: 7, name: '본사 창고' }],
+        operation: 'count-adjustment',
+        models: [
+          {
+            id: 1,
+            name: 'LP01',
+            sizes: [{ id: 11, name: 'S', sortOrder: 1, modelId: 1 }],
+            colors: [{ id: 21, name: '네이비', rgbCode: '#111111', textWhite: true, sortOrder: 1, modelId: 1 }],
+          },
+        ],
+      }),
+    )
+
+    await openComboboxAndPick('상품', 'LP01')
+    await openComboboxAndPick('사이즈', 'S')
+    await openComboboxAndPick('색상', '네이비')
+
+    await waitFor(() => expect(screen.getByText('7')).toBeTruthy())
+    fireEvent.change(screen.getAllByRole('spinbutton')[0], { target: { value: '10' } })
+
+    expect(screen.getByText('+3')).toBeTruthy()
+
+    fireEvent.change(screen.getAllByRole('spinbutton')[0], { target: { value: '4' } })
+
+    expect(screen.getByText('-3')).toBeTruthy()
   })
 
   it('uses product language rather than the legacy model label in the editor', () => {
