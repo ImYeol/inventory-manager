@@ -105,7 +105,6 @@ describe('sourcing actions', () => {
       },
     ])
   })
-
   it('receives a factory arrival through the RPC and revalidates inventory and sourcing paths', async () => {
     mocks.runReceiveFactoryArrival.mockResolvedValue(undefined)
 

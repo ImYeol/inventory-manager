@@ -11,6 +11,23 @@ function normalizedSql(text: string) {
 }
 
 describe('schema contract', () => {
+  it('models verified inbound drafts with exact supplier SKU links only', () => {
+    const root = process.cwd()
+    const inboundMigration = normalizedSql(fs.readFileSync(
+      path.join(root, 'supabase/migrations/20260717153604_inbound_drafts_and_supplier_sku_links.sql'),
+      'utf8',
+    ))
+
+    expect(inboundMigration).toMatch(/create table if not exists public\.inbound_drafts/)
+    expect(inboundMigration).toMatch(/external_sku text not null/)
+    expect(inboundMigration).toMatch(/warehouse_id bigint not null/)
+    expect(inboundMigration).toMatch(/product_variant_id bigint/)
+    expect(inboundMigration).toMatch(/create table if not exists public\.supplier_sku_links/)
+    expect(inboundMigration).toMatch(/unique\(user_id,supplier_id,template,external_sku\)/)
+    expect(inboundMigration).toMatch(/unmatched inbound rows cannot be received/)
+    expect(inboundMigration).not.toMatch(/similarity\s*\(/)
+  })
+
   it('uses warehouse_id across the checked-in schema transition files', () => {
     const root = process.cwd()
     const prismaSchema = normalizedSql(fs.readFileSync(path.join(root, 'prisma/schema.prisma'), 'utf8'))

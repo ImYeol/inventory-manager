@@ -16,5 +16,9 @@ export default async function InventoryPage() {
     transactions={transactions}
     variants={workspace.variants}
     channelProductRefs={workspace.channelProductRefs}
+    incomingByVariant={Object.fromEntries(workspace.variants.map((variant) => [
+      `${variant.modelId}:${variant.sizeId}:${variant.colorId}`,
+      variant.incoming,
+    ]))}
   />
 }

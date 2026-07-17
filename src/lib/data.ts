@@ -7,6 +7,7 @@ import {
   transactionTypeLabels,
   type TransactionTypeValue,
 } from './inventory'
+import type { InboundDraftRowInput } from './inbound'
 
 type WarehouseRow = {
   id: number
@@ -510,6 +511,23 @@ export async function getProductWorkspaceData(): Promise<{
       incoming.set(key, (incoming.get(key) ?? 0) + Math.max(item.ordered_quantity - item.received_quantity, 0))
     }
   }
+  // New inbound drafts are optional during rollout. Only explicitly assigned
+  // rows contribute to incoming; unmatched supplier rows remain drafts.
+  try {
+    const inboundRowsRes = await supabase
+      .from('inbound_draft_rows')
+      .select('product_variant_id, quantity, received_quantity')
+    if (!inboundRowsRes.error) {
+      const variantKey = new Map((variantsRes.data ?? []).map((variant) => [Number(variant.id), `${variant.model_id}:${variant.size_id}:${variant.color_id}`]))
+      for (const row of inboundRowsRes.data ?? []) {
+        if (row.product_variant_id === null) continue
+        const key = variantKey.get(Number(row.product_variant_id))
+        if (key) incoming.set(key, (incoming.get(key) ?? 0) + Math.max(Number(row.quantity) - Number(row.received_quantity), 0))
+      }
+    }
+  } catch {
+    // A pre-migration project can continue showing legacy factory arrivals.
+  }
   const variants = (variantsRes.data ?? []).map((row) => ({
     id: Number(row.id),
     modelId: Number(row.model_id),
@@ -981,6 +999,40 @@ export async function runReceiveFactoryArrival(
     p_items: payload,
   })
 
+  if (error) throw new Error(error.message)
+}
+
+export async function createInboundDraft(input: {
+  supplierId: number
+  rows: InboundDraftRowInput[]
+}) {
+  if (!input.supplierId || input.rows.length === 0) throw new Error('공급자와 입고 행을 입력해주세요.')
+  const { supabase } = await getSupabaseWithUser()
+  const { data: draft, error: draftError } = await supabase
+    .from('inbound_drafts')
+    .insert({ supplier_id: input.supplierId })
+    .select('id')
+    .single()
+  if (draftError || !draft?.id) throw new Error(draftError?.message ?? '입고 초안을 저장하지 못했습니다.')
+  const { error: rowsError } = await supabase.from('inbound_draft_rows').insert(input.rows.map((row) => ({
+    inbound_draft_id: draft.id,
+    template: row.template.trim(),
+    external_sku: row.externalSku.trim(),
+    quantity: row.quantity,
+    warehouse_id: row.warehouseId,
+    product_variant_id: row.productVariantId,
+  })))
+  if (rowsError) throw new Error(rowsError.message)
+  return Number(draft.id)
+}
+
+export async function runReceiveInboundDraftRows(draftId: number, rows: Array<{ rowId: number; quantity: number }>) {
+  if (!draftId || rows.length === 0) throw new Error('입고 반영 행을 선택해주세요.')
+  const { supabase } = await getSupabaseWithUser()
+  const { error } = await supabase.rpc('receive_inbound_draft_rows', {
+    p_draft_id: draftId,
+    p_rows: rows.map((row) => ({ row_id: row.rowId, quantity: row.quantity })),
+  })
   if (error) throw new Error(error.message)
 }
 

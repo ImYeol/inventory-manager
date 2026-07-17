@@ -14,7 +14,10 @@ import {
   runWarehouseTransfer,
   runRevertTransaction,
   runReceiveFactoryArrival,
+  createInboundDraft as runCreateInboundDraft,
+  runReceiveInboundDraftRows,
 } from './data'
+import type { InboundDraftRowInput } from './inbound'
 import { getSupabaseWithUser } from './db'
 
 export async function getModels() {
@@ -617,6 +620,29 @@ export async function receiveFactoryArrival(input: {
   revalidateInventoryPaths()
   revalidatePath('/sourcing/arrivals')
   revalidatePath('/sourcing/factories')
+  return { success: true }
+}
+
+export async function createManualInboundDraft(input: { supplierId: number; rows: InboundDraftRowInput[] }) {
+  if (!input.supplierId || input.rows.length === 0) throw new Error('공급자와 입고 행을 입력해주세요.')
+  for (const row of input.rows) {
+    if (!row.template.trim() || !row.externalSku.trim() || !Number.isInteger(row.quantity) || row.quantity <= 0 || !row.warehouseId) {
+      throw new Error('템플릿, 외부 SKU, 수량, 창고를 모두 입력해주세요.')
+    }
+  }
+  const id = await runCreateInboundDraft(input)
+  revalidatePath('/sourcing/arrivals')
+  revalidatePath('/inventory')
+  return { success: true, id }
+}
+
+export async function receiveManualInboundDraftRows(input: { draftId: number; rows: Array<{ rowId: number; quantity: number; productVariantId: number | null }> }) {
+  if (!input.draftId || input.rows.length === 0 || input.rows.some((row) => !row.rowId || !row.productVariantId || !Number.isInteger(row.quantity) || row.quantity <= 0)) {
+    throw new Error('미연결 행은 검수 입고할 수 없습니다.')
+  }
+  await runReceiveInboundDraftRows(input.draftId, input.rows.map(({ rowId, quantity }) => ({ rowId, quantity })))
+  revalidateInventoryPaths()
+  revalidatePath('/sourcing/arrivals')
   return { success: true }
 }
 
