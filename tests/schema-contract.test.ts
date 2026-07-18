@@ -11,6 +11,33 @@ function normalizedSql(text: string) {
 }
 
 describe('schema contract', () => {
+  it('defines canonical inbound imports, arrivals, allocations, immutable receipt evidence and migration exceptions', () => {
+    const root = process.cwd()
+    const schema = normalizedSql(fs.readFileSync(path.join(root, 'supabase/schema.sql'), 'utf8'))
+    const prisma = normalizedSql(fs.readFileSync(path.join(root, 'prisma/schema.prisma'), 'utf8'))
+    const migrations = fs.readdirSync(path.join(root, 'supabase/migrations')).filter((file) => file.includes('canonical_arrival'))
+    expect(migrations).toHaveLength(1)
+    const migration = normalizedSql(fs.readFileSync(path.join(root, 'supabase/migrations', migrations[0]), 'utf8'))
+
+    for (const table of ['inbound_imports', 'inbound_import_revisions', 'inbound_import_source_rows', 'factory_arrival_allocations', 'factory_receipt_events', 'factory_receipt_lines', 'inbound_migration_exceptions']) {
+      expect(schema).toContain(`create table if not exists public.${table}`)
+      expect(migration).toContain(`create table public.${table}`)
+      expect(migration).toContain(`alter table public.${table} enable row level security`)
+      expect(migration).toContain(`users manage own ${table}`)
+    }
+    expect(schema).toMatch(/factory_arrival_items[\s\S]*product_variant_id bigint/)
+    expect(schema).toMatch(/allocated_quantity integer not null/)
+    expect(schema).toMatch(/normally_received_quantity integer not null default 0/)
+    expect(schema).toMatch(/shortage_closed_quantity integer not null default 0/)
+    expect(schema).toMatch(/check \(status in \('draft', 'ready', 'partial', 'received', 'variance_closed', 'cancelled'\)\)/)
+    expect(migration).toContain('does not insert transactions')
+    expect(migration).toContain('does not update public.inventory')
+    expect(migration).toContain('ambiguous_transaction_evidence')
+    expect(migration).toContain('on delete restrict')
+    expect(prisma).toContain('model inboundimport')
+    expect(prisma).toContain('model factoryreceiptevent')
+  })
+
   it('models verified inbound drafts with exact supplier SKU links only', () => {
     const root = process.cwd()
     const inboundMigration = normalizedSql(fs.readFileSync(

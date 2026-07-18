@@ -9,6 +9,7 @@ import {
 } from './inventory'
 import type { InboundDraftRowInput } from './inbound'
 import type { InboundTemplateVersion } from './inbound-import'
+import { allocationRemainder, isCanonicalIncomingArrival } from './factory-arrival'
 
 type WarehouseRow = {
   id: number
@@ -362,7 +363,7 @@ export function normalizeSourcingErrorMessage(
 }
 
 function isOpenSourcingArrival(status: string) {
-  return status === '예정' || status === '부분입고'
+  return status === '예정' || status === '부분입고' || isCanonicalIncomingArrival(status)
 }
 
 export async function getWarehouses(): Promise<WarehouseLookup[]> {
@@ -483,7 +484,7 @@ export async function getProductWorkspaceData(): Promise<{
   channelProductRefs: ProductWorkspaceChannelRef[]
 }> {
   const { supabase } = await getSupabaseWithUser()
-  const [variantsRes, modelsRes, sizesRes, colorsRes, inventoryRes, reservationsRes, refsRes, arrivalsRes, arrivalItemsRes] = await Promise.all([
+  const [variantsRes, modelsRes, sizesRes, colorsRes, inventoryRes, reservationsRes, refsRes, arrivalsRes, allocationsRes] = await Promise.all([
     supabase.from('product_variants').select('id, model_id, size_id, color_id, seller_sku'),
     supabase.from('models').select('id, name'),
     supabase.from('sizes').select('id, name'),
@@ -492,7 +493,7 @@ export async function getProductWorkspaceData(): Promise<{
     supabase.from('inventory_reservations').select('product_variant_id, quantity').eq('status', 'active'),
     supabase.from('channel_product_refs').select('id, variant_id, channel, external_product_id, external_variant_id, product_name, option_name, seller_sku, listing_status, channel_attributes, channel_reported, last_synced_at, last_sync_error, sync_target_quantity, sync_status, verification_status'),
     supabase.from('factory_arrivals').select('id, status'),
-    supabase.from('factory_arrival_items').select('factory_arrival_id, model_id, size_id, color_id, ordered_quantity, received_quantity'),
+    supabase.from('factory_arrival_allocations').select('factory_arrival_id, product_variant_id, allocated_quantity, normally_received_quantity, shortage_closed_quantity'),
   ])
   if ([variantsRes, reservationsRes, refsRes].some((response) => isMissingSchemaError(response.error))) {
     return { variants: [], channelProductRefs: [] }
@@ -515,33 +516,18 @@ export async function getProductWorkspaceData(): Promise<{
   }
   const openArrivalIds = new Set(
     (arrivalsRes.error ? [] : arrivalsRes.data ?? [])
-      .filter((arrival) => isOpenSourcingArrival(arrival.status))
+      .filter((arrival) => isCanonicalIncomingArrival(arrival.status))
       .map((arrival) => Number(arrival.id)),
   )
   const incoming = new Map<string, number>()
-  if (!arrivalItemsRes.error) {
-    for (const item of arrivalItemsRes.data ?? []) {
+  if (!allocationsRes.error) {
+    const variantKey = new Map((variantsRes.data ?? []).map((variant) => [Number(variant.id), `${variant.model_id}:${variant.size_id}:${variant.color_id}`]))
+    for (const item of allocationsRes.data ?? []) {
       if (!openArrivalIds.has(Number(item.factory_arrival_id))) continue
-      const key = `${item.model_id}:${item.size_id}:${item.color_id}`
-      incoming.set(key, (incoming.get(key) ?? 0) + Math.max(item.ordered_quantity - item.received_quantity, 0))
+      const key = variantKey.get(Number(item.product_variant_id))
+      if (!key) continue
+      incoming.set(key, (incoming.get(key) ?? 0) + allocationRemainder({ allocatedQuantity: Number(item.allocated_quantity), normallyReceivedQuantity: Number(item.normally_received_quantity), shortageClosedQuantity: Number(item.shortage_closed_quantity) }))
     }
-  }
-  // New inbound drafts are optional during rollout. Only explicitly assigned
-  // rows contribute to incoming; unmatched supplier rows remain drafts.
-  try {
-    const inboundRowsRes = await supabase
-      .from('inbound_draft_rows')
-      .select('product_variant_id, quantity, received_quantity')
-    if (!inboundRowsRes.error) {
-      const variantKey = new Map((variantsRes.data ?? []).map((variant) => [Number(variant.id), `${variant.model_id}:${variant.size_id}:${variant.color_id}`]))
-      for (const row of inboundRowsRes.data ?? []) {
-        if (row.product_variant_id === null) continue
-        const key = variantKey.get(Number(row.product_variant_id))
-        if (key) incoming.set(key, (incoming.get(key) ?? 0) + Math.max(Number(row.quantity) - Number(row.received_quantity), 0))
-      }
-    }
-  } catch {
-    // A pre-migration project can continue showing legacy factory arrivals.
   }
   const variants = (variantsRes.data ?? []).map((row) => ({
     id: Number(row.id),

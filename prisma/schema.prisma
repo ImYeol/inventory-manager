@@ -128,6 +128,11 @@ model FactoryArrival {
   status        String
   sourceChannel String               @map("source_channel")
   memo          String?
+  importRevisionId BigInt?            @map("import_revision_id") @db.BigInt
+  followUpParentArrivalId BigInt?     @map("follow_up_parent_arrival_id") @db.BigInt
+  sourceType    String?               @map("source_type")
+  externalShipmentReference String?   @map("external_shipment_reference")
+  supplierNameSnapshot String?        @map("supplier_name_snapshot")
   createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime             @default(now()) @map("updated_at") @db.Timestamptz(6)
   factory       Factory              @relation(fields: [factoryId, userId], references: [id, userId], onDelete: Cascade)
@@ -143,21 +148,122 @@ model FactoryArrivalItem {
   id               BigInt         @id @default(autoincrement()) @db.BigInt
   userId           String         @map("user_id") @db.Uuid
   factoryArrivalId BigInt         @map("factory_arrival_id") @db.BigInt
-  modelId          BigInt         @map("model_id") @db.BigInt
-  sizeId           BigInt         @map("size_id") @db.BigInt
-  colorId          BigInt         @map("color_id") @db.BigInt
-  orderedQuantity  Int            @map("ordered_quantity")
+  modelId          BigInt?        @map("model_id") @db.BigInt
+  sizeId           BigInt?        @map("size_id") @db.BigInt
+  colorId          BigInt?        @map("color_id") @db.BigInt
+  orderedQuantity  Int?           @map("ordered_quantity")
   receivedQuantity Int            @default(0) @map("received_quantity")
+  productVariantId BigInt?        @map("product_variant_id") @db.BigInt
+  inboundImportSourceRowId BigInt? @map("inbound_import_source_row_id") @db.BigInt
+  externalSkuSnapshot String?     @map("external_sku_snapshot")
+  sellerSkuSnapshot String?       @map("seller_sku_snapshot")
+  productNameSnapshot String?     @map("product_name_snapshot")
+  optionNameSnapshot String?      @map("option_name_snapshot")
   createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime       @default(now()) @map("updated_at") @db.Timestamptz(6)
   arrival          FactoryArrival @relation(fields: [factoryArrivalId, userId], references: [id, userId], onDelete: Cascade)
-  model            Model          @relation(fields: [modelId, userId], references: [id, userId], onDelete: Cascade)
-  size             Size           @relation(fields: [modelId, sizeId, userId], references: [modelId, id, userId], onDelete: Cascade)
-  color            Color          @relation(fields: [modelId, colorId, userId], references: [modelId, id, userId], onDelete: Cascade)
+  model            Model?         @relation(fields: [modelId, userId], references: [id, userId], onDelete: Cascade)
+  size             Size?          @relation(fields: [modelId, sizeId, userId], references: [modelId, id, userId], onDelete: Cascade)
+  color            Color?         @relation(fields: [modelId, colorId, userId], references: [modelId, id, userId], onDelete: Cascade)
 
   @@index([factoryArrivalId, userId], map: "factory_arrival_items_arrival_id_user_id_idx")
   @@index([modelId, userId], map: "factory_arrival_items_model_id_user_id_idx")
   @@map("factory_arrival_items")
+}
+
+model InboundImport {
+  id BigInt @id @default(autoincrement()) @db.BigInt
+  userId String @map("user_id") @db.Uuid
+  legacyInboundDraftId BigInt? @unique @map("legacy_inbound_draft_id") @db.BigInt
+  supplierId BigInt? @map("supplier_id") @db.BigInt
+  sourceType String @map("source_type")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  @@unique([id, userId])
+  @@index([userId], map: "inbound_imports_user_id_idx")
+  @@map("inbound_imports")
+}
+
+model InboundImportRevision {
+  id BigInt @id @default(autoincrement()) @db.BigInt
+  userId String @map("user_id") @db.Uuid
+  inboundImportId BigInt @map("inbound_import_id") @db.BigInt
+  revisionNumber Int @map("revision_number")
+  sourceFilename String? @map("source_filename")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  @@unique([id, userId])
+  @@unique([inboundImportId, revisionNumber])
+  @@index([userId, inboundImportId], map: "inbound_import_revisions_user_import_idx")
+  @@map("inbound_import_revisions")
+}
+
+model InboundImportSourceRow {
+  id BigInt @id @default(autoincrement()) @db.BigInt
+  userId String @map("user_id") @db.Uuid
+  inboundImportRevisionId BigInt @map("inbound_import_revision_id") @db.BigInt
+  legacyInboundDraftRowId BigInt? @unique @map("legacy_inbound_draft_row_id") @db.BigInt
+  externalSku String? @map("external_sku")
+  quantity Int?
+  productVariantId BigInt? @map("product_variant_id") @db.BigInt
+  sellerSkuSnapshot String? @map("seller_sku_snapshot")
+  productNameSnapshot String? @map("product_name_snapshot")
+  optionNameSnapshot String? @map("option_name_snapshot")
+  supplierNameSnapshot String? @map("supplier_name_snapshot")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  @@unique([id, userId])
+  @@index([userId, inboundImportRevisionId], map: "inbound_import_source_rows_user_revision_idx")
+  @@map("inbound_import_source_rows")
+}
+
+model FactoryArrivalAllocation {
+  id BigInt @id @default(autoincrement()) @db.BigInt
+  userId String @map("user_id") @db.Uuid
+  factoryArrivalId BigInt @map("factory_arrival_id") @db.BigInt
+  factoryArrivalItemId BigInt @map("factory_arrival_item_id") @db.BigInt
+  productVariantId BigInt @map("product_variant_id") @db.BigInt
+  warehouseId BigInt @map("warehouse_id") @db.BigInt
+  allocatedQuantity Int @map("allocated_quantity")
+  normallyReceivedQuantity Int @default(0) @map("normally_received_quantity")
+  shortageClosedQuantity Int @default(0) @map("shortage_closed_quantity")
+  warehouseNameSnapshot String? @map("warehouse_name_snapshot")
+  @@unique([id, userId])
+  @@index([userId, factoryArrivalId], map: "factory_arrival_allocations_user_arrival_idx")
+  @@index([userId, productVariantId, warehouseId], map: "factory_arrival_allocations_user_variant_warehouse_idx")
+  @@map("factory_arrival_allocations")
+}
+
+model FactoryReceiptEvent {
+  id BigInt @id @default(autoincrement()) @db.BigInt
+  userId String @map("user_id") @db.Uuid
+  factoryArrivalId BigInt @map("factory_arrival_id") @db.BigInt
+  eventKind String @map("event_kind")
+  receivedAt DateTime @map("received_at") @db.Timestamptz(6)
+  immutablePayload Json @map("immutable_payload")
+  @@unique([id, userId])
+  @@index([userId, factoryArrivalId], map: "factory_receipt_events_user_arrival_idx")
+  @@map("factory_receipt_events")
+}
+
+model FactoryReceiptLine {
+  id BigInt @id @default(autoincrement()) @db.BigInt
+  userId String @map("user_id") @db.Uuid
+  factoryReceiptEventId BigInt @map("factory_receipt_event_id") @db.BigInt
+  factoryArrivalAllocationId BigInt? @map("factory_arrival_allocation_id") @db.BigInt
+  transactionId BigInt? @map("transaction_id") @db.BigInt
+  receivedQuantity Int @map("received_quantity")
+  @@unique([id, userId])
+  @@index([userId, factoryReceiptEventId, transactionId], map: "factory_receipt_lines_user_event_transaction_idx")
+  @@map("factory_receipt_lines")
+}
+
+model InboundMigrationException {
+  id BigInt @id @default(autoincrement()) @db.BigInt
+  userId String @map("user_id") @db.Uuid
+  inboundImportSourceRowId BigInt? @map("inbound_import_source_row_id") @db.BigInt
+  exceptionType String @map("exception_type")
+  details Json
+  @@unique([id, userId])
+  @@index([userId, inboundImportSourceRowId], map: "inbound_migration_exceptions_user_row_idx")
+  @@map("inbound_migration_exceptions")
 }
 
 model Inventory {

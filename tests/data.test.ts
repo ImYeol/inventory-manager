@@ -16,6 +16,7 @@ import {
   getFactoriesData,
   getFactoryArrivalsData,
   getModelLookups,
+  getProductWorkspaceData,
   getRawTransactions,
   getTransactionsWithRelations,
   runBulkTransaction,
@@ -61,6 +62,32 @@ afterEach(() => {
 })
 
 describe('Supabase data mappers', () => {
+  it('derives incoming only from open canonical warehouse allocations, never raw import or draft rows', async () => {
+    const supabase = createSupabaseMock({
+      product_variants: { data: [{ id: 9, model_id: 1, size_id: 10, color_id: 20, seller_sku: 'SKU-1' }], error: null },
+      models: { data: [{ id: 1, name: 'LP01' }], error: null },
+      sizes: { data: [{ id: 10, name: 'S' }], error: null },
+      colors: { data: [{ id: 20, name: '네이비' }], error: null },
+      inventory: { data: [{ model_id: 1, size_id: 10, color_id: 20, quantity: 3 }], error: null },
+      inventory_reservations: { data: [], error: null },
+      channel_product_refs: { data: [], error: null },
+      factory_arrivals: { data: [{ id: 7, status: 'READY' }, { id: 8, status: 'RECEIVED' }], error: null },
+      factory_arrival_allocations: {
+        data: [
+          { factory_arrival_id: 7, product_variant_id: 9, allocated_quantity: 12, normally_received_quantity: 5, shortage_closed_quantity: 2 },
+          { factory_arrival_id: 8, product_variant_id: 9, allocated_quantity: 99, normally_received_quantity: 0, shortage_closed_quantity: 0 },
+        ], error: null,
+      },
+    })
+    mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
+
+    await expect(getProductWorkspaceData()).resolves.toMatchObject({
+      variants: [{ id: 9, incoming: 5, onHand: 3, available: 3 }],
+    })
+    expect(supabase.from).not.toHaveBeenCalledWith('inbound_draft_rows')
+    expect(supabase.from).not.toHaveBeenCalledWith('inbound_import_source_rows')
+  })
+
   it('maps catalog rows into the model, size, color, inventory and warehouse shape used by the UI', async () => {
     const supabase = createSupabaseMock({
       models: {
