@@ -14,10 +14,12 @@ import {
   runWarehouseTransfer,
   runRevertTransaction,
   runReceiveFactoryArrival,
+  runFactoryArrivalOperation,
   createInboundDraft as runCreateInboundDraft,
   runReceiveInboundDraftRows,
   attachInternalSkuToInboundDraftRow as runAttachInternalSkuToInboundDraftRow,
 } from './data'
+import { assertAllocationSplit, receiptPayloadHash } from './factory-arrival'
 import type { InboundDraftRowInput } from './inbound'
 import { getSupabaseWithUser } from './db'
 
@@ -611,6 +613,46 @@ export async function receiveFactoryArrival(input: {
   revalidateInventoryPaths()
   revalidatePath('/sourcing/arrivals')
   revalidatePath('/sourcing/factories')
+  return { success: true }
+}
+
+export async function replaceFactoryArrivalAllocations(input: { arrivalId: number; itemId: number; allocations: Array<{ warehouseId: number; quantity: number }> }) {
+  if (!Number.isInteger(input.arrivalId) || !Number.isInteger(input.itemId)) throw new Error('입고 예정 행을 찾을 수 없습니다.')
+  assertAllocationSplit(input.allocations.reduce((sum, row) => sum + row.quantity, 0), input.allocations)
+  await runFactoryArrivalOperation('replace_factory_arrival_allocations', {
+    arrival_id: input.arrivalId, item_id: input.itemId,
+    allocations: input.allocations.map((row) => ({ warehouse_id: row.warehouseId, quantity: row.quantity })),
+  })
+  revalidateInventoryPaths(); revalidatePath('/sourcing/arrivals')
+  return { success: true }
+}
+
+export async function receiveFactoryArrivalRequest(input: { arrivalId: number; receiptRequestId: string; lines: Array<{ allocationId: number; quantity: number; overageQuantity?: number; overageReason?: string }> }) {
+  if (!input.arrivalId || !input.receiptRequestId.trim() || !input.lines.length || input.lines.some((line) => !line.allocationId || !Number.isInteger(line.quantity) || line.quantity < 0 || !Number.isInteger(line.overageQuantity ?? 0) || (line.overageQuantity ?? 0) < 0)) throw new Error('입고 요청 정보가 올바르지 않습니다.')
+  const payload = { arrivalId: input.arrivalId, receiptRequestId: input.receiptRequestId.trim(), lines: input.lines.map((line) => ({ allocationId: line.allocationId, quantity: line.quantity, overageQuantity: line.overageQuantity ?? 0, overageReason: line.overageReason?.trim() ?? '' })) }
+  const result = await runFactoryArrivalOperation('receive_factory_arrival_request', { arrival_id: payload.arrivalId, receipt_request_id: payload.receiptRequestId, payload_hash: await receiptPayloadHash(payload), lines: payload.lines.map((line) => ({ allocation_id: line.allocationId, quantity: line.quantity, overage_quantity: line.overageQuantity, overage_reason: line.overageReason })) })
+  revalidateInventoryPaths(); revalidatePath('/sourcing/arrivals')
+  return { success: true, result }
+}
+
+export async function closeFactoryArrivalShortage(input: { allocationId: number; quantity: number; reason: string }) {
+  if (!input.allocationId || !Number.isInteger(input.quantity) || input.quantity <= 0 || !input.reason.trim()) throw new Error('부족 수량과 사유를 입력해주세요.')
+  await runFactoryArrivalOperation('close_factory_arrival_shortage', { allocation_id: input.allocationId, quantity: input.quantity, reason: input.reason.trim() })
+  revalidateInventoryPaths(); revalidatePath('/sourcing/arrivals')
+  return { success: true }
+}
+
+export async function recordFactoryArrivalFollowUp(input: { arrivalId: number; itemId: number; warehouseId: number; quantity: number; reason: string; receiptRequestId: string }) {
+  if (!input.arrivalId || !input.itemId || !input.warehouseId || !Number.isInteger(input.quantity) || input.quantity <= 0 || !input.reason.trim() || !input.receiptRequestId.trim()) throw new Error('후속 입고 정보를 모두 입력해주세요.')
+  await runFactoryArrivalOperation('record_factory_arrival_follow_up', { arrival_id: input.arrivalId, item_id: input.itemId, warehouse_id: input.warehouseId, quantity: input.quantity, reason: input.reason.trim(), receipt_request_id: input.receiptRequestId.trim() })
+  revalidateInventoryPaths(); revalidatePath('/sourcing/arrivals')
+  return { success: true }
+}
+
+export async function reverseFactoryReceiptLine(input: { receiptLineId: number; correctionRequestId: string; reason: string }) {
+  if (!input.receiptLineId || !input.correctionRequestId.trim() || !input.reason.trim()) throw new Error('정정 요청 ID와 사유를 입력해주세요.')
+  await runFactoryArrivalOperation('reverse_factory_receipt_line', { receipt_line_id: input.receiptLineId, correction_request_id: input.correctionRequestId.trim(), reason: input.reason.trim() })
+  revalidateInventoryPaths(); revalidatePath('/sourcing/arrivals')
   return { success: true }
 }
 

@@ -257,6 +257,7 @@ model FactoryReceiptEvent {
   eventKind String @map("event_kind")
   receivedAt DateTime @map("received_at") @db.Timestamptz(6)
   immutablePayload Json @map("immutable_payload")
+  receiptRequestId String? @map("receipt_request_id")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   @@unique([id, userId])
   @@index([userId, factoryArrivalId], map: "factory_receipt_events_user_arrival_idx")
@@ -270,6 +271,10 @@ model FactoryReceiptLine {
   factoryArrivalAllocationId BigInt? @map("factory_arrival_allocation_id") @db.BigInt
   transactionId BigInt? @map("transaction_id") @db.BigInt
   receivedQuantity Int @map("received_quantity")
+  factoryArrivalItemId BigInt? @map("factory_arrival_item_id") @db.BigInt
+  warehouseId BigInt? @map("warehouse_id") @db.BigInt
+  normalQuantity Int @default(0) @map("normal_quantity")
+  overageQuantity Int @default(0) @map("overage_quantity")
   sellerSkuSnapshot String? @map("seller_sku_snapshot")
   productNameSnapshot String? @map("product_name_snapshot")
   optionNameSnapshot String? @map("option_name_snapshot")
@@ -278,6 +283,46 @@ model FactoryReceiptLine {
   @@unique([id, userId])
   @@index([userId, factoryReceiptEventId, transactionId], map: "factory_receipt_lines_user_event_transaction_idx")
   @@map("factory_receipt_lines")
+}
+
+model FactoryReceiptRequest {
+  id BigInt @id @default(autoincrement()) @db.BigInt
+  userId String @map("user_id") @db.Uuid
+  receiptRequestId String @map("receipt_request_id")
+  payloadHash String @map("payload_hash")
+  factoryArrivalId BigInt @map("factory_arrival_id") @db.BigInt
+  immutablePayload Json @map("immutable_payload")
+  receiptEventId BigInt? @map("receipt_event_id") @db.BigInt
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  @@unique([userId, receiptRequestId])
+  @@unique([id, userId])
+  @@index([userId, factoryArrivalId])
+  @@map("factory_receipt_requests")
+}
+
+model FactoryArrivalShortageClosure {
+  id BigInt @id @default(autoincrement()) @db.BigInt
+  userId String @map("user_id") @db.Uuid
+  factoryArrivalAllocationId BigInt @map("factory_arrival_allocation_id") @db.BigInt
+  quantity Int
+  reason String
+  closedAt DateTime @default(now()) @map("closed_at") @db.Timestamptz(6)
+  @@unique([id, userId])
+  @@index([userId, factoryArrivalAllocationId])
+  @@map("factory_arrival_shortage_closures")
+}
+
+model FactoryReceiptLineCorrection {
+  id BigInt @id @default(autoincrement()) @db.BigInt
+  userId String @map("user_id") @db.Uuid
+  correctionRequestId String @map("correction_request_id")
+  factoryReceiptLineId BigInt @unique @map("factory_receipt_line_id") @db.BigInt
+  reason String
+  transactionId BigInt? @map("transaction_id") @db.BigInt
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  @@unique([userId, correctionRequestId])
+  @@unique([id, userId])
+  @@map("factory_receipt_line_corrections")
 }
 
 model InboundMigrationException {
