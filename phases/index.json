@@ -132,7 +132,7 @@
     },
     {
       "dir": "inbound-import-factory-arrival",
-      "status": "in_progress"
+      "status": "pending"
     }
   ]
 }

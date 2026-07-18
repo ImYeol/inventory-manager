@@ -2,12 +2,14 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "in_progress",
+  "status": "pending",
   "steps": [
     {
       "step": 0,
       "name": "canonical-arrival-schema-and-legacy-migration",
-      "status": "blocked"
+      "status": "completed",
+      "summary": "Established the canonical import/arrival/allocation/receipt schema, migration, canonical incoming loader, ProductVariant references, owner-scoped RLS foundations, immutable source rows, and compatibility RPC baseline. Focused and full tests, Prisma validation, lint, build, and isolated empty legacy-schema migration execution passed in the outer orchestrator. Remaining audited compatibility and behavioral-fixture work is isolated in step 1.",
+      "completed_at": "2026-07-19T04:41:00+0900"
     },
     {
       "step": 1,
