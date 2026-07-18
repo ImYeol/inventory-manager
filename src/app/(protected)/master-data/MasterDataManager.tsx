@@ -21,6 +21,7 @@ import {
   updateChannelProductMapping,
 } from '@/lib/actions/channel-product-link'
 import { createInternalProduct } from '@/lib/actions/internal-product'
+import { confirmSupplierSkuMapping } from '@/lib/actions/supplier-sku-mapping'
 import type { ProductWorkspaceChannelRef, ProductWorkspaceVariant } from '@/lib/data'
 
 type WarehouseLookup = { id: number; name: string }
@@ -38,6 +39,7 @@ type MasterDataManagerProps = {
   warehouseStats?: WarehouseStat[]
   variants?: ProductWorkspaceVariant[]
   channelProductRefs?: ProductWorkspaceChannelRef[]
+  suppliers?: WarehouseLookup[]
 }
 type TabKey = 'product' | 'warehouse'
 type ProductChannelFilter = 'all' | 'naver' | 'coupang'
@@ -75,6 +77,7 @@ export default function MasterDataManager({
   warehouseStats = [],
   variants = [],
   channelProductRefs = [],
+  suppliers = [],
 }: MasterDataManagerProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -93,6 +96,7 @@ export default function MasterDataManager({
   const [warehouseName, setWarehouseName] = useState('')
   const warehouseNameRef = useRef<HTMLInputElement>(null)
   const [deleteWarehouseTarget, setDeleteWarehouseTarget] = useState<WarehouseLookup | null>(null)
+  const [supplierMappingDraft, setSupplierMappingDraft] = useState({ supplierId: '', externalSku: '' })
 
   const showToast = (next: { type: 'success' | 'error'; text: string }) => {
     setMessage(next)
@@ -167,6 +171,10 @@ export default function MasterDataManager({
       () => { setMappingDraft(null); setEditingMappingId(null) },
     )
   }
+  const saveSupplierMapping = () => {
+    if (!selectedVariant) return
+    run(() => confirmSupplierSkuMapping({ supplierId: Number(supplierMappingDraft.supplierId), externalSku: supplierMappingDraft.externalSku, productVariantId: selectedVariant.id }), '공급자 SKU를 연결했습니다.', () => setSupplierMappingDraft({ supplierId: '', externalSku: '' }))
+  }
 
   return (
     <div className="space-y-4">
@@ -217,7 +225,7 @@ export default function MasterDataManager({
 
       <Modal open={Boolean(selectedVariant)} title="SKU 매핑" description={selectedVariant ? `${selectedVariant.sellerSku} · ${selectedVariant.modelName}` : undefined} onOpenChange={(open) => { if (!open) { setSelectedVariant(null); setMappingDraft(null) } }} footer={<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setSelectedVariant(null)}>닫기</Button>{mappingDraft ? <Button type="button" onClick={saveMapping} disabled={isPending || !mappingDraft.sellerSku.trim() || !mappingDraft.externalProductId.trim() || !mappingDraft.externalVariantId.trim()}>저장</Button> : <Button type="button" onClick={startNewMapping}>매핑 추가</Button>}</div>}>
         <div className="space-y-3 text-sm">
-          {mappingDraft ? <div className="grid gap-3"><Select value={mappingDraft.channel} onValueChange={(value) => setMappingDraft((draft) => draft ? { ...draft, channel: value as MappingDraft['channel'] } : draft)}><SelectTrigger aria-label="채널 선택"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="naver">네이버</SelectItem><SelectItem value="coupang">쿠팡</SelectItem></SelectContent></Select><label className="space-y-1"><span className={ui.label}>판매자 SKU</span><Input aria-label="판매자 SKU" value={mappingDraft.sellerSku} onChange={(event) => setMappingDraft((draft) => draft ? { ...draft, sellerSku: event.target.value } : draft)} /></label><label className="space-y-1"><span className={ui.label}>채널 상품 ID</span><Input aria-label="채널 상품 ID" value={mappingDraft.externalProductId} onChange={(event) => setMappingDraft((draft) => draft ? { ...draft, externalProductId: event.target.value } : draft)} /></label><label className="space-y-1"><span className={ui.label}>채널 옵션 ID</span><Input aria-label="채널 옵션 ID" value={mappingDraft.externalVariantId} onChange={(event) => setMappingDraft((draft) => draft ? { ...draft, externalVariantId: event.target.value } : draft)} /></label></div> : selectedRefs.length ? selectedRefs.map((ref) => <div key={ref.id} className="flex items-center justify-between gap-3 border-b border-[color:var(--border)] pb-3 last:border-0"><div className="min-w-0"><ChannelBadge channel={ref.channel} listingStatus={ref.lastSyncError ? 'sync-error' : ref.listingStatus} /><p className="mt-1 font-mono text-xs text-[color:var(--muted)]">{ref.externalProductId} / {ref.externalVariantId}</p>{ref.lastSyncError ? <p className="mt-1 text-xs text-[color:var(--danger-foreground)]">{ref.lastSyncError}</p> : null}</div><ActionToolbar><Button type="button" variant="ghost" size="sm" onClick={() => startEditMapping(ref)}>수정</Button><Button type="button" variant="ghost" size="sm" onClick={() => run(() => unlinkChannelProductMapping(ref.id), '채널 판매 옵션을 해제했습니다.')}>해제</Button></ActionToolbar></div>) : <p className="text-[color:var(--muted)]">연결된 채널 판매 옵션이 없습니다.</p>}
+          {mappingDraft ? <div className="grid gap-3"><Select value={mappingDraft.channel} onValueChange={(value) => setMappingDraft((draft) => draft ? { ...draft, channel: value as MappingDraft['channel'] } : draft)}><SelectTrigger aria-label="채널 선택"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="naver">네이버</SelectItem><SelectItem value="coupang">쿠팡</SelectItem></SelectContent></Select><label className="space-y-1"><span className={ui.label}>판매자 SKU</span><Input aria-label="판매자 SKU" value={mappingDraft.sellerSku} onChange={(event) => setMappingDraft((draft) => draft ? { ...draft, sellerSku: event.target.value } : draft)} /></label><label className="space-y-1"><span className={ui.label}>채널 상품 ID</span><Input aria-label="채널 상품 ID" value={mappingDraft.externalProductId} onChange={(event) => setMappingDraft((draft) => draft ? { ...draft, externalProductId: event.target.value } : draft)} /></label><label className="space-y-1"><span className={ui.label}>채널 옵션 ID</span><Input aria-label="채널 옵션 ID" value={mappingDraft.externalVariantId} onChange={(event) => setMappingDraft((draft) => draft ? { ...draft, externalVariantId: event.target.value } : draft)} /></label></div> : <><div className="space-y-2 border-b border-[color:var(--border)] pb-3"><p className={ui.label}>공급자 SKU 사전 연결 (선택)</p><div className="flex gap-2"><Select value={supplierMappingDraft.supplierId} onValueChange={(supplierId) => setSupplierMappingDraft((draft) => ({ ...draft, supplierId }))}><SelectTrigger aria-label="공급자 선택" className="w-36"><SelectValue placeholder="공급자" /></SelectTrigger><SelectContent>{suppliers.map((supplier) => <SelectItem key={supplier.id} value={String(supplier.id)}>{supplier.name}</SelectItem>)}</SelectContent></Select><Input aria-label="외부 SKU" value={supplierMappingDraft.externalSku} onChange={(event) => setSupplierMappingDraft((draft) => ({ ...draft, externalSku: event.target.value }))} placeholder="외부 SKU" /><Button type="button" size="sm" variant="secondary" disabled={isPending || !supplierMappingDraft.supplierId || !supplierMappingDraft.externalSku} onClick={saveSupplierMapping}>연결</Button></div></div>{selectedRefs.length ? selectedRefs.map((ref) => <div key={ref.id} className="flex items-center justify-between gap-3 border-b border-[color:var(--border)] pb-3 last:border-0"><div className="min-w-0"><ChannelBadge channel={ref.channel} listingStatus={ref.lastSyncError ? 'sync-error' : ref.listingStatus} /><p className="mt-1 font-mono text-xs text-[color:var(--muted)]">{ref.externalProductId} / {ref.externalVariantId}</p>{ref.lastSyncError ? <p className="mt-1 text-xs text-[color:var(--danger-foreground)]">{ref.lastSyncError}</p> : null}</div><ActionToolbar><Button type="button" variant="ghost" size="sm" onClick={() => startEditMapping(ref)}>수정</Button><Button type="button" variant="ghost" size="sm" onClick={() => run(() => unlinkChannelProductMapping(ref.id), '채널 판매 옵션을 해제했습니다.')}>해제</Button></ActionToolbar></div>) : <p className="text-[color:var(--muted)]">연결된 채널 판매 옵션이 없습니다.</p>}</>}
         </div>
       </Modal>
 

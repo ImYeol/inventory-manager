@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getCatalogData: vi.fn(),
   getTransactionsWithRelations: vi.fn(),
   getProductWorkspaceData: vi.fn(),
+  getFactoriesData: vi.fn(),
   masterDataManager: vi.fn(),
 }))
 
@@ -14,6 +15,7 @@ vi.mock('@/lib/data', () => ({
   getCatalogData: mocks.getCatalogData,
   getTransactionsWithRelations: mocks.getTransactionsWithRelations,
   getProductWorkspaceData: mocks.getProductWorkspaceData,
+  getFactoriesData: mocks.getFactoriesData,
 }))
 
 vi.mock('@/app/(protected)/master-data/MasterDataManager', () => ({
@@ -32,6 +34,7 @@ afterEach(() => {
   mocks.getCatalogData.mockReset()
   mocks.getTransactionsWithRelations.mockReset()
   mocks.getProductWorkspaceData.mockReset()
+  mocks.getFactoriesData.mockReset()
   mocks.masterDataManager.mockReset()
 })
 
@@ -44,12 +47,14 @@ describe('ProductsPage', () => {
     mocks.getCatalogData.mockResolvedValue({ models, warehouses })
     mocks.getTransactionsWithRelations.mockResolvedValue({ transactions })
     mocks.getProductWorkspaceData.mockResolvedValue({ variants: [], channelProductRefs: [] })
+    mocks.getFactoriesData.mockResolvedValue({ factories: [], schemaState: 'ready', factorySourcingItems: [] })
 
     render(await ProductsPage())
 
     expect(mocks.getCatalogData).toHaveBeenCalledTimes(1)
     expect(mocks.getTransactionsWithRelations).toHaveBeenCalledTimes(1)
     expect(mocks.getProductWorkspaceData).toHaveBeenCalledTimes(1)
+    expect(mocks.getFactoriesData).toHaveBeenCalledTimes(1)
     expect(mocks.masterDataManager).toHaveBeenCalledWith(
       expect.objectContaining({
         warehouses,

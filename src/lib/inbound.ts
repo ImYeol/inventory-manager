@@ -9,11 +9,11 @@ export type InboundDraftRowInput = {
 
 /** Exact supplier links deliberately preserve the raw template and SKU identity. */
 export function inboundSupplierSkuKey(input: Pick<InboundDraftRowInput, 'supplierId' | 'template' | 'externalSku'>) {
-  return `${input.supplierId}:${input.template.trim()}:${input.externalSku.trim()}`
+  return `${input.supplierId}:${input.externalSku.trim()}`
 }
 
 export function inboundTemplateSkuKey(input: { supplierId: number; templateId: number; externalSku: string }) {
-  return `${input.supplierId}:${input.templateId}:${input.externalSku.trim()}`
+  return `${input.supplierId}:${input.externalSku.trim()}`
 }
 
 /** Invalid preview rows are draftable evidence; receipt validation happens later. */

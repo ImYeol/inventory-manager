@@ -284,6 +284,44 @@ model InboundMigrationException {
   @@map("inbound_migration_exceptions")
 }
 
+model SupplierSkuLink {
+  id                    BigInt    @id @default(autoincrement()) @db.BigInt
+  userId                String    @map("user_id") @db.Uuid
+  supplierId            BigInt    @map("supplier_id") @db.BigInt
+  template              String
+  templateId            BigInt?   @map("template_id") @db.BigInt
+  externalSku           String    @map("external_sku")
+  normalizedExternalSku String    @map("normalized_external_sku")
+  productVariantId      BigInt    @map("product_variant_id") @db.BigInt
+  receivedAt            DateTime  @map("received_at") @db.Timestamptz(6)
+  isActive              Boolean   @default(true) @map("is_active")
+  deactivatedAt         DateTime? @map("deactivated_at") @db.Timestamptz(6)
+  deactivationReason    String?   @map("deactivation_reason")
+
+  @@index([userId, supplierId, normalizedExternalSku], map: "supplier_sku_links_active_exact_idx")
+  @@map("supplier_sku_links")
+}
+
+model SupplierSkuMappingAudit {
+  id                       BigInt   @id @default(autoincrement()) @db.BigInt
+  userId                   String   @map("user_id") @db.Uuid
+  actorId                  String   @map("actor_id") @db.Uuid
+  supplierId               BigInt   @map("supplier_id") @db.BigInt
+  supplierNameSnapshot     String?  @map("supplier_name_snapshot")
+  rawExternalSku           String   @map("raw_external_sku")
+  normalizedExternalSku    String   @map("normalized_external_sku")
+  action                   String
+  previousProductVariantId BigInt?  @map("previous_product_variant_id") @db.BigInt
+  previousSellerSkuSnapshot String? @map("previous_seller_sku_snapshot")
+  newProductVariantId      BigInt?  @map("new_product_variant_id") @db.BigInt
+  newSellerSkuSnapshot     String?  @map("new_seller_sku_snapshot")
+  reason                   String?
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, supplierId, createdAt(sort: Desc)], map: "supplier_sku_mapping_audits_owner_supplier_created_idx")
+  @@map("supplier_sku_mapping_audits")
+}
+
 model Inventory {
   id          BigInt    @id @default(autoincrement()) @db.BigInt
   userId      String    @map("user_id") @db.Uuid

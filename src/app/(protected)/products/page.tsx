@@ -1,14 +1,15 @@
-import { getCatalogData, getProductWorkspaceData, getTransactionsWithRelations } from '@/lib/data'
+import { getCatalogData, getFactoriesData, getProductWorkspaceData, getTransactionsWithRelations } from '@/lib/data'
 import { PageHeader, ui } from '../../components/ui'
 import MasterDataManager from '../master-data/MasterDataManager'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ProductsPage() {
-  const [{ models, warehouses }, txData, workspace] = await Promise.all([
+  const [{ models, warehouses }, txData, workspace, factoriesData] = await Promise.all([
     getCatalogData(),
     getTransactionsWithRelations(),
     getProductWorkspaceData(),
+    getFactoriesData(),
   ])
 
   const warehouseStats = warehouses.map((warehouse) => {
@@ -49,7 +50,7 @@ export default async function ProductsPage() {
   return (
     <div className={ui.shell}>
       <PageHeader title="상품 관리" description="상품과 창고 기준정보를 표에서 관리합니다." />
-      <MasterDataManager {...workspace} warehouses={warehouses} warehouseStats={warehouseStats} />
+      <MasterDataManager {...workspace} warehouses={warehouses} warehouseStats={warehouseStats} suppliers={factoriesData.factories.filter((factory) => factory.isActive).map((factory) => ({ id: factory.id, name: factory.name }))} />
     </div>
   )
 }

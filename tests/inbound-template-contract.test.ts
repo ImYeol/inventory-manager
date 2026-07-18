@@ -4,10 +4,10 @@ import { resolve } from 'node:path'
 import { inboundTemplateSkuKey, validateInboundPreviewRows } from '@/lib/inbound'
 
 describe('versioned inbound template contract', () => {
-  it('uses the stable template identity in exact supplier matching, never source text', () => {
-    expect(inboundTemplateSkuKey({ supplierId: 4, templateId: 7, externalSku: ' EXT-1 ' })).toBe('4:7:EXT-1')
+  it('keeps template versions out of exact supplier matching', () => {
+    expect(inboundTemplateSkuKey({ supplierId: 4, templateId: 7, externalSku: ' EXT-1 ' })).toBe('4:EXT-1')
     expect(inboundTemplateSkuKey({ supplierId: 4, templateId: 7, externalSku: 'EXT-1' }))
-      .not.toBe(inboundTemplateSkuKey({ supplierId: 4, templateId: 8, externalSku: 'EXT-1' }))
+      .toBe(inboundTemplateSkuKey({ supplierId: 4, templateId: 8, externalSku: 'EXT-1' }))
   })
 
   it('allows invalid preview rows to be saved, but excludes them from receipt validation', () => {

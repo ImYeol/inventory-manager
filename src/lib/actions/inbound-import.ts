@@ -5,7 +5,8 @@ import * as XLSX from 'xlsx'
 import { revalidatePath } from 'next/cache'
 import { getSupabaseWithUser } from '../db'
 import { createInboundDraft, getInboundTemplateVersion } from '../data'
-import { parseInboundTemplateWorksheet, suggestExactInboundTemplateLinks } from '../inbound-import'
+import { parseInboundTemplateWorksheet } from '../inbound-import'
+import { suggestExactSupplierSkuLinks } from '../supplier-sku'
 
 export type InboundTemplateSample = { sheets: Array<{ name: string; rows: string[][] }> }
 
@@ -80,11 +81,11 @@ export async function previewInboundTemplateFile(input: { supplierId: number; wa
   const { supabase } = await getSupabaseWithUser()
   const { data: links, error } = await supabase
     .from('supplier_sku_links')
-    .select('external_sku, product_variant_id')
+    .select('normalized_external_sku, product_variant_id')
     .eq('supplier_id', input.supplierId)
-    .eq('template_id', template.templateId)
+    .eq('is_active', true)
   if (error) throw new Error(error.message)
-  const linkMap = new Map((links ?? []).map((link) => [`${input.supplierId}:${template.templateId}:${link.external_sku}`, Number(link.product_variant_id)]))
+  const linkMap = new Map((links ?? []).map((link) => [`${input.supplierId}:${link.normalized_external_sku}`, Number(link.product_variant_id)]))
   return {
     supplierId: input.supplierId,
     warehouseId: input.warehouseId,
@@ -93,7 +94,7 @@ export async function previewInboundTemplateFile(input: { supplierId: number; wa
     sheetName: parsed.sheetName,
     headerRowNumber: parsed.headerRowNumber,
     headers: parsed.headers,
-    rows: suggestExactInboundTemplateLinks(parsed.rows, linkMap, input.supplierId, template.templateId),
+    rows: suggestExactSupplierSkuLinks(parsed.rows, linkMap, input.supplierId),
   }
 }
 
