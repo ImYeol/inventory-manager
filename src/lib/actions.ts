@@ -571,8 +571,11 @@ export async function createFactoryArrivalBatch(input: {
     .insert({
       factory_id: input.factoryId,
       expected_date: input.expectedDate,
-      status: '예정',
+      // FactoryArrival persists the canonical lifecycle vocabulary. Korean
+      // labels remain a presentation concern, never a database value.
+      status: 'READY',
       source_channel: input.sourceChannel,
+      source_type: input.sourceChannel === 'csv' ? 'FILE' : 'MANUAL',
       memo: input.memo?.trim() || null,
     })
     .select('id')

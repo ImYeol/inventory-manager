@@ -130,12 +130,12 @@ model FactoryArrival {
   memo          String?
   importRevisionId BigInt?            @map("import_revision_id") @db.BigInt
   followUpParentArrivalId BigInt?     @map("follow_up_parent_arrival_id") @db.BigInt
-  sourceType    String?               @map("source_type")
+  sourceType    String                @map("source_type")
   externalShipmentReference String?   @map("external_shipment_reference")
   supplierNameSnapshot String?        @map("supplier_name_snapshot")
   createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime             @default(now()) @map("updated_at") @db.Timestamptz(6)
-  factory       Factory              @relation(fields: [factoryId, userId], references: [id, userId], onDelete: Cascade)
+  factory       Factory              @relation(fields: [factoryId, userId], references: [id, userId], onDelete: Restrict)
   items         FactoryArrivalItem[]
 
   @@unique([id, userId])
@@ -167,6 +167,7 @@ model FactoryArrivalItem {
   color            Color?         @relation(fields: [modelId, colorId, userId], references: [modelId, id, userId], onDelete: Cascade)
 
   @@index([factoryArrivalId, userId], map: "factory_arrival_items_arrival_id_user_id_idx")
+  @@unique([id, userId])
   @@index([modelId, userId], map: "factory_arrival_items_model_id_user_id_idx")
   @@map("factory_arrival_items")
 }
@@ -508,6 +509,7 @@ model Transaction {
   warehouse     Warehouse            @relation(fields: [warehouseId, userId], references: [id, userId], onDelete: Cascade)
 
   @@index([userId, date(sort: Desc), createdAt(sort: Desc)], map: "transactions_user_date_created_at_idx")
+  @@unique([id, userId])
   @@index([modelId, userId], map: "transactions_model_id_user_id_idx")
   @@index([modelId, sizeId, userId], map: "transactions_model_id_size_id_user_id_idx")
   @@index([modelId, colorId, userId], map: "transactions_model_id_color_id_user_id_idx")

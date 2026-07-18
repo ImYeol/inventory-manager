@@ -62,10 +62,15 @@ alter table public.factory_arrival_items alter column model_id drop not null;
 alter table public.factory_arrival_items alter column size_id drop not null;
 alter table public.factory_arrival_items alter column color_id drop not null;
 alter table public.factory_arrival_items alter column ordered_quantity drop not null;
+-- Composite references below must be backed by a matching unique key; the
+-- identity primary key alone is not sufficient for (id, user_id) FKs.
+alter table public.factory_arrival_items add constraint factory_arrival_items_id_user_id_key unique (id, user_id);
+alter table public.transactions add constraint transactions_id_user_id_key unique (id, user_id);
 alter table public.factory_arrival_items drop constraint if exists factory_arrival_items_factory_arrival_id_user_id_fkey;
 alter table public.factory_arrival_items add constraint factory_arrival_items_factory_arrival_id_user_id_fkey foreign key (factory_arrival_id, user_id) references public.factory_arrivals(id, user_id) on delete restrict;
 alter table public.factory_arrival_items add constraint factory_arrival_items_product_variant_id_user_id_fkey foreign key (product_variant_id, user_id) references public.product_variants(id, user_id) on delete restrict;
 alter table public.factory_arrival_items add constraint factory_arrival_items_source_row_id_user_id_fkey foreign key (inbound_import_source_row_id, user_id) references public.inbound_import_source_rows(id, user_id) on delete restrict;
+alter table public.factory_arrival_items add constraint factory_arrival_items_one_source_row_key unique (inbound_import_source_row_id);
 update public.factory_arrival_items i set product_variant_id = pv.id, seller_sku_snapshot = pv.seller_sku
 from public.product_variants pv where pv.user_id = i.user_id and pv.model_id = i.model_id and pv.size_id = i.size_id and pv.color_id = i.color_id and i.product_variant_id is null;
 
@@ -109,6 +114,26 @@ create table public.inbound_migration_exceptions (
   unique (id, user_id), foreign key (inbound_import_source_row_id, user_id) references public.inbound_import_source_rows(id, user_id) on delete restrict
 );
 
+-- An allocation cannot cross an arrival, item, variant, or owner boundary.
+create or replace function public.assert_factory_arrival_allocation_consistency()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if not exists (
+    select 1 from public.factory_arrival_items i
+    where i.id = new.factory_arrival_item_id
+      and i.user_id = new.user_id
+      and i.factory_arrival_id = new.factory_arrival_id
+      and i.product_variant_id = new.product_variant_id
+  ) then
+    raise exception 'factory_arrival_allocation_matches_item';
+  end if;
+  return new;
+end;
+$$;
+create trigger factory_arrival_allocation_consistency
+before insert or update on public.factory_arrival_allocations
+for each row execute function public.assert_factory_arrival_allocation_consistency();
+
 create index inbound_imports_user_id_idx on public.inbound_imports(user_id);
 create index inbound_import_revisions_user_import_idx on public.inbound_import_revisions(user_id, inbound_import_id);
 create index inbound_import_source_rows_user_revision_idx on public.inbound_import_source_rows(user_id, inbound_import_revision_id);
@@ -126,12 +151,28 @@ alter table public.factory_receipt_events enable row level security;
 alter table public.factory_receipt_lines enable row level security;
 alter table public.inbound_migration_exceptions enable row level security;
 create policy "Users manage own inbound_imports" on public.inbound_imports for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
-create policy "Users manage own inbound_import_revisions" on public.inbound_import_revisions for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
-create policy "Users manage own inbound_import_source_rows" on public.inbound_import_source_rows for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+create policy "Users read own inbound_import_revisions" on public.inbound_import_revisions for select to authenticated using ((select auth.uid()) = user_id);
+create policy "Users insert own inbound_import_revisions" on public.inbound_import_revisions for insert to authenticated with check ((select auth.uid()) = user_id);
+create policy "Users read own inbound_import_source_rows" on public.inbound_import_source_rows for select to authenticated using ((select auth.uid()) = user_id);
+create policy "Users insert own inbound_import_source_rows" on public.inbound_import_source_rows for insert to authenticated with check ((select auth.uid()) = user_id);
 create policy "Users manage own factory_arrival_allocations" on public.factory_arrival_allocations for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
-create policy "Users manage own factory_receipt_events" on public.factory_receipt_events for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
-create policy "Users manage own factory_receipt_lines" on public.factory_receipt_lines for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
-create policy "Users manage own inbound_migration_exceptions" on public.inbound_migration_exceptions for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+create policy "Users read own factory_receipt_events" on public.factory_receipt_events for select to authenticated using ((select auth.uid()) = user_id);
+create policy "Users insert own factory_receipt_events" on public.factory_receipt_events for insert to authenticated with check ((select auth.uid()) = user_id);
+create policy "Users read own factory_receipt_lines" on public.factory_receipt_lines for select to authenticated using ((select auth.uid()) = user_id);
+create policy "Users insert own factory_receipt_lines" on public.factory_receipt_lines for insert to authenticated with check ((select auth.uid()) = user_id);
+create policy "Users read own inbound_migration_exceptions" on public.inbound_migration_exceptions for select to authenticated using ((select auth.uid()) = user_id);
+create policy "Users insert own inbound_migration_exceptions" on public.inbound_migration_exceptions for insert to authenticated with check ((select auth.uid()) = user_id);
+
+create or replace function public.reject_canonical_evidence_mutation()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  raise exception 'immutable_canonical_evidence';
+end;
+$$;
+create trigger inbound_import_revision_immutable before update or delete on public.inbound_import_revisions for each row execute function public.reject_canonical_evidence_mutation();
+create trigger inbound_import_source_row_immutable before update or delete on public.inbound_import_source_rows for each row execute function public.reject_canonical_evidence_mutation();
+create trigger factory_receipt_event_immutable before update or delete on public.factory_receipt_events for each row execute function public.reject_canonical_evidence_mutation();
+create trigger factory_receipt_line_immutable before update or delete on public.factory_receipt_lines for each row execute function public.reject_canonical_evidence_mutation();
 
 insert into public.inbound_imports (user_id, legacy_inbound_draft_id, supplier_id, source_type, created_at)
 select user_id, id, supplier_id, case when source_filename is null then 'MANUAL' else 'FILE' end, created_at from public.inbound_drafts;
@@ -147,9 +188,62 @@ insert into public.factory_arrival_items (user_id, factory_arrival_id, model_id,
 select sr.user_id, a.id, pv.model_id, pv.size_id, pv.color_id, sr.product_variant_id, sr.id, sr.external_sku, sr.seller_sku_snapshot, sr.product_name_snapshot, sr.option_name_snapshot, sr.quantity, coalesce(dr.received_quantity,0), sr.created_at, sr.created_at from public.inbound_import_source_rows sr join public.inbound_import_revisions r on r.id=sr.inbound_import_revision_id join public.factory_arrivals a on a.import_revision_id=r.id left join public.inbound_draft_rows dr on dr.id=sr.legacy_inbound_draft_row_id left join public.product_variants pv on pv.id=sr.product_variant_id and pv.user_id=sr.user_id;
 insert into public.factory_arrival_allocations (user_id, factory_arrival_id, factory_arrival_item_id, product_variant_id, warehouse_id, allocated_quantity, normally_received_quantity, warehouse_name_snapshot, created_at, updated_at)
 select i.user_id, i.factory_arrival_id, i.id, i.product_variant_id, dr.warehouse_id, i.ordered_quantity, least(i.received_quantity, i.ordered_quantity), w.name, i.created_at, i.updated_at from public.factory_arrival_items i join public.inbound_import_source_rows sr on sr.id=i.inbound_import_source_row_id join public.inbound_draft_rows dr on dr.id=sr.legacy_inbound_draft_row_id join public.warehouses w on w.id=dr.warehouse_id and w.user_id=i.user_id where i.product_variant_id is not null and i.ordered_quantity is not null;
+-- Pre-canonical arrivals did not retain an allocation. Preserve their incoming
+-- value only when the owner has exactly one warehouse; otherwise record the
+-- missing evidence instead of assigning stock to an arbitrary warehouse.
+insert into public.factory_arrival_allocations (user_id, factory_arrival_id, factory_arrival_item_id, product_variant_id, warehouse_id, allocated_quantity, normally_received_quantity, warehouse_name_snapshot)
+select i.user_id, i.factory_arrival_id, i.id, i.product_variant_id, w.id, i.ordered_quantity, coalesce(i.received_quantity, 0), w.name
+from public.factory_arrival_items i
+join public.factory_arrivals a on a.id = i.factory_arrival_id and a.user_id = i.user_id
+join public.warehouses w on w.user_id = i.user_id
+where i.inbound_import_source_row_id is null and i.product_variant_id is not null and i.ordered_quantity is not null
+  and (select count(*) from public.warehouses only_one where only_one.user_id = i.user_id) = 1;
+insert into public.inbound_migration_exceptions (user_id, inbound_import_source_row_id, exception_type, details)
+select i.user_id, i.inbound_import_source_row_id, 'unallocated_legacy_arrival', jsonb_build_object('factory_arrival_item_id', i.id)
+from public.factory_arrival_items i
+left join public.factory_arrival_allocations al on al.factory_arrival_item_id = i.id and al.user_id = i.user_id
+where i.product_variant_id is not null and i.ordered_quantity is not null and al.id is null;
+insert into public.inbound_migration_exceptions (user_id, inbound_import_source_row_id, exception_type, details)
+select sr.user_id, sr.id, 'unmapped_or_invalid_source_row', jsonb_build_object('validation_error', sr.validation_error, 'product_variant_id', sr.product_variant_id)
+from public.inbound_import_source_rows sr
+where sr.validation_error is not null or sr.product_variant_id is null;
+update public.factory_arrivals a set status = 'READY'
+where a.status = 'DRAFT' and a.import_revision_id is not null
+  and exists (select 1 from public.factory_arrival_items i where i.factory_arrival_id = a.id and i.user_id = a.user_id)
+  and not exists (
+    select 1 from public.factory_arrival_items i
+    left join public.inbound_import_source_rows sr on sr.id = i.inbound_import_source_row_id and sr.user_id = i.user_id
+    left join public.factory_arrival_allocations al on al.factory_arrival_item_id = i.id and al.user_id = i.user_id
+    where i.factory_arrival_id = a.id and i.user_id = a.user_id
+      and (i.product_variant_id is null or i.ordered_quantity is null or sr.validation_error is not null or al.id is null)
+  );
 insert into public.factory_receipt_events (user_id, factory_arrival_id, received_at, immutable_payload)
 select t.user_id, a.id, t.created_at, jsonb_build_object('migration', 'legacy_inbound_draft_transaction', 'transaction_id', t.id) from public.transactions t join public.inbound_import_source_rows sr on sr.legacy_inbound_draft_row_id=t.reference_id and sr.user_id=t.user_id join public.inbound_import_revisions r on r.id=sr.inbound_import_revision_id join public.factory_arrivals a on a.import_revision_id=r.id where t.source_channel='inbound-draft' and t.reference_type='inbound_draft_row';
 insert into public.factory_receipt_lines (user_id, factory_receipt_event_id, factory_arrival_allocation_id, transaction_id, received_quantity, seller_sku_snapshot, product_name_snapshot, option_name_snapshot, warehouse_name_snapshot)
 select e.user_id, e.id, al.id, (e.immutable_payload->>'transaction_id')::bigint, t.quantity, i.seller_sku_snapshot, i.product_name_snapshot, i.option_name_snapshot, al.warehouse_name_snapshot from public.factory_receipt_events e join public.transactions t on t.id=(e.immutable_payload->>'transaction_id')::bigint and t.user_id=e.user_id join public.inbound_import_source_rows sr on sr.legacy_inbound_draft_row_id=t.reference_id and sr.user_id=t.user_id join public.factory_arrival_items i on i.inbound_import_source_row_id=sr.id join public.factory_arrival_allocations al on al.factory_arrival_item_id=i.id;
 insert into public.inbound_migration_exceptions (user_id, inbound_import_source_row_id, exception_type, details)
 select sr.user_id, sr.id, 'ambiguous_transaction_evidence', jsonb_build_object('legacy_received_quantity', dr.received_quantity, 'linked_transaction_quantity', coalesce(sum(t.quantity),0)) from public.inbound_import_source_rows sr join public.inbound_draft_rows dr on dr.id=sr.legacy_inbound_draft_row_id left join public.transactions t on t.user_id=sr.user_id and t.source_channel='inbound-draft' and t.reference_type='inbound_draft_row' and t.reference_id=dr.id group by sr.user_id, sr.id, dr.received_quantity having dr.received_quantity > 0 and coalesce(sum(t.quantity),0) <> dr.received_quantity;
+
+-- Compatibility window: the old RPC remains callable, but its row update and
+-- transaction write update the canonical aggregate in the same transaction.
+create or replace function public.sync_legacy_inbound_draft_receipt()
+returns trigger language plpgsql set search_path = public as $$
+declare v_arrival_id bigint;
+begin
+  if new.received_quantity = old.received_quantity then return new; end if;
+  update public.factory_arrival_allocations al
+  set normally_received_quantity = new.received_quantity, updated_at = timezone('utc', now())
+  from public.inbound_import_source_rows sr, public.factory_arrival_items i
+  where sr.legacy_inbound_draft_row_id = new.id and sr.user_id = new.user_id
+    and i.inbound_import_source_row_id = sr.id and i.user_id = new.user_id
+    and al.factory_arrival_item_id = i.id and al.user_id = new.user_id
+  returning al.factory_arrival_id into v_arrival_id;
+  if v_arrival_id is not null then
+    update public.factory_arrival_items i set received_quantity = new.received_quantity, updated_at = timezone('utc', now())
+    from public.inbound_import_source_rows sr where sr.legacy_inbound_draft_row_id = new.id and sr.user_id = new.user_id and i.inbound_import_source_row_id = sr.id and i.user_id = new.user_id;
+    update public.factory_arrivals a set status = case when exists (select 1 from public.factory_arrival_allocations al where al.factory_arrival_id = a.id and al.user_id = a.user_id and al.normally_received_quantity + al.shortage_closed_quantity < al.allocated_quantity) then 'PARTIAL' else 'RECEIVED' end, updated_at = timezone('utc', now()) where a.id = v_arrival_id and a.user_id = new.user_id;
+  end if;
+  return new;
+end;
+$$;
+create trigger inbound_draft_row_canonical_receipt after update of received_quantity on public.inbound_draft_rows for each row execute function public.sync_legacy_inbound_draft_receipt();
