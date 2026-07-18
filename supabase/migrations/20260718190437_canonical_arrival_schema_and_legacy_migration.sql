@@ -163,6 +163,15 @@ create policy "Users insert own factory_receipt_lines" on public.factory_receipt
 create policy "Users read own inbound_migration_exceptions" on public.inbound_migration_exceptions for select to authenticated using ((select auth.uid()) = user_id);
 create policy "Users insert own inbound_migration_exceptions" on public.inbound_migration_exceptions for insert to authenticated with check ((select auth.uid()) = user_id);
 
+-- Keep Data API privileges deterministic across local, CI, and hosted
+-- migrations. RLS remains the owner boundary for every granted operation.
+grant select, insert, update, delete on public.inbound_imports to authenticated;
+grant select, insert on public.inbound_import_revisions, public.inbound_import_source_rows to authenticated;
+grant select on public.factory_arrival_allocations, public.factory_receipt_events,
+  public.factory_receipt_lines, public.inbound_migration_exceptions to authenticated;
+grant usage, select on sequence public.inbound_imports_id_seq,
+  public.inbound_import_revisions_id_seq, public.inbound_import_source_rows_id_seq to authenticated;
+
 create or replace function public.reject_canonical_evidence_mutation()
 returns trigger language plpgsql set search_path = public as $$
 begin
@@ -261,11 +270,11 @@ alter table public.factory_arrivals add constraint factory_arrivals_one_import_r
 -- as an exception rather than being guessed into an expected allocation.
 create temporary table legacy_factory_arrival_transaction_assignments as
 with legacy_items as (
-  select i.*, coalesce(sum(i.ordered_quantity) over (
+  select i.*, coalesce(sum(i.received_quantity) over (
     partition by i.user_id, i.factory_arrival_id, i.model_id, i.size_id, i.color_id
     order by i.id rows between unbounded preceding and 1 preceding
   ), 0) as expected_start,
-  sum(i.ordered_quantity) over (
+  sum(i.received_quantity) over (
     partition by i.user_id, i.factory_arrival_id, i.model_id, i.size_id, i.color_id
     order by i.id
   ) as expected_end
@@ -294,11 +303,26 @@ select * from deterministic_transaction_assignments;
 insert into public.factory_arrival_allocations
   (user_id, factory_arrival_id, factory_arrival_item_id, product_variant_id, warehouse_id,
    allocated_quantity, normally_received_quantity, warehouse_name_snapshot)
-select d.user_id, d.factory_arrival_id, d.factory_arrival_item_id, d.product_variant_id, d.warehouse_id,
-       sum(d.quantity), sum(d.quantity), w.name
-from legacy_factory_arrival_transaction_assignments d
-join public.warehouses w on w.id=d.warehouse_id and w.user_id=d.user_id
-group by d.user_id, d.factory_arrival_id, d.factory_arrival_item_id, d.product_variant_id, d.warehouse_id, w.name;
+with received_by_warehouse as (
+  select d.user_id, d.factory_arrival_id, d.factory_arrival_item_id, d.product_variant_id,
+         d.warehouse_id, sum(d.quantity) as received_quantity, w.name
+  from legacy_factory_arrival_transaction_assignments d
+  join public.warehouses w on w.id=d.warehouse_id and w.user_id=d.user_id
+  group by d.user_id, d.factory_arrival_id, d.factory_arrival_item_id, d.product_variant_id, d.warehouse_id, w.name
+), capped as (
+  select r.*, i.ordered_quantity,
+         coalesce(sum(r.received_quantity) over (
+           partition by r.user_id, r.factory_arrival_item_id
+           order by r.warehouse_id rows between unbounded preceding and 1 preceding
+         ), 0) as received_before
+  from received_by_warehouse r
+  join public.factory_arrival_items i on i.id=r.factory_arrival_item_id and i.user_id=r.user_id
+)
+select user_id, factory_arrival_id, factory_arrival_item_id, product_variant_id, warehouse_id,
+       least(received_quantity, greatest(ordered_quantity-received_before, 0)),
+       least(received_quantity, greatest(ordered_quantity-received_before, 0)), name
+from capped
+where received_before < ordered_quantity;
 insert into public.inbound_migration_exceptions (user_id, exception_type, details)
 select i.user_id, 'over_received_legacy_arrival', jsonb_build_object('factory_arrival_item_id', i.id, 'ordered_quantity', i.ordered_quantity, 'received_quantity', i.received_quantity)
 from public.factory_arrival_items i

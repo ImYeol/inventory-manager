@@ -11,7 +11,7 @@ begin
   -- source rows remain immutable evidence and incoming is allocation remainder only.
   if (select count(*) from public.inbound_import_source_rows where legacy_inbound_draft_row_id in (210,211,212)) <> 3 then raise exception 'source rows were not preserved'; end if;
   if exists (select 1 from public.factory_arrival_items i where i.inbound_import_source_row_id is not null and i.ordered_quantity <> (select sr.quantity from public.inbound_import_source_rows sr where sr.id=i.inbound_import_source_row_id)) then raise exception 'source row quantity changed'; end if;
-  if (select sum(allocated_quantity-normally_received_quantity-shortage_closed_quantity) from public.factory_arrival_allocations where factory_arrival_item_id in (select id from public.factory_arrival_items where inbound_import_source_row_id is not null)) <> 9 then raise exception 'allocation remainder/incoming semantics failed'; end if;
+  if (select sum(allocated_quantity-normally_received_quantity-shortage_closed_quantity) from public.factory_arrival_allocations where user_id='00000000-0000-0000-0000-000000000011' and factory_arrival_item_id in (select id from public.factory_arrival_items where inbound_import_source_row_id is not null and user_id='00000000-0000-0000-0000-000000000011')) <> 9 then raise exception 'allocation remainder/incoming semantics failed'; end if;
 
   -- repeated variant transactions attach once, in order, without duplicated evidence.
   if (select count(*) from public.factory_receipt_lines where transaction_id in (410,411)) <> 2

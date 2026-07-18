@@ -1,10 +1,15 @@
 -- Representative pre-canonical data. Run only after the legacy migrations and
 -- before 20260718190437_canonical_arrival_schema_and_legacy_migration.sql.
 -- IDs are intentionally stable so post-migration assertions name each case.
-insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data)
+-- This disposable fixture seeds auth identities directly. Disable auth hooks so
+-- the test is independent of the local GoTrue trigger owner's grants.
+set session_replication_role = replica;
+insert into auth.users (id, instance_id, aud, role, email, encrypted_password, confirmed_at, raw_app_meta_data, raw_user_meta_data)
 values
   ('00000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'fixture-owner@example.test', 'fixture', now(), '{}'::jsonb, '{}'::jsonb),
-  ('00000000-0000-0000-0000-000000000022', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'fixture-other@example.test', 'fixture', now(), '{}'::jsonb, '{}'::jsonb);
+  ('00000000-0000-0000-0000-000000000022', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'fixture-other@example.test', 'fixture', now(), '{}'::jsonb, '{}'::jsonb)
+on conflict (id) do nothing;
+set session_replication_role = origin;
 
 insert into public.models (id, user_id, name) values
   (110, '00000000-0000-0000-0000-000000000011', 'Fixture model'),
@@ -61,6 +66,11 @@ insert into public.transactions (id, user_id, date, model_id, size_id, color_id,
   (412, '00000000-0000-0000-0000-000000000011', current_date, 110, 111, 112, 'INBOUND', 2, 130, 'factory-arrival', 'factory_arrival', 301, now() - interval '4 minutes'),
   (413, '00000000-0000-0000-0000-000000000011', current_date, 110, 111, 112, 'INBOUND', 3, 131, 'factory-arrival', 'factory_arrival', 301, now() - interval '3 minutes'),
   (414, '00000000-0000-0000-0000-000000000011', current_date, 110, 111, 112, 'INBOUND', 3, 130, 'factory-arrival', 'factory_arrival', 302, now() - interval '2 minutes');
+
+-- A manual legacy-schema restore does not inherit the Supabase platform's
+-- default Data API grants, so reproduce them before exercising RLS as a user.
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
 
 create table if not exists public.inbound_canonical_fixture_baseline (inventory_total bigint not null, transaction_count bigint not null);
 truncate public.inbound_canonical_fixture_baseline;
