@@ -2,12 +2,14 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "pending",
+  "status": "blocked",
   "steps": [
     {
       "step": 0,
       "name": "canonical-arrival-schema-and-legacy-migration",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-07-19T04:28:30+0900",
+      "result": "Implemented canonical receipt/allocation compatibility corrections. Focused and full Vitest suites, Prisma validation, and lint pass. Blocked: local Supabase reset/test cannot access the Docker daemon; build cannot fetch Google Geist fonts in this network-restricted environment."
     }
   ]
 }
