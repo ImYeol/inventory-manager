@@ -2,7 +2,7 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "pending",
+  "status": "blocked",
   "steps": [
     {
       "step": 0,
@@ -76,7 +76,8 @@
     {
       "step": 9,
       "name": "allocation-partial-receipt-variance-and-correction",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-07-19T06:06:07+0900"
     }
   ]
 }
