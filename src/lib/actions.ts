@@ -148,7 +148,7 @@ export async function getTransactions(filters?: {
   sizeId?: number
   colorId?: number
   type?: string
-  warehouseId: number
+  warehouseId?: number
   dateFrom?: string
   dateTo?: string
 }) {

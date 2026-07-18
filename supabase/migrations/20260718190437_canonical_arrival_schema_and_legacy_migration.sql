@@ -255,24 +255,50 @@ alter table public.inbound_imports add constraint inbound_imports_supplier_id_us
   foreign key (supplier_id, user_id) references public.factories(id, user_id) on delete restrict;
 alter table public.factory_arrivals add constraint factory_arrivals_one_import_revision_key unique (import_revision_id);
 
--- Historical factory arrivals predate allocations.  Transaction warehouse
--- evidence is safe to use; if it is absent or split ambiguously we preserve an
--- exception instead of inventing a destination warehouse.
+-- Historical factory arrivals predate allocations.  A transaction can only be
+-- assigned once: for repeated legacy rows we use its complete ordered-quantity
+-- interval, never a variant-wide aggregate.  Split/crossing evidence is kept
+-- as an exception rather than being guessed into an expected allocation.
+create temporary table legacy_factory_arrival_transaction_assignments as
+with legacy_items as (
+  select i.*, coalesce(sum(i.ordered_quantity) over (
+    partition by i.user_id, i.factory_arrival_id, i.model_id, i.size_id, i.color_id
+    order by i.id rows between unbounded preceding and 1 preceding
+  ), 0) as expected_start,
+  sum(i.ordered_quantity) over (
+    partition by i.user_id, i.factory_arrival_id, i.model_id, i.size_id, i.color_id
+    order by i.id
+  ) as expected_end
+  from public.factory_arrival_items i
+  where i.inbound_import_source_row_id is null and i.product_variant_id is not null
+), legacy_transactions as (
+  select t.*, coalesce(sum(t.quantity) over (
+    partition by t.user_id, t.reference_id, t.model_id, t.size_id, t.color_id
+    order by t.created_at, t.id rows between unbounded preceding and 1 preceding
+  ), 0) as received_start,
+  sum(t.quantity) over (
+    partition by t.user_id, t.reference_id, t.model_id, t.size_id, t.color_id
+    order by t.created_at, t.id
+  ) as received_end
+  from public.transactions t
+  where t.source_channel = 'factory-arrival' and t.reference_type = 'factory_arrival'
+), deterministic_transaction_assignments as (
+  select t.id as transaction_id, t.user_id, t.warehouse_id, t.quantity,
+         i.factory_arrival_id, i.id as factory_arrival_item_id, i.product_variant_id
+  from legacy_transactions t
+  join legacy_items i on i.user_id=t.user_id and i.factory_arrival_id=t.reference_id
+    and i.model_id=t.model_id and i.size_id=t.size_id and i.color_id=t.color_id
+    and t.received_start >= i.expected_start and t.received_end <= i.expected_end
+)
+select * from deterministic_transaction_assignments;
 insert into public.factory_arrival_allocations
   (user_id, factory_arrival_id, factory_arrival_item_id, product_variant_id, warehouse_id,
    allocated_quantity, normally_received_quantity, warehouse_name_snapshot)
-select i.user_id, i.factory_arrival_id, i.id, i.product_variant_id, t.warehouse_id,
-       i.ordered_quantity, least(coalesce(sum(t.quantity), 0), i.ordered_quantity), w.name
-from public.factory_arrival_items i
-join public.factory_arrivals a on a.id = i.factory_arrival_id and a.user_id = i.user_id
-join public.transactions t on t.user_id = i.user_id and t.source_channel = 'factory-arrival'
-  and t.reference_type = 'factory_arrival' and t.reference_id = a.id
-  and t.model_id = i.model_id and t.size_id = i.size_id and t.color_id = i.color_id
-join public.warehouses w on w.id = t.warehouse_id and w.user_id = t.user_id
-left join public.factory_arrival_allocations al on al.factory_arrival_item_id = i.id and al.user_id = i.user_id
-where al.id is null and i.product_variant_id is not null
-group by i.user_id, i.factory_arrival_id, i.id, i.product_variant_id, i.ordered_quantity, t.warehouse_id, w.name
-having (select count(distinct t2.warehouse_id) from public.transactions t2 where t2.user_id=i.user_id and t2.source_channel='factory-arrival' and t2.reference_type='factory_arrival' and t2.reference_id=i.factory_arrival_id and t2.model_id=i.model_id and t2.size_id=i.size_id and t2.color_id=i.color_id) = 1;
+select d.user_id, d.factory_arrival_id, d.factory_arrival_item_id, d.product_variant_id, d.warehouse_id,
+       sum(d.quantity), sum(d.quantity), w.name
+from legacy_factory_arrival_transaction_assignments d
+join public.warehouses w on w.id=d.warehouse_id and w.user_id=d.user_id
+group by d.user_id, d.factory_arrival_id, d.factory_arrival_item_id, d.product_variant_id, d.warehouse_id, w.name;
 insert into public.inbound_migration_exceptions (user_id, exception_type, details)
 select i.user_id, 'over_received_legacy_arrival', jsonb_build_object('factory_arrival_item_id', i.id, 'ordered_quantity', i.ordered_quantity, 'received_quantity', i.received_quantity)
 from public.factory_arrival_items i
@@ -282,25 +308,30 @@ select i.user_id, 'ambiguous_legacy_factory_arrival_warehouse', jsonb_build_obje
 from public.factory_arrival_items i
 left join public.factory_arrival_allocations al on al.factory_arrival_item_id = i.id and al.user_id = i.user_id
 where i.inbound_import_source_row_id is null and i.product_variant_id is not null and al.id is null;
+insert into public.inbound_migration_exceptions (user_id, exception_type, details)
+select i.user_id, 'ambiguous_legacy_arrival_expected_remainder',
+       jsonb_build_object('factory_arrival_item_id', i.id, 'expected_remainder', i.ordered_quantity-coalesce(sum(al.allocated_quantity),0))
+from public.factory_arrival_items i
+left join public.factory_arrival_allocations al on al.factory_arrival_item_id=i.id and al.user_id=i.user_id
+where i.inbound_import_source_row_id is null and i.product_variant_id is not null
+group by i.user_id, i.id, i.ordered_quantity
+having i.ordered_quantity > coalesce(sum(al.allocated_quantity),0);
 -- legacy_factory_arrival_transaction evidence is linked, never replayed.
 insert into public.factory_receipt_events (user_id, factory_arrival_id, event_kind, received_at, immutable_payload)
 select t.user_id, a.id, 'MIGRATED_LEGACY_RECEIPT', t.created_at,
        jsonb_build_object('migration', 'legacy_factory_arrival_transaction', 'transaction_id', t.id)
 from public.transactions t
 join public.factory_arrivals a on a.id = t.reference_id and a.user_id = t.user_id
+join legacy_factory_arrival_transaction_assignments d on d.transaction_id=t.id
 where t.source_channel = 'factory-arrival' and t.reference_type = 'factory_arrival';
 insert into public.factory_receipt_lines (user_id, factory_receipt_event_id, factory_arrival_allocation_id, transaction_id, received_quantity, warehouse_name_snapshot)
 select e.user_id, e.id, al.id, t.id, t.quantity, al.warehouse_name_snapshot
 from public.factory_receipt_events e
 join public.transactions t on t.id = (e.immutable_payload->>'transaction_id')::bigint and t.user_id = e.user_id
-join lateral (
-  select al.* from public.factory_arrival_allocations al
-  join public.product_variants pv on pv.id=al.product_variant_id and pv.user_id=al.user_id
-  where al.factory_arrival_id=e.factory_arrival_id and al.user_id=e.user_id and al.warehouse_id=t.warehouse_id
-    and pv.model_id=t.model_id and pv.size_id=t.size_id and pv.color_id=t.color_id
-  order by al.id limit 1
-) al on true
+join legacy_factory_arrival_transaction_assignments d on d.transaction_id=t.id and d.factory_arrival_id=e.factory_arrival_id
+join public.factory_arrival_allocations al on al.factory_arrival_item_id=d.factory_arrival_item_id and al.user_id=d.user_id and al.warehouse_id=d.warehouse_id
 where e.immutable_payload->>'migration' = 'legacy_factory_arrival_transaction';
+drop table legacy_factory_arrival_transaction_assignments;
 
 -- Direct PostgREST writes cannot alter receipt counters or fabricate receipt
 -- evidence.  Only the audited RPCs below retain the narrowly scoped rights.

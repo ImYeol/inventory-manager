@@ -80,6 +80,25 @@ describe('schema contract', () => {
     expect(migration).toContain('insert into public.factory_receipt_events(user_id,factory_arrival_id,event_kind,received_at,immutable_payload)')
   })
 
+  it('ships an executable representative legacy migration proof', () => {
+    const root = process.cwd()
+    const fixture = normalizedSql(fs.readFileSync(path.join(root, 'scripts/fixtures/inbound-canonical-legacy.sql'), 'utf8'))
+    const assertions = normalizedSql(fs.readFileSync(path.join(root, 'scripts/fixtures/inbound-canonical-assertions.sql'), 'utf8'))
+    const runner = fs.readFileSync(path.join(root, 'scripts/test-inbound-canonical-behavior.ts'), 'utf8')
+
+    for (const table of ['auth.users', 'public.product_variants', 'public.warehouses', 'public.factory_arrivals', 'public.factory_arrival_items', 'public.inbound_drafts', 'public.inbound_draft_rows', 'public.inventory', 'public.transactions']) {
+      expect(fixture).toContain(`insert into ${table}`)
+    }
+    expect(fixture).toContain('fixture-repeated-variant')
+    expect(fixture).toContain('fixture-multi-warehouse')
+    for (const assertion of ['source rows', 'allocation remainder', 'repeated variant', 'multi warehouse', 'compatibility path', 'rls isolation', 'immutable']) {
+      expect(assertions).toContain(assertion)
+    }
+    expect(runner).toContain('INBOUND_BEHAVIORAL_PSQL')
+    expect(runner).toContain('INBOUND_BEHAVIORAL_DOCKER_CONTAINER')
+    expect(runner).toContain('supabase_db_seleccase-inventory-issue-11')
+  })
+
   it('models verified inbound drafts with exact supplier SKU links only', () => {
     const root = process.cwd()
     const inboundMigration = normalizedSql(fs.readFileSync(
