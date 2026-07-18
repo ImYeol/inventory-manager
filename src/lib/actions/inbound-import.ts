@@ -56,7 +56,7 @@ export async function createInboundTemplateVersion(input: {
 
 export type InboundFilePreview = {
   supplierId: number
-  warehouseId: number
+  warehouseId?: number
   templateId: number
   templateVersionId: number
   sheetName: string
@@ -70,8 +70,8 @@ export type InboundFilePreview = {
  * Server-only inspection boundary. This deliberately has no storage, draft,
  * inventory, or SKU-master mutation.
  */
-export async function previewInboundTemplateFile(input: { supplierId: number; warehouseId: number; templateVersionId: number; file: File }): Promise<InboundFilePreview> {
-  if (!input.supplierId || !input.warehouseId || !input.templateVersionId || !input.file) throw new Error('공급자, 창고, 템플릿, 파일을 선택해주세요.')
+export async function previewInboundTemplateFile(input: { supplierId: number; templateVersionId: number; file: File }): Promise<InboundFilePreview> {
+  if (!input.supplierId || !input.templateVersionId || !input.file) throw new Error('공급자, 템플릿, 파일을 선택해주세요.')
   const template = await getInboundTemplateVersion(input.templateVersionId)
   if (!template.active) throw new Error('비활성 템플릿은 새 입고에 사용할 수 없습니다.')
   const bytes = Buffer.from(await input.file.arrayBuffer())
@@ -90,7 +90,6 @@ export async function previewInboundTemplateFile(input: { supplierId: number; wa
   const linkMap = new Map((links ?? []).map((link) => [`${input.supplierId}:${link.normalized_external_sku}`, Number(link.product_variant_id)]))
   return {
     supplierId: input.supplierId,
-    warehouseId: input.warehouseId,
     templateId: template.templateId,
     templateVersionId: input.templateVersionId,
     sheetName: parsed.sheetName,

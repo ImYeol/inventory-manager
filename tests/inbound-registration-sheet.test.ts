@@ -35,6 +35,7 @@ describe('InboundRegistrationSheet', () => {
     expect(screen.getByText('파일을 놓거나 선택하세요')).toBeTruthy()
     expect(screen.getByRole('button', { name: '행 추가' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '검토 저장' })).toBeTruthy()
+    expect(screen.queryByRole('combobox', { name: '입고 창고' })).toBeNull()
     expect(screen.queryByRole('tab')).toBeNull()
   })
 
@@ -63,7 +64,8 @@ describe('InboundRegistrationSheet', () => {
     const file = new File(['contents'], 'inbound.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     fireEvent.change(screen.getByLabelText('입고 파일 업로드'), { target: { files: [file] } })
 
-    await waitFor(() => expect(mocks.previewInboundTemplateFile).toHaveBeenCalledWith({ supplierId: 4, warehouseId: 2, templateVersionId: 11, file }))
+    await waitFor(() => expect(mocks.previewInboundTemplateFile).toHaveBeenCalledWith({ supplierId: 4, templateVersionId: 11, file }))
+    expect(screen.queryByRole('combobox', { name: '입고 창고' })).toBeNull()
     await waitFor(() => expect(screen.getAllByLabelText('외부 SKU')).toHaveLength(2))
     expect(screen.getByText('상품 관리에서 SKU 만들기')).toBeTruthy()
     fireEvent.click(screen.getAllByRole('combobox', { name: '내부 SKU' })[0])
@@ -79,6 +81,7 @@ describe('InboundRegistrationSheet', () => {
     })))
     expect(onSaved).not.toHaveBeenCalled()
     expect(await screen.findByText('2단계 · 입고 예정 전환')).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: '입고 창고' })).toBeTruthy()
     await waitFor(() => expect((screen.getByRole('button', { name: '입고 예정 전환' }) as HTMLButtonElement).disabled).toBe(false))
     fireEvent.click(screen.getByRole('button', { name: '입고 예정 전환' }))
     await waitFor(() => expect(mocks.promoteInboundImportRevision).toHaveBeenCalledWith({ revisionId: 88, defaultWarehouseId: 2 }))

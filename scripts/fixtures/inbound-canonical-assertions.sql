@@ -77,6 +77,44 @@ begin
  if (select coalesce(sum(quantity),0) from public.inventory)<>inventory_before or (select count(*) from public.transactions)<>transaction_before then raise exception 'registration/promotion mutated inventory'; end if;
 end $$;
 reset role;
+
+-- The hash identity is owner-scoped, while the trusted tables remain
+-- append-only and RPC-owned.  These are behavioral checks, not SQL text.
+insert into public.inbound_templates(user_id,name) values ('00000000-0000-0000-0000-000000000022','Other RPC fixture');
+insert into public.inbound_template_versions(user_id,template_id,version_number,sheet_name,header_row_number,headers,mappings)
+select '00000000-0000-0000-0000-000000000022', id, 1, 'Sheet1', 1, '["SKU","Qty"]', '{"externalSku":"SKU","quantity":"Qty"}' from public.inbound_templates where user_id='00000000-0000-0000-0000-000000000022' and name='Other RPC fixture';
+set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000022',false);
+select public.confirm_supplier_sku_mapping(141,'IMP-001',151,'{}');
+do $$
+declare v_template bigint; v_version bigint; v_revision bigint; failed boolean:=false;
+begin
+ select t.id,tv.id into v_template,v_version from public.inbound_templates t join public.inbound_template_versions tv on tv.template_id=t.id where t.user_id=auth.uid() and t.name='Other RPC fixture';
+ -- The exact same file hash is allowed for a different owner.
+ select revision_id into v_revision from public.register_inbound_import_revision(141,'OTHER-SHIP','FILE','other.xlsx','other/a.xlsx','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',v_template,v_version,'Sheet1',1,'[]','[{"externalSku":"IMP-001","rawQuantity":"1","quantity":1}]');
+ if v_revision is null then raise exception 'two-user same-hash allowance failed'; end if;
+ begin insert into public.inbound_imports(user_id,supplier_id,source_type,external_shipment_number) values(auth.uid(),141,'FILE','forged'); exception when others then failed:=true; end;
+ if not failed then raise exception 'direct inbound import insert was not denied'; end if;
+end $$;
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000011',false);
+do $$
+declare failed boolean:=false; v_template bigint:=current_setting('inbound_fixture.template_id')::bigint; v_version bigint:=current_setting('inbound_fixture.version_id')::bigint;
+begin
+ begin update public.inbound_import_revisions set source_filename='forged' where id=(select min(r.id) from public.inbound_import_revisions r where r.user_id=auth.uid()); exception when others then failed:=true; end;
+ if not failed then raise exception 'immutable revision update succeeded'; end if;
+ failed:=false;
+ begin delete from public.inbound_import_source_rows where id=(select min(sr.id) from public.inbound_import_source_rows sr where sr.user_id=auth.uid()); exception when others then failed:=true; end;
+ if not failed then raise exception 'immutable source row delete succeeded'; end if;
+ failed:=false;
+ begin perform public.register_inbound_import_revision(140,'UNMAPPED','FILE','u.xlsx','owner/u.xlsx','eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',v_template,v_version,'Sheet1',1,'[]','[{"externalSku":"NO-MAP","rawQuantity":"1","quantity":1,"productVariantId":150}]'); exception when others then failed:=sqlerrm like 'mapping_blocker:%'; end;
+ if not failed then raise exception 'unmapped/forged ProductVariant rejection failed'; end if;
+ failed:=false;
+ begin perform public.register_inbound_import_revision(140,'INVALID','FILE','i.xlsx','owner/i.xlsx','ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',v_template,v_version,'Sheet1',1,'[]','[{"externalSku":"IMP-001","rawQuantity":"0","quantity":0}]'); exception when others then failed:=sqlerrm like 'review_blocker:%'; end;
+ if not failed then raise exception 'invalid quantity rejection failed'; end if;
+end $$;
+reset role;
 -- Receipt evidence is seeded by the fixture owner only through an admin setup
 -- boundary, then the authenticated RPC must reject the later revision.
 update public.factory_arrival_allocations set normally_received_quantity=1 where factory_arrival_id=(select id from public.factory_arrivals where external_shipment_reference='SHIP-1');

@@ -39,8 +39,8 @@ begin
  select * into v_import from public.inbound_imports where user_id=v_user and supplier_id=p_supplier_id and external_shipment_number=v_shipment for update;
  if not found then insert into public.inbound_imports(user_id,supplier_id,source_type,external_shipment_number) values(v_user,p_supplier_id,p_source_type,v_shipment) returning * into v_import; v_number:=1;
  else
-   select * into v_previous from public.inbound_import_revisions where inbound_import_id=v_import.id and user_id=v_user order by revision_number desc for update limit 1;
-   if exists(select 1 from public.factory_arrivals a left join public.factory_arrival_allocations al on al.factory_arrival_id=a.id and al.user_id=a.user_id left join public.factory_receipt_lines rl on rl.factory_arrival_allocation_id=al.id and rl.user_id=al.user_id where a.user_id=v_user and a.import_revision_id in(select id from public.inbound_import_revisions where inbound_import_id=v_import.id) and (coalesce(al.normally_received_quantity,0)>0 or rl.id is not null)) then raise exception 'supersession_after_receipt_evidence'; end if;
+   select * into v_previous from public.inbound_import_revisions r where r.inbound_import_id=v_import.id and r.user_id=v_user order by r.revision_number desc for update limit 1;
+   if exists(select 1 from public.factory_arrivals a left join public.factory_arrival_allocations al on al.factory_arrival_id=a.id and al.user_id=a.user_id left join public.factory_receipt_lines rl on rl.factory_arrival_allocation_id=al.id and rl.user_id=al.user_id where a.user_id=v_user and a.import_revision_id in(select r.id from public.inbound_import_revisions r where r.inbound_import_id=v_import.id) and (coalesce(al.normally_received_quantity,0)>0 or rl.id is not null)) then raise exception 'supersession_after_receipt_evidence'; end if;
    v_number:=coalesce(v_previous.revision_number,0)+1;
  end if;
  -- Mapping confirmation happens before immutable evidence is written. Client ids
@@ -71,7 +71,7 @@ begin
  if v_user is null then raise exception 'Authentication is required.'; end if;
  select * into v_revision from public.inbound_import_revisions where id=p_revision_id and user_id=v_user for update; if not found then raise exception 'Import revision not found.'; end if;
  select * into v_import from public.inbound_imports where id=v_revision.inbound_import_id and user_id=v_user for update;
- if exists(select 1 from public.inbound_import_revisions where inbound_import_id=v_import.id and user_id=v_user and revision_number>v_revision.revision_number) then raise exception 'Only the current import revision can be promoted.'; end if;
+ if exists(select 1 from public.inbound_import_revisions r where r.inbound_import_id=v_import.id and r.user_id=v_user and r.revision_number>v_revision.revision_number) then raise exception 'Only the current import revision can be promoted.'; end if;
  if not exists(select 1 from public.warehouses where id=p_default_warehouse_id and user_id=v_user) then raise exception 'Warehouse not found.'; end if;
  if exists(select 1 from public.factory_arrivals where import_revision_id=p_revision_id) then raise exception 'Import revision has already been promoted.'; end if;
  for v_row in select * from public.inbound_import_source_rows where inbound_import_revision_id=p_revision_id and user_id=v_user order by source_row_ordinal,id loop

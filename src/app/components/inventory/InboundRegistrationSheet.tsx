@@ -109,14 +109,14 @@ export default function InboundRegistrationSheet({
   }
 
   const previewFile = (file: File) => {
-    if (!supplierId || !warehouseId || !templateVersionId) {
-      setMessage('공급자, 창고, 템플릿을 먼저 선택해주세요.')
+    if (!supplierId || !templateVersionId) {
+      setMessage('공급자와 템플릿을 먼저 선택해주세요.')
       return
     }
     setMessage(null)
     startTransition(async () => {
       try {
-        const result = await previewInboundTemplateFile({ supplierId: Number(supplierId), warehouseId: Number(warehouseId), templateVersionId: Number(templateVersionId), file })
+        const result = await previewInboundTemplateFile({ supplierId: Number(supplierId), templateVersionId: Number(templateVersionId), file })
         setPreview(result)
         setSourceFile(file)
         setRows(result.rows.map((row) => ({ ...row, key: rowKey() })))
@@ -128,12 +128,12 @@ export default function InboundRegistrationSheet({
   }
 
   const saveDraft = () => {
-    if (!supplierId || !warehouseId || !selectedTemplate || rows.length === 0 || !shipmentNumber.trim()) {
-      setMessage('공급자, 창고, 템플릿, 외부 출고 번호와 입고 행을 입력해주세요.')
+    if (!supplierId || !selectedTemplate || rows.length === 0 || !shipmentNumber.trim()) {
+      setMessage('공급자, 템플릿, 외부 출고 번호와 입고 행을 입력해주세요.')
       return
     }
     const draftPreview: InboundFilePreview = preview ?? {
-      supplierId: Number(supplierId), warehouseId: Number(warehouseId), templateId: selectedTemplate.id, templateVersionId: selectedTemplate.versionId,
+      supplierId: Number(supplierId), templateId: selectedTemplate.id, templateVersionId: selectedTemplate.versionId,
       sheetName: '', headerRowNumber: 0, headers: [], fileHash: '', rows: [],
     }
     startTransition(async () => {
@@ -190,9 +190,8 @@ export default function InboundRegistrationSheet({
 
   return (
     <div className="space-y-[var(--space-5)]">
-      <div className="grid gap-[var(--space-3)] md:grid-cols-4">
+      <div className="grid gap-[var(--space-3)] md:grid-cols-3">
         <label className="space-y-1"><span className={ui.label}>공급자</span><Select value={supplierId || EMPTY_VALUE} onValueChange={(value) => setSupplierId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="공급자"><SelectValue placeholder="공급자 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>공급자 선택</SelectItem>{suppliers.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></label>
-        <label className="space-y-1"><span className={ui.label}>입고 창고</span><Select value={warehouseId || EMPTY_VALUE} onValueChange={(value) => setWarehouseId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="입고 창고"><SelectValue placeholder="창고 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>창고 선택</SelectItem>{warehouses.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></label>
         <div className="space-y-1"><span className={ui.label}>입고 템플릿</span><div className="flex gap-2"><Select value={templateVersionId || EMPTY_VALUE} onValueChange={(value) => setTemplateVersionId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="입고 템플릿"><SelectValue placeholder="템플릿 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>템플릿 선택</SelectItem>{templateOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Button type="button" variant="secondary" size="sm" onClick={() => { setEditingTemplateId(undefined); setTemplateName(''); setTemplateModalOpen(true) }}>템플릿 만들기</Button>{selectedTemplate ? <Button type="button" variant="secondary" size="sm" onClick={() => { setEditingTemplateId(selectedTemplate.id); setTemplateName(selectedTemplate.name); setTemplateModalOpen(true) }}>템플릿 수정</Button> : null}</div></div>
         <label className="space-y-1"><span className={ui.label}>외부 출고 번호</span><Input aria-label="외부 출고 번호" value={shipmentNumber} onChange={(event) => setShipmentNumber(event.target.value)} /></label>
       </div>
@@ -227,7 +226,7 @@ export default function InboundRegistrationSheet({
       {rows.some((row) => !row.productVariantId) ? <a href="/products" className="text-sm text-[color:var(--link)] underline underline-offset-4">상품 관리에서 SKU 만들기</a> : null}
 
       {message ? <p role="alert" className="text-sm text-[color:var(--muted)]">{message}</p> : null}
-      {savedRevisionId ? <div className="flex items-end justify-between gap-3 border-t border-[color:var(--border)] pt-[var(--space-4)]"><div><p className="text-sm font-medium text-[color:var(--foreground)]">2단계 · 입고 예정 전환</p><p className="text-sm text-[color:var(--muted)]">기본 창고 하나로 입고 예정 수량을 만듭니다.</p></div><Button type="button" disabled={isPending || !warehouseId} onClick={promote}>입고 예정 전환</Button></div> : <div className="flex justify-end"><Button type="button" disabled={isPending || rows.some((row) => Boolean(row.validationError) || !row.productVariantId)} onClick={saveDraft}>검토 저장</Button></div>}
+      {savedRevisionId ? <div className="flex items-end justify-between gap-3 border-t border-[color:var(--border)] pt-[var(--space-4)]"><div><p className="text-sm font-medium text-[color:var(--foreground)]">2단계 · 입고 예정 전환</p><p className="text-sm text-[color:var(--muted)]">기본 창고 하나로 입고 예정 수량을 만듭니다.</p></div><label className="space-y-1"><span className={ui.label}>입고 창고</span><Select value={warehouseId || EMPTY_VALUE} onValueChange={(value) => setWarehouseId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="입고 창고"><SelectValue placeholder="창고 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>창고 선택</SelectItem>{warehouses.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></label><Button type="button" disabled={isPending || !warehouseId} onClick={promote}>입고 예정 전환</Button></div> : <div className="flex justify-end"><Button type="button" disabled={isPending || rows.some((row) => Boolean(row.validationError) || !row.productVariantId)} onClick={saveDraft}>검토 저장</Button></div>}
 
       <Modal open={templateModalOpen} title="입고 템플릿 만들기" description="샘플 파일에서 시트·헤더 행과 외부 SKU, 수량 열을 선택해 저장합니다." onOpenChange={setTemplateModalOpen} footer={<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setTemplateModalOpen(false)}>닫기</Button><Button type="button" disabled={isPending || !sampleSheet || !templateName.trim() || !externalSkuColumn || !quantityColumn} onClick={saveTemplate}>템플릿 저장</Button></div>}>
         <div className="space-y-4">
