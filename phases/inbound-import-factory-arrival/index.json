@@ -2,7 +2,7 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "completed",
+  "status": "pending",
   "steps": [
     {
       "step": 0,
@@ -15,8 +15,13 @@
       "step": 1,
       "name": "canonical-persistence-hardening-and-behavioral-fixture",
       "status": "completed",
-      "summary": "Hardened canonical manual/CSV creation with an explicit warehouse selector, moved legacy counter synchronization behind a private SECURITY DEFINER trigger boundary, tightened receipt transaction consistency and one-transaction evidence linkage, restored receipt outbox writes, and added a disposable-URL behavioral fixture command. Focused and full tests, Prisma validation, lint, and diff checks passed. Local Supabase/Docker execution was unavailable in the sandbox; the production build was attempted but blocked solely by sandbox network access to Google Fonts.",
+      "summary": "Hardened canonical manual/CSV creation with an explicit warehouse selector, moved legacy counter synchronization behind a private SECURITY DEFINER trigger boundary, tightened receipt transaction consistency and one-transaction evidence linkage, restored receipt outbox writes, and added the behavioral runner skeleton. Focused/full tests and outer production build passed. Outer audit found the fixture had no representative rows and no psql portability; step 2 owns those acceptance gaps.",
       "completed_at": "2026-07-19T04:47:00+0900"
+    },
+    {
+      "step": 2,
+      "name": "executable-legacy-migration-proof",
+      "status": "pending"
     }
   ]
 }
