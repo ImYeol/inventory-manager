@@ -2,7 +2,7 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "completed",
+  "status": "pending",
   "steps": [
     {
       "step": 0,
@@ -72,6 +72,11 @@
       "started_at": "2026-07-19T05:54:50+0900",
       "completed_at": "2026-07-19T06:00:00+0900",
       "summary": "Qualified OUT-column-colliding import revision references in the forward RPCs, added executable checked-in schema register/promote RPC bodies and grants, and expanded the disposable proof with cross-owner hash, direct-insert, immutable evidence, mapping/forged-id, and invalid-row assertions. The inbound sheet now keeps warehouse selection out of preview/review-save and reveals it only for second-stage promotion. Focused and full tests, Prisma validation, lint, and diff checks passed. The dedicated behavioral runner remains blocked in this sandbox by tsx IPC socket permissions; production build reaches the existing unavailable Google Fonts network failure. The outer Docker harness must execute the fresh migration/schema proof."
+    },
+    {
+      "step": 9,
+      "name": "allocation-partial-receipt-variance-and-correction",
+      "status": "pending"
     }
   ]
 }
