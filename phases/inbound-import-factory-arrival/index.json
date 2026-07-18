@@ -2,7 +2,7 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "pending",
+  "status": "completed",
   "steps": [
     {
       "step": 0,
@@ -36,7 +36,10 @@
     {
       "step": 4,
       "name": "supplier-mapping-migration-and-receipt-hardening",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-07-19T05:17:15+0900",
+      "summary": "Hardened supplier SKU migration ordering by normalizing and collapsing legacy template mappings before the active exact unique index, with complete audit evidence and a dynamic drop for PostgreSQL-truncated legacy constraints. Confirm now locks and validates every targeted source row atomically; mapping write RPCs are authenticated-only and mapping history uses restrictive supplier/ProductVariant deletion behavior. Replaced the installed legacy draft receipt RPC with a trusted atomic mapping-free implementation, and made schema.sql executable with matching collapse, policies, helpers, RPCs, and grants. Added migration-chain fixtures for same-target/conflicting legacy duplicates, reconfirm after deactivate, source-row rollback, receipt compatibility, isolation, and immutable audit. Focused/full tests (240), Prisma validation, and lint passed (four pre-existing warnings). Disposable DB proof could not run because Docker socket access is denied; build reached Next font fetch and failed only because Google Fonts is unreachable in the sandbox.",
+      "completed_at": "2026-07-19T05:23:30+0900"
     }
   ]
 }
