@@ -28,6 +28,27 @@ begin
 end;
 $$;
 
+-- Forward mapping migration collapse and the installed compatibility RPC are
+-- exercised after the complete migration chain, not by inspecting SQL text.
+set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000011',false);
+do $$
+declare v_before bigint; v_after bigint; v_failed boolean:=false;
+begin
+  if (select count(*) from public.supplier_sku_links where supplier_id=140 and normalized_external_sku='SAME-001' and is_active) <> 1 then raise exception 'same-target duplicate collapse failed'; end if;
+  if exists(select 1 from public.supplier_sku_links where supplier_id=140 and normalized_external_sku='CONFLICT-001' and is_active) then raise exception 'conflicting duplicate collapse failed'; end if;
+  if (select count(*) from public.supplier_sku_mapping_audits where supplier_id=140 and normalized_external_sku in ('SAME-001','CONFLICT-001')) <> 3 then raise exception 'migration collapse audit evidence missing'; end if;
+  perform public.confirm_supplier_sku_mapping(140,'RECONFIRM-001',150,'{}');
+  perform public.deactivate_supplier_sku_mapping(140,'RECONFIRM-001','fixture deactivation');
+  perform public.confirm_supplier_sku_mapping(140,'RECONFIRM-001',150,'{}');
+  select count(*) into v_before from public.supplier_sku_links;
+  begin perform public.confirm_supplier_sku_mapping(140,'UNT-001',150,array[1,1]); exception when others then v_failed:=true; end;
+  select count(*) into v_after from public.supplier_sku_links;
+  if not v_failed or v_before<>v_after then raise exception 'source-row mismatch rollback failed'; end if;
+end;
+$$;
+reset role;
+
 -- Compatibility path remains atomic under the authenticated role.
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000011', false);

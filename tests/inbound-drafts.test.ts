@@ -21,10 +21,11 @@ describe('manual inbound drafts', () => {
 
   it('keeps unmatched rows out of receipt without receipt-time mapping writes', () => {
     const schema = readFileSync(resolve(process.cwd(), 'supabase/schema.sql'), 'utf8')
+    const receiptRpc = schema.slice(schema.lastIndexOf('create or replace function public.receive_inbound_draft_rows'))
     expect(schema).toContain('create table if not exists public.inbound_drafts')
     expect(schema).toContain('create table if not exists public.supplier_sku_links')
     expect(schema).toContain("raise exception 'Unmatched inbound rows cannot be received.'")
-    expect(schema).not.toContain('insert into public.supplier_sku_links')
-    expect(schema).toContain('insert into public.inventory_sync_outbox')
+    expect(receiptRpc).not.toContain('insert into public.supplier_sku_links')
+    expect(receiptRpc).toContain('insert into public.inventory_sync_outbox')
   })
 })

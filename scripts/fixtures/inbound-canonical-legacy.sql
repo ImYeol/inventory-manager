@@ -29,7 +29,16 @@ insert into public.factories (id, user_id, name) values
   (141, '00000000-0000-0000-0000-000000000022', 'Other factory');
 insert into public.product_variants (id, user_id, model_id, size_id, color_id, seller_sku) values
   (150, '00000000-0000-0000-0000-000000000011', 110, 111, 112, 'FIXTURE-SKU'),
+  (152, '00000000-0000-0000-0000-000000000011', 110, 111, 112, 'FIXTURE-SKU-ALT'),
   (151, '00000000-0000-0000-0000-000000000022', 120, 121, 122, 'OTHER-SKU');
+
+-- Pre-forward template-scoped mappings exercise the supplier-only collapse.
+-- SAME-001 must retain one active row; CONFLICT-001 must retain none.
+insert into public.supplier_sku_links (user_id, supplier_id, template, external_sku, product_variant_id, received_at) values
+  ('00000000-0000-0000-0000-000000000011', 140, 'legacy-a', ' SAME-001 ', 150, now() - interval '2 minutes'),
+  ('00000000-0000-0000-0000-000000000011', 140, 'legacy-b', 'SAME-001', 150, now() - interval '1 minute'),
+  ('00000000-0000-0000-0000-000000000011', 140, 'legacy-a', 'CONFLICT-001', 150, now() - interval '2 minutes'),
+  ('00000000-0000-0000-0000-000000000011', 140, 'legacy-b', 'CONFLICT-001', 152, now() - interval '1 minute');
 
 -- The draft rows cover untouched, partial and completely received imports.
 insert into public.inbound_drafts (id, user_id, supplier_id, status) values

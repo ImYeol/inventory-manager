@@ -29,7 +29,8 @@ const root = process.cwd()
 const fixture = path.join(root, 'scripts/fixtures/inbound-canonical-legacy.sql')
 const assertions = path.join(root, 'scripts/fixtures/inbound-canonical-assertions.sql')
 const migration = path.join(root, 'supabase/migrations/20260718190437_canonical_arrival_schema_and_legacy_migration.sql')
-for (const file of [fixture, assertions, migration]) if (!existsSync(file)) throw new Error(`Missing fixture file: ${file}`)
+const mappingMigration = path.join(root, 'supabase/migrations/20260719053000_supplier_sku_mapping_and_audit.sql')
+for (const file of [fixture, assertions, migration, mappingMigration]) if (!existsSync(file)) throw new Error(`Missing fixture file: ${file}`)
 
 function psql(file: string) {
   if (dockerContainer) {
@@ -47,6 +48,7 @@ function psql(file: string) {
 // script after provisioning a disposable legacy baseline.
 psql(fixture)
 psql(migration)
+psql(mappingMigration)
 psql(assertions)
 
 // The project-local Supabase container is intentionally supported by name;
