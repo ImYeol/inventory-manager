@@ -16,6 +16,7 @@ insert into public.models (id, user_id, name) values
   (120, '00000000-0000-0000-0000-000000000022', 'Other model');
 insert into public.sizes (id, user_id, model_id, name) values
   (111, '00000000-0000-0000-0000-000000000011', 110, 'M'),
+  (113, '00000000-0000-0000-0000-000000000011', 110, 'L'),
   (121, '00000000-0000-0000-0000-000000000022', 120, 'M');
 insert into public.colors (id, user_id, model_id, name, rgb_code) values
   (112, '00000000-0000-0000-0000-000000000011', 110, 'Black', '#000000'),
@@ -29,7 +30,7 @@ insert into public.factories (id, user_id, name) values
   (141, '00000000-0000-0000-0000-000000000022', 'Other factory');
 insert into public.product_variants (id, user_id, model_id, size_id, color_id, seller_sku) values
   (150, '00000000-0000-0000-0000-000000000011', 110, 111, 112, 'FIXTURE-SKU'),
-  (152, '00000000-0000-0000-0000-000000000011', 110, 111, 112, 'FIXTURE-SKU-ALT'),
+  (152, '00000000-0000-0000-0000-000000000011', 110, 113, 112, 'FIXTURE-SKU-ALT'),
   (151, '00000000-0000-0000-0000-000000000022', 120, 121, 122, 'OTHER-SKU');
 
 -- Pre-forward template-scoped mappings exercise the supplier-only collapse.
