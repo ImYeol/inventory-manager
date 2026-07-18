@@ -15,7 +15,7 @@ describe('built-in inbound template imports', () => {
     const order = parseInboundWorksheet(BUILT_IN_INBOUND_PRESETS[1], [
       ['货号', '数量', '订单号', '单价', '币种'], ['1688-1', 2, 'O-7', 11.5, 'CNY'],
     ])
-    expect(factory).toMatchObject({ headerRowNumber: 1, rows: [{ sourceRowNumber: 2, externalSku: 'FAC-1', quantity: 3, sourceValues: { product: '외부 상품', option: '빨강' } }] })
+    expect(factory).toMatchObject({ headerRowNumber: 1, rows: [{ sourceRowNumber: 2, externalSku: 'FAC-1', rawQuantity: '3', quantity: 3, sourceValues: { product: '외부 상품', option: '빨강' } }] })
     expect(order).toMatchObject({ headerRowNumber: 1, rows: [{ sourceRowNumber: 2, externalSku: '1688-1', quantity: 2, sourceValues: { orderNumber: 'O-7', unitCost: '11.5', currency: 'CNY' } }] })
   })
 
@@ -57,5 +57,10 @@ describe('built-in inbound template imports', () => {
     }
     const preview = parseInboundTemplateWorksheet(version, '입고', [['외부 SKU', '수량'], ['', 2], ['EXT-2', '1.5']])
     expect(preview.rows.map((row) => row.validationError)).toEqual(['외부 SKU를 입력해주세요.', '수량은 양의 정수여야 합니다.'])
+  })
+
+  it('preserves literal quantity cells for immutable source evidence', () => {
+    const version: InboundTemplateVersion = { templateId: 1, versionNumber: 1, sheetName: '입고', headerRowNumber: 1, headers: ['외부 SKU', '수량'], mappings: { externalSku: '외부 SKU', quantity: '수량', source: {} } }
+    expect(parseInboundTemplateWorksheet(version, '입고', [['외부 SKU', '수량'], ['A', '001'], ['B', '1,000'], ['C', '1.5']]).rows.map((row) => row.rawQuantity)).toEqual(['001', '1,000', '1.5'])
   })
 })

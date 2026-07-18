@@ -38,7 +38,7 @@ describe('InboundRegistrationSheet', () => {
   it('uses the selected template to preview a file, then keeps the preview editable before draft save', async () => {
     mocks.previewInboundTemplateFile.mockResolvedValue({
       supplierId: 4, warehouseId: 2, templateId: 7, templateVersionId: 11, sheetName: '입고', headerRowNumber: 1, headers: ['외부 SKU', '수량'], fileHash: 'hash',
-      rows: [{ sourceRowNumber: 2, externalSku: 'EXT-1', quantity: 3, validationError: null, productVariantId: null, sourceValues: {} }],
+      rows: [{ sourceRowNumber: 2, externalSku: 'EXT-1', rawQuantity: '3', quantity: 3, validationError: null, productVariantId: null, sourceValues: {} }],
     })
     mocks.saveInboundTemplateDraft.mockResolvedValue({ success: true, id: 88 })
     const onSaved = vi.fn()

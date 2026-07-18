@@ -62,7 +62,7 @@ export type InboundFilePreview = {
   headerRowNumber: number
   headers: string[]
   fileHash: string
-  rows: Array<{ sourceRowNumber: number; externalSku: string; quantity: number | null; validationError: string | null; productVariantId: number | null; sourceValues: Record<string, string> }>
+  rows: Array<{ sourceRowNumber: number; externalSku: string; rawQuantity: string; quantity: number | null; validationError: string | null; productVariantId: number | null; sourceValues: Record<string, string> }>
 }
 
 /**
@@ -133,7 +133,13 @@ export async function saveInboundTemplateDraft(input: {
       p_sheet_name: input.preview.sheetName || null,
       p_header_row_number: input.preview.headerRowNumber || null,
       p_headers: input.preview.headers,
-      p_rows: input.rows.map((row) => ({ ...row, rawQuantity: row.quantity === null ? '' : String(row.quantity) })),
+      // Evidence values are parser output. In particular, never rebuild the raw
+      // cell from a parsed number (001, 1,000 and invalid cells are material).
+      p_rows: input.rows.map((row) => {
+        const evidenceRow = { ...row }
+        delete evidenceRow.productVariantId
+        return evidenceRow
+      }),
     })
     if (error || !data?.[0]) throw new Error(error?.message ?? '입고 증빙을 저장하지 못했습니다.')
     const id = Number(data[0].revision_id)

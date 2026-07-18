@@ -21,7 +21,7 @@ function rowKey() {
 }
 
 function emptyRow(): DraftRow {
-  return { key: rowKey(), sourceRowNumber: 0, externalSku: '', quantity: null, validationError: '외부 SKU와 수량을 입력해주세요.', productVariantId: null, sourceValues: {} }
+  return { key: rowKey(), sourceRowNumber: 0, externalSku: '', rawQuantity: '', quantity: null, validationError: '외부 SKU와 수량을 입력해주세요.', productVariantId: null, sourceValues: {} }
 }
 
 export default function InboundRegistrationSheet({
@@ -97,7 +97,7 @@ export default function InboundRegistrationSheet({
       if (row.key !== key) return row
       const next = { ...row, ...patch }
       const quantityValid = Number.isInteger(next.quantity) && (next.quantity ?? 0) > 0
-      return { ...next, validationError: next.externalSku.trim() && quantityValid ? null : '외부 SKU와 수량을 입력해주세요.' }
+      return { ...next, rawQuantity: patch.quantity === undefined ? next.rawQuantity : String(patch.quantity ?? ''), validationError: next.externalSku.trim() && quantityValid ? null : '외부 SKU와 수량을 입력해주세요.' }
     }))
   }
 
@@ -135,6 +135,7 @@ export default function InboundRegistrationSheet({
           rows: rows.map((row) => ({
             sourceRowNumber: row.sourceRowNumber,
             externalSku: row.externalSku,
+            rawQuantity: row.rawQuantity,
             quantity: row.quantity,
             validationError: row.validationError,
             productVariantId: row.productVariantId,

@@ -308,7 +308,7 @@ begin
 end;
 $$;
 
-/* Step 5 bootstrap declarations are installed after all canonical tables below.
+/* Historical import declarations retained only for migration archaeology.
 -- bootstrap schema aligned with 20260719060000_import_deduplication_revisions_and_promotion.sql.
 create schema if not exists private;
 create or replace function private.normalize_external_shipment_number(p_value text) returns text language sql immutable strict set search_path=pg_catalog as $$ select btrim(p_value, E' \t\n\r\f\v' || U&'\0085\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000') $$;
@@ -1467,3 +1467,16 @@ create unique index if not exists inbound_import_source_rows_ordinal_key on publ
 create unique index if not exists factory_arrivals_one_import_revision_key on public.factory_arrivals(import_revision_id) where import_revision_id is not null;
 create index if not exists inbound_imports_owner_supplier_shipment_idx on public.inbound_imports(user_id,supplier_id,external_shipment_number);
 create index if not exists inbound_import_revisions_supersedes_idx on public.inbound_import_revisions(supersedes_revision_id);
+
+-- Executable bootstrap hardening.  These declarations deliberately appear
+-- after canonical tables and are not a commented pseudo-schema.
+create schema if not exists private;
+create or replace function private.normalize_external_shipment_number(p_value text) returns text language sql immutable strict set search_path=pg_catalog as $$ select btrim(p_value, E' \t\n\r\f\v' || U&'\0085\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000') $$;
+alter table public.inbound_template_versions add constraint inbound_template_versions_id_template_user_key unique(id,template_id,user_id);
+alter table public.inbound_import_revisions add constraint inbound_import_revisions_template_version_template_fkey foreign key(template_version_id,template_id,user_id) references public.inbound_template_versions(id,template_id,user_id) on delete restrict;
+drop policy if exists "Users manage own inbound_imports" on public.inbound_imports;
+drop policy if exists "Users insert own inbound_import_revisions" on public.inbound_import_revisions;
+drop policy if exists "Users insert own inbound_import_source_rows" on public.inbound_import_source_rows;
+drop policy if exists "Users manage own factory_arrival_allocations" on public.factory_arrival_allocations;
+create policy "Users read own inbound imports" on public.inbound_imports for select to authenticated using ((select auth.uid())=user_id);
+revoke insert,update,delete on public.inbound_imports,public.inbound_import_revisions,public.inbound_import_source_rows,public.factory_arrivals,public.factory_arrival_items,public.factory_arrival_allocations from authenticated;

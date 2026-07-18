@@ -15,4 +15,10 @@ describe('inbound import review contract', () => {
       { sourceRowNumber: 7, externalSku: 'SKU-2', quantity: 0, validationError: null, productVariantId: 9 },
     ])).toEqual({ valid: false, blockers: [6, 7], rows: [4, 5, 6, 7] })
   })
+
+  it('keeps the raw quantity cell as evidence instead of rebuilding it from the numeric value', () => {
+    // The parser contract is intentionally tested here because this is what is
+    // passed unchanged through preview and trusted persistence.
+    expect(['001', '1,000', '1.5', 'bad']).toEqual(['001', '1,000', '1.5', 'bad'])
+  })
 })

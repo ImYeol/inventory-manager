@@ -4,7 +4,7 @@ export const BUILT_IN_INBOUND_PRESETS = [
 ] as const
 
 export type InboundPreset = (typeof BUILT_IN_INBOUND_PRESETS)[number]
-export type ParsedInboundRow = { sourceRowNumber: number; externalSku: string; quantity: number | null; validationError: string | null; productVariantId: number | null; sourceValues: Record<string, string> }
+export type ParsedInboundRow = { sourceRowNumber: number; externalSku: string; rawQuantity: string; quantity: number | null; validationError: string | null; productVariantId: number | null; sourceValues: Record<string, string> }
 
 export type InboundTemplateVersion = {
   id?: number
@@ -44,7 +44,7 @@ export function parseInboundWorksheet(preset: InboundPreset, sheetRows: unknown[
     const number = rawQuantity === '' ? null : Number(rawQuantity.replace(/,/g, ''))
     const sourceValues = Object.fromEntries(Object.entries(optionalColumns).flatMap(([field, column]) => column >= 0 && text(cells[column]) ? [[field, text(cells[column])]] : []))
     const validationError = !externalSku ? '외부 SKU를 입력해주세요.' : !Number.isInteger(number) || number === null || number <= 0 ? '수량은 양의 정수여야 합니다.' : null
-    return { sourceRowNumber: headerIndex + index + 2, externalSku, quantity: validationError ? null : number, validationError, productVariantId: null, sourceValues }
+    return { sourceRowNumber: headerIndex + index + 2, externalSku, rawQuantity, quantity: validationError ? null : number, validationError, productVariantId: null, sourceValues }
   })
   return { headerRowNumber: headerIndex + 1, headers: headers.map(text), rows }
 }
@@ -78,7 +78,7 @@ export function parseInboundTemplateWorksheet(template: InboundTemplateVersion, 
     const number = rawQuantity === '' ? null : Number(rawQuantity.replace(/,/g, ''))
     const sourceValues = Object.fromEntries(Object.entries(sourceColumns).flatMap(([field, column]) => text(cells[column]) ? [[field, text(cells[column])]] : []))
     const validationError = !externalSku ? '외부 SKU를 입력해주세요.' : !Number.isInteger(number) || number === null || number <= 0 ? '수량은 양의 정수여야 합니다.' : null
-    return { sourceRowNumber: template.headerRowNumber + index + 1, externalSku, quantity: validationError ? null : number, validationError, productVariantId: null, sourceValues }
+    return { sourceRowNumber: template.headerRowNumber + index + 1, externalSku, rawQuantity, quantity: validationError ? null : number, validationError, productVariantId: null, sourceValues }
   })
   return { sheetName, headerRowNumber: template.headerRowNumber, headers, rows }
 }

@@ -85,6 +85,7 @@ describe('schema contract', () => {
     const fixture = normalizedSql(fs.readFileSync(path.join(root, 'scripts/fixtures/inbound-canonical-legacy.sql'), 'utf8'))
     const assertions = normalizedSql(fs.readFileSync(path.join(root, 'scripts/fixtures/inbound-canonical-assertions.sql'), 'utf8'))
     const runner = fs.readFileSync(path.join(root, 'scripts/test-inbound-canonical-behavior.ts'), 'utf8')
+    const hardening = normalizedSql(fs.readFileSync(path.join(root, 'supabase/migrations/20260719070000_import_revision_proof_and_review_hardening.sql'), 'utf8'))
 
     for (const table of ['auth.users', 'public.product_variants', 'public.warehouses', 'public.factory_arrivals', 'public.factory_arrival_items', 'public.inbound_drafts', 'public.inbound_draft_rows', 'public.inventory', 'public.transactions']) {
       expect(fixture).toContain(`insert into ${table}`)
@@ -97,6 +98,12 @@ describe('schema contract', () => {
     expect(runner).toContain('INBOUND_BEHAVIORAL_PSQL')
     expect(runner).toContain('INBOUND_BEHAVIORAL_DOCKER_CONTAINER')
     expect(runner).toContain('supabase_db_seleccase-inventory-issue-11')
+    expect(runner).toContain('20260719070000_import_revision_proof_and_review_hardening.sql')
+    expect(assertions).toContain('step-5/6 rpc proof')
+    expect(hardening).toContain('mapping_blocker')
+    expect(hardening).toContain('duplicate_file_hash')
+    expect(hardening).toContain('logical_import_conflict')
+    expect(hardening).toContain('revoke insert,update,delete on public.inbound_imports')
   })
 
   it('models verified inbound drafts with exact supplier SKU links only', () => {
