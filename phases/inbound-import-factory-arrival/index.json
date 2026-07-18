@@ -2,7 +2,7 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     {
       "step": 0,
@@ -44,7 +44,10 @@
     {
       "step": 5,
       "name": "import-deduplication-revisions-and-promotion",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-07-19T05:29:12+0900",
+      "summary": "Added immutable logical import evidence with edge-Unicode shipment normalization, user-wide SHA-256 file identity, ordered source-row snapshots, immutable revisions/supersession guards, exact mapping review blockers, and trusted atomic promotion into one FactoryArrival item/allocation per source row. The existing template surface now requires an external shipment number at save time and computes the original-byte hash server-side. Focused and full tests (242), Prisma validation, lint (four existing warnings), and diff checks passed. Disposable migration/RLS proof could not run because psql and Docker access are unavailable; production build reached the existing Google Fonts network failure.",
+      "completed_at": "2026-07-19T05:36:00+0900"
     }
   ]
 }
