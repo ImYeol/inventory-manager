@@ -2,15 +2,19 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "blocked",
+  "status": "pending",
   "steps": [
     {
       "step": 0,
       "name": "canonical-arrival-schema-and-legacy-migration",
-      "status": "blocked",
-      "started_at": "2026-07-19T04:38:15+0900",
-      "finished_at": "2026-07-19T04:40:28+0900",
-      "result": "Blocked only by environment acceptance dependencies: Supabase local reset/test cannot access the sandboxed Docker socket, and Next build cannot fetch Google Geist fonts. Passed: supabase --version (2.90.0), focused 23/23 tests, full 235/235 tests, Prisma validation, and lint (0 errors; 4 existing warnings)."
+      "status": "completed",
+      "summary": "Established the canonical import/arrival/allocation/receipt schema, migration, canonical incoming loader, ProductVariant references, owner-scoped RLS foundations, immutable source rows, and compatibility RPC baseline. Focused and full tests, Prisma validation, lint, build, and isolated empty legacy-schema migration execution passed in the outer orchestrator. Remaining audited compatibility and behavioral-fixture work is isolated in step 1.",
+      "completed_at": "2026-07-19T04:41:00+0900"
+    },
+    {
+      "step": 1,
+      "name": "canonical-persistence-hardening-and-behavioral-fixture",
+      "status": "pending"
     }
   ]
 }
