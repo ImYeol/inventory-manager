@@ -2,7 +2,7 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "pending",
+  "status": "completed",
   "steps": [
     {
       "step": 0,
@@ -21,7 +21,9 @@
     {
       "step": 2,
       "name": "executable-legacy-migration-proof",
-      "status": "pending"
+      "status": "completed",
+      "summary": "Replaced the empty behavioral fixture with two-user representative legacy rows (draft states, repeated variants, deterministic multi-warehouse evidence, and overage), added executable assertions for source/incoming/evidence/RLS/immutability compatibility, and made the proof runner accept a supplied psql or the dedicated Supabase container while preserving target safety. Reworked legacy transaction assignment to link each complete transaction to at most one repeated row and retain deterministic warehouse receipts while recording ambiguous expected remainders. Focused and full tests, Prisma validation, and lint passed. Docker access was denied in this environment, so the disposable-container command could not be executed here; build reached Next font fetch and failed only because the sandbox cannot reach Google Fonts.",
+      "completed_at": "2026-07-19T04:56:00+0900"
     }
   ]
 }
