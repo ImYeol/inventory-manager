@@ -73,6 +73,11 @@ describe('schema contract', () => {
     expect(migration).toContain('normally_received_quantity = normally_received_quantity + v_quantity')
     expect(migration).toContain("revoke insert, update, delete on table public.factory_arrival_allocations from authenticated")
     expect(migration).toContain('drop policy if exists "users manage own factory_arrival_allocations"')
+    expect(migration).toContain('create schema if not exists private')
+    expect(migration).toContain('create or replace function private.sync_legacy_inbound_draft_receipt')
+    expect(migration).toContain('create or replace function private.receive_factory_arrival')
+    expect(migration).toContain('unique (transaction_id)')
+    expect(migration).toContain('insert into public.factory_receipt_events(user_id,factory_arrival_id,event_kind,received_at,immutable_payload)')
   })
 
   it('models verified inbound drafts with exact supplier SKU links only', () => {

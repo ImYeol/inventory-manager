@@ -262,7 +262,7 @@ insert into public.factory_arrival_allocations
   (user_id, factory_arrival_id, factory_arrival_item_id, product_variant_id, warehouse_id,
    allocated_quantity, normally_received_quantity, warehouse_name_snapshot)
 select i.user_id, i.factory_arrival_id, i.id, i.product_variant_id, t.warehouse_id,
-       greatest(i.ordered_quantity, coalesce(sum(t.quantity), 0)), coalesce(sum(t.quantity), 0), w.name
+       i.ordered_quantity, least(coalesce(sum(t.quantity), 0), i.ordered_quantity), w.name
 from public.factory_arrival_items i
 join public.factory_arrivals a on a.id = i.factory_arrival_id and a.user_id = i.user_id
 join public.transactions t on t.user_id = i.user_id and t.source_channel = 'factory-arrival'
@@ -293,7 +293,13 @@ insert into public.factory_receipt_lines (user_id, factory_receipt_event_id, fac
 select e.user_id, e.id, al.id, t.id, t.quantity, al.warehouse_name_snapshot
 from public.factory_receipt_events e
 join public.transactions t on t.id = (e.immutable_payload->>'transaction_id')::bigint and t.user_id = e.user_id
-join public.factory_arrival_allocations al on al.factory_arrival_id = e.factory_arrival_id and al.user_id = e.user_id and al.warehouse_id = t.warehouse_id
+join lateral (
+  select al.* from public.factory_arrival_allocations al
+  join public.product_variants pv on pv.id=al.product_variant_id and pv.user_id=al.user_id
+  where al.factory_arrival_id=e.factory_arrival_id and al.user_id=e.user_id and al.warehouse_id=t.warehouse_id
+    and pv.model_id=t.model_id and pv.size_id=t.size_id and pv.color_id=t.color_id
+  order by al.id limit 1
+) al on true
 where e.immutable_payload->>'migration' = 'legacy_factory_arrival_transaction';
 
 -- Direct PostgREST writes cannot alter receipt counters or fabricate receipt
@@ -410,3 +416,101 @@ end;
 $$;
 revoke all on function public.receive_factory_arrival(bigint,bigint,jsonb) from public, anon;
 grant execute on function public.receive_factory_arrival(bigint,bigint,jsonb) to authenticated;
+
+-- Step 1 hardening.  The public RPC names are the deliberately small PostgREST
+-- boundary; all table-mutating work lives in private helpers with a fixed path.
+create schema if not exists private;
+revoke all on schema private from public, anon, authenticated;
+
+alter table public.factory_receipt_lines add constraint factory_receipt_lines_transaction_id_key unique (transaction_id);
+drop trigger if exists inbound_draft_row_canonical_receipt on public.inbound_draft_rows;
+create or replace function private.sync_legacy_inbound_draft_receipt()
+returns trigger language plpgsql security definer set search_path = private, public as $$
+declare v_arrival_id bigint;
+begin
+  if new.received_quantity = old.received_quantity then return new; end if;
+  update public.factory_arrival_allocations al set normally_received_quantity = new.received_quantity, updated_at = timezone('utc', now())
+  from public.inbound_import_source_rows sr join public.factory_arrival_items i on i.inbound_import_source_row_id = sr.id and i.user_id = sr.user_id
+  where sr.legacy_inbound_draft_row_id = new.id and sr.user_id = new.user_id
+    and al.factory_arrival_item_id = i.id and al.user_id = new.user_id
+  returning al.factory_arrival_id into v_arrival_id;
+  if v_arrival_id is not null then
+    update public.factory_arrival_items i set received_quantity = new.received_quantity, updated_at = timezone('utc', now())
+    from public.inbound_import_source_rows sr where sr.legacy_inbound_draft_row_id = new.id and sr.user_id = new.user_id and i.inbound_import_source_row_id = sr.id and i.user_id = new.user_id;
+    update public.factory_arrivals a set status = case when exists (
+      select 1 from public.factory_arrival_items i left join public.factory_arrival_allocations al on al.factory_arrival_item_id=i.id and al.user_id=i.user_id
+      where i.factory_arrival_id=a.id and i.user_id=a.user_id and (i.product_variant_id is null or al.id is null or al.normally_received_quantity+al.shortage_closed_quantity<al.allocated_quantity)
+    ) then 'PARTIAL' else 'RECEIVED' end, updated_at=timezone('utc',now()) where a.id=v_arrival_id and a.user_id=new.user_id;
+  end if;
+  return new;
+end;
+$$;
+create trigger inbound_draft_row_canonical_receipt after update of received_quantity on public.inbound_draft_rows
+for each row execute function private.sync_legacy_inbound_draft_receipt();
+
+create or replace function private.assert_factory_arrival_receipt_consistency()
+returns trigger language plpgsql set search_path = private, public as $$
+declare v_event public.factory_receipt_events%rowtype; v_allocation public.factory_arrival_allocations%rowtype;
+declare v_transaction public.transactions%rowtype; v_variant public.product_variants%rowtype;
+begin
+  select * into v_event from public.factory_receipt_events where id=new.factory_receipt_event_id and user_id=new.user_id;
+  if not found then raise exception 'factory_arrival_receipt_consistency'; end if;
+  if new.transaction_id is not null and new.factory_arrival_allocation_id is null then raise exception 'factory_arrival_receipt_consistency'; end if;
+  if new.factory_arrival_allocation_id is not null then
+    select * into v_allocation from public.factory_arrival_allocations where id=new.factory_arrival_allocation_id and user_id=new.user_id;
+    if not found or v_allocation.factory_arrival_id<>v_event.factory_arrival_id then raise exception 'factory_arrival_receipt_consistency'; end if;
+  end if;
+  if new.transaction_id is not null then
+    select * into v_transaction from public.transactions where id=new.transaction_id and user_id=new.user_id;
+    select * into v_variant from public.product_variants where id=v_allocation.product_variant_id and user_id=new.user_id;
+    if not found or v_transaction.warehouse_id<>v_allocation.warehouse_id or v_transaction.quantity<>new.received_quantity
+      or v_transaction.model_id<>v_variant.model_id or v_transaction.size_id<>v_variant.size_id or v_transaction.color_id<>v_variant.color_id then raise exception 'factory_arrival_receipt_consistency'; end if;
+    if v_transaction.source_channel='factory-arrival' and (v_transaction.reference_type<>'factory_arrival' or v_transaction.reference_id<>v_event.factory_arrival_id) then raise exception 'factory_arrival_receipt_consistency'; end if;
+    if v_transaction.source_channel='inbound-draft' and not exists (
+      select 1 from public.factory_arrival_items i join public.inbound_import_source_rows sr on sr.id=i.inbound_import_source_row_id and sr.user_id=i.user_id
+      where i.id=v_allocation.factory_arrival_item_id and sr.legacy_inbound_draft_row_id=v_transaction.reference_id and v_transaction.reference_type='inbound_draft_row'
+    ) then raise exception 'factory_arrival_receipt_consistency'; end if;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists factory_receipt_line_consistency on public.factory_receipt_lines;
+create trigger factory_receipt_line_consistency before insert on public.factory_receipt_lines for each row execute function private.assert_factory_arrival_receipt_consistency();
+
+create or replace function private.receive_factory_arrival(p_arrival_id bigint, p_warehouse_id bigint, p_items jsonb)
+returns void language plpgsql security definer set search_path = private, public as $$
+declare v_user_id uuid:=auth.uid(); v_item jsonb; v_arrival public.factory_arrivals%rowtype; v_arrival_item public.factory_arrival_items%rowtype;
+declare v_allocation public.factory_arrival_allocations%rowtype; v_quantity integer; v_transaction_id bigint; v_event_id bigint; v_variant public.product_variants%rowtype;
+begin
+  if v_user_id is null then raise exception 'Authentication is required.'; end if;
+  select * into v_arrival from public.factory_arrivals where id=p_arrival_id and user_id=v_user_id for update;
+  if not found or v_arrival.status in ('RECEIVED','VARIANCE_CLOSED','CANCELLED') then raise exception 'This arrival cannot be received.'; end if;
+  insert into public.factory_receipt_events(user_id,factory_arrival_id,event_kind,received_at,immutable_payload)
+  values(v_user_id,p_arrival_id,'RECEIPT',timezone('utc',now()),jsonb_build_object('submission',true)) returning id into v_event_id;
+  for v_item in select * from jsonb_array_elements(p_items) loop
+    v_quantity:=(v_item->>'quantity')::integer;
+    select * into v_arrival_item from public.factory_arrival_items where id=(v_item->>'arrival_item_id')::bigint and factory_arrival_id=p_arrival_id and user_id=v_user_id for update;
+    select * into v_allocation from public.factory_arrival_allocations where factory_arrival_item_id=v_arrival_item.id and warehouse_id=p_warehouse_id and user_id=v_user_id for update;
+    if not found or v_quantity is null or v_quantity<=0 or v_quantity>v_allocation.allocated_quantity-v_allocation.normally_received_quantity-v_allocation.shortage_closed_quantity then raise exception 'Receive quantity exceeds allocated remaining quantity.'; end if;
+    update public.factory_arrival_allocations set normally_received_quantity=normally_received_quantity+v_quantity,updated_at=timezone('utc',now()) where id=v_allocation.id;
+    update public.factory_arrival_items set received_quantity=received_quantity+v_quantity,updated_at=timezone('utc',now()) where id=v_arrival_item.id;
+    insert into public.inventory(user_id,model_id,size_id,color_id,warehouse_id,quantity) values(v_user_id,v_arrival_item.model_id,v_arrival_item.size_id,v_arrival_item.color_id,p_warehouse_id,v_quantity) on conflict(user_id,model_id,size_id,color_id,warehouse_id) do update set quantity=public.inventory.quantity+excluded.quantity,updated_at=timezone('utc',now());
+    insert into public.transactions(user_id,date,model_id,size_id,color_id,type,quantity,warehouse_id,source_channel,reference_type,reference_id,memo) values(v_user_id,current_date,v_arrival_item.model_id,v_arrival_item.size_id,v_arrival_item.color_id,'INBOUND',v_quantity,p_warehouse_id,'factory-arrival','factory_arrival',p_arrival_id,coalesce(v_arrival.memo,'공장 예정 입고 반영')) returning id into v_transaction_id;
+    insert into public.factory_receipt_lines(user_id,factory_receipt_event_id,factory_arrival_allocation_id,transaction_id,received_quantity,seller_sku_snapshot,product_name_snapshot,option_name_snapshot,warehouse_name_snapshot) values(v_user_id,v_event_id,v_allocation.id,v_transaction_id,v_quantity,v_arrival_item.seller_sku_snapshot,v_arrival_item.product_name_snapshot,v_arrival_item.option_name_snapshot,v_allocation.warehouse_name_snapshot);
+    select * into v_variant from public.product_variants where id=v_allocation.product_variant_id and user_id=v_user_id;
+    insert into public.inventory_sync_outbox(user_id,channel_product_ref_id,target_quantity,status,last_error,requested_at,updated_at)
+    select v_user_id,ref.id,greatest(coalesce(sum(inv.quantity),0)-coalesce((select sum(quantity) from public.inventory_reservations where user_id=v_user_id and product_variant_id=v_variant.id and status='active'),0),0),'required','동기화 필요: 현재 provider는 재고 수량 쓰기를 지원하지 않습니다.',timezone('utc',now()),timezone('utc',now()) from public.channel_product_refs ref left join public.inventory inv on inv.user_id=v_user_id and inv.model_id=v_variant.model_id and inv.size_id=v_variant.size_id and inv.color_id=v_variant.color_id where ref.user_id=v_user_id and ref.variant_id=v_variant.id group by ref.id on conflict(user_id,channel_product_ref_id) do update set target_quantity=excluded.target_quantity,status='required',last_error=excluded.last_error,requested_at=excluded.requested_at,updated_at=excluded.updated_at;
+  end loop;
+  update public.factory_arrivals a set status=case when exists(select 1 from public.factory_arrival_items i left join public.factory_arrival_allocations al on al.factory_arrival_item_id=i.id and al.user_id=i.user_id where i.factory_arrival_id=a.id and i.user_id=a.user_id and (i.product_variant_id is null or al.id is null or al.normally_received_quantity+al.shortage_closed_quantity<al.allocated_quantity)) then 'PARTIAL' else 'RECEIVED' end,updated_at=timezone('utc',now()) where id=p_arrival_id and user_id=v_user_id;
+end;
+$$;
+create or replace function public.receive_factory_arrival(p_arrival_id bigint,p_warehouse_id bigint,p_items jsonb) returns void language plpgsql security definer set search_path = private, public as $$ begin perform private.receive_factory_arrival(p_arrival_id,p_warehouse_id,p_items); end; $$;
+revoke all on function private.receive_factory_arrival(bigint,bigint,jsonb) from public, anon, authenticated;
+revoke all on function public.receive_factory_arrival(bigint,bigint,jsonb) from public, anon;
+grant execute on function public.receive_factory_arrival(bigint,bigint,jsonb) to authenticated;
+
+drop policy if exists "Users manage own factory arrivals" on public.factory_arrivals;
+drop policy if exists "Users manage own factory arrival items" on public.factory_arrival_items;
+create policy "Users read own factory arrivals" on public.factory_arrivals for select to authenticated using ((select auth.uid())=user_id);
+create policy "Users read own factory arrival items" on public.factory_arrival_items for select to authenticated using ((select auth.uid())=user_id);
+revoke insert, update, delete on public.factory_arrivals, public.factory_arrival_items from authenticated;

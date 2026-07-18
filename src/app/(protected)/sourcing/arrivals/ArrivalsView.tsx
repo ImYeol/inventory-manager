@@ -162,6 +162,7 @@ export default function ArrivalsView({
   const [entryMode, setEntryMode] = useState<'manual' | 'csv'>('manual')
   const [message, setMessage] = useState<string | null>(null)
   const [factoryId, setFactoryId] = useState<number | null>(factories.find((factory) => factory.isActive)?.id ?? factories[0]?.id ?? null)
+  const [arrivalWarehouseId, setArrivalWarehouseId] = useState<number | null>(warehouses[0]?.id ?? null)
   const [expectedDate, setExpectedDate] = useState(new Date().toISOString().slice(0, 10))
   const [memo, setMemo] = useState('')
   const [rows, setRows] = useState<ArrivalRow[]>([createRow(), createRow()])
@@ -264,6 +265,11 @@ export default function ArrivalsView({
       return
     }
 
+    if (!arrivalWarehouseId) {
+      setMessage('입고 예정 창고를 선택해주세요.')
+      return
+    }
+
     if (schemaState.status === 'missing') {
       setMessage(schemaState.message)
       return
@@ -273,6 +279,7 @@ export default function ArrivalsView({
       try {
         await createFactoryArrivalBatch({
           factoryId: selectedFactoryId,
+          warehouseId: arrivalWarehouseId,
           expectedDate,
           memo,
           sourceChannel: entryMode,
@@ -392,6 +399,16 @@ export default function ArrivalsView({
             <div>
               <label className={ui.label}>예정 입고일</label>
               <input type="date" value={expectedDate} onChange={(event) => setExpectedDate(event.target.value)} className={ui.controlSm} />
+            </div>
+            <div>
+              <SelectField
+                label="입고 예정 창고"
+                value={arrivalWarehouseId}
+                placeholder={warehouses.length > 0 ? '창고 선택' : '등록된 창고가 없습니다'}
+                options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))}
+                onValueChange={(next) => setArrivalWarehouseId(next === null ? null : Number(next))}
+                disabled={warehouses.length === 0}
+              />
             </div>
             <div className="md:col-span-2">
               <label className={ui.label}>메모</label>

@@ -148,7 +148,7 @@ export async function getTransactions(filters?: {
   sizeId?: number
   colorId?: number
   type?: string
-  warehouseId?: number
+  warehouseId: number
   dateFrom?: string
   dateTo?: string
 }) {
@@ -549,6 +549,10 @@ export async function createFactoryArrivalBatch(input: {
     throw new Error('예정 입고일을 입력해주세요.')
   }
 
+  if (!input.warehouseId) {
+    throw new Error('입고 예정 창고를 선택해주세요.')
+  }
+
   if (!Array.isArray(input.items) || input.items.length === 0) {
     throw new Error('등록할 예정 입고 항목이 없습니다.')
   }
@@ -572,7 +576,7 @@ export async function createFactoryArrivalBatch(input: {
     p_expected_date: input.expectedDate,
     p_memo: input.memo?.trim() || null,
     p_source_channel: input.sourceChannel,
-    p_warehouse_id: input.warehouseId ?? null,
+    p_warehouse_id: input.warehouseId,
     p_items: normalizedItems,
   })
 

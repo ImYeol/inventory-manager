@@ -64,6 +64,7 @@ describe('ArrivalsView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'CSV 행 가져오기' }))
 
     await openSelectAndChoose('공장', '광주 협력사')
+    await openSelectAndChoose('입고 예정 창고', '대자동')
     fireEvent.click(screen.getByRole('combobox', { name: '항목 #1 상품 옵션' }))
     fireEvent.click(await screen.findByRole('option', { name: /LP01/ }))
     expect(screen.getByText('CSV 붙여넣기').closest('section')?.className).toContain('ui-card')
@@ -78,6 +79,7 @@ describe('ArrivalsView', () => {
         expect.objectContaining({
           factoryId: 1,
           sourceChannel: 'csv',
+          warehouseId: 12,
           items: [{ modelId: 1, sizeId: 10, colorId: 20, orderedQuantity: 12 }],
         }),
       ),

@@ -1264,9 +1264,14 @@ $$;
 create trigger inbound_draft_row_canonical_receipt after update of received_quantity on public.inbound_draft_rows for each row execute function public.sync_legacy_inbound_draft_receipt();
 
 -- Canonical receipt hardening, kept equivalent to the forward migration.
+create schema if not exists private;
+revoke all on schema private from public, anon, authenticated;
+update public.factory_arrivals set source_type = case when source_channel = 'csv' then 'FILE' else 'MANUAL' end where source_type is null;
+alter table public.factory_arrivals alter column source_type set not null;
 alter table public.inbound_imports drop constraint if exists inbound_imports_supplier_id_fkey;
 alter table public.inbound_imports add constraint inbound_imports_supplier_id_user_id_fkey foreign key (supplier_id,user_id) references public.factories(id,user_id) on delete restrict;
 alter table public.factory_arrivals add constraint factory_arrivals_one_import_revision_key unique (import_revision_id);
+alter table public.factory_receipt_lines add constraint factory_receipt_lines_transaction_id_key unique (transaction_id);
 drop policy if exists "Users manage own factory_arrival_allocations" on public.factory_arrival_allocations;
 drop policy if exists "Users insert own factory_receipt_events" on public.factory_receipt_events;
 drop policy if exists "Users insert own factory_receipt_lines" on public.factory_receipt_lines;
@@ -1285,6 +1290,25 @@ begin
   return new;
 end; $$;
 create trigger factory_receipt_line_consistency before insert on public.factory_receipt_lines for each row execute function public.assert_factory_arrival_receipt_consistency();
+
+-- Public RPCs are the intentional API boundary.  Private helpers are used by
+-- trigger/RPC implementations in the forward migration and are never granted
+-- to PostgREST roles.
+create or replace function private.sync_legacy_inbound_draft_receipt() returns trigger language plpgsql security definer set search_path = private, public as $$
+begin
+  update public.factory_arrival_allocations al set normally_received_quantity=new.received_quantity,updated_at=timezone('utc',now())
+  from public.inbound_import_source_rows sr join public.factory_arrival_items i on i.inbound_import_source_row_id=sr.id and i.user_id=sr.user_id
+  where sr.legacy_inbound_draft_row_id=new.id and sr.user_id=new.user_id and al.factory_arrival_item_id=i.id and al.user_id=new.user_id;
+  return new;
+end; $$;
+drop trigger if exists inbound_draft_row_canonical_receipt on public.inbound_draft_rows;
+create trigger inbound_draft_row_canonical_receipt after update of received_quantity on public.inbound_draft_rows for each row execute function private.sync_legacy_inbound_draft_receipt();
+revoke all on function private.sync_legacy_inbound_draft_receipt() from public, anon, authenticated;
+drop policy if exists "Users manage own factory arrivals" on public.factory_arrivals;
+drop policy if exists "Users manage own factory arrival items" on public.factory_arrival_items;
+create policy "Users read own factory arrivals" on public.factory_arrivals for select to authenticated using ((select auth.uid())=user_id);
+create policy "Users read own factory arrival items" on public.factory_arrival_items for select to authenticated using ((select auth.uid())=user_id);
+revoke insert, update, delete on public.factory_arrivals, public.factory_arrival_items from authenticated;
 
 create or replace function public.receive_inbound_draft_rows(p_draft_id bigint, p_rows jsonb)
 returns void language plpgsql security invoker set search_path = '' as $$

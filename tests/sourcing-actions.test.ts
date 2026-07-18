@@ -77,6 +77,7 @@ describe('sourcing actions', () => {
         expectedDate: '2026-04-21',
         memo: '1차 납품',
         sourceChannel: 'csv',
+        warehouseId: 2,
         items: [{ modelId: 1, sizeId: 10, colorId: 20, orderedQuantity: 12 }],
       }),
     ).resolves.toEqual({ success: true, count: 1 })
@@ -86,7 +87,7 @@ describe('sourcing actions', () => {
       p_expected_date: '2026-04-21',
       p_memo: '1차 납품',
       p_source_channel: 'csv',
-      p_warehouse_id: null,
+      p_warehouse_id: 2,
       p_items: [{ model_id: 1, size_id: 10, color_id: 20, ordered_quantity: 12 }],
     })
   })
@@ -139,6 +140,7 @@ describe('sourcing actions', () => {
         factoryId: 1,
         expectedDate: '2026-04-21',
         sourceChannel: 'manual',
+        warehouseId: 2,
         items: [{ modelId: 1, sizeId: 10, colorId: 20, orderedQuantity: 4 }],
       }),
     ).rejects.toThrow(SOURCING_SCHEMA_MISSING_MESSAGE)
