@@ -49,4 +49,19 @@ npm run lint
 npm run build
 ```
 
+## Mandatory audit corrections before completion
+
+The first attempt produced commit `f692b7d` and must be corrected, not treated as a clean implementation. Verify all of these against executable PostgreSQL and regressions:
+
+- Add every composite UNIQUE/primary key required by new composite foreign keys, especially `factory_arrival_items(id,user_id)` and `transactions(id,user_id)`, before creating dependent FKs.
+- Update existing manual/CSV FactoryArrival creation and the legacy receive code in the same migration-compatible deployment so `source_type` and canonical lifecycle constraints never break runtime writes. Do not leave Korean persisted statuses writing into an English-only check.
+- Backfill allocations and receipt evidence for existing `factory_arrivals` as well as `inbound_drafts`; preserve existing canonical incoming and do not replay inventory.
+- Prevent the legacy inbound receipt path from making canonical allocation/receipt data stale. Either make it update the canonical aggregate atomically during the compatibility window or retire/revoke it together with an application action change that leaves no callable dead path.
+- Promote wholly-unreceived valid/mapped/balanced migrated drafts to READY; keep invalid/unmapped work DRAFT with explicit exception evidence.
+- Enforce same-owner and aggregate consistency for supplier/import/revision/source-row/item/allocation references. One source row cannot silently promote to multiple items.
+- Raw revision/source rows and receipt evidence must be immutable at the database policy/trigger boundary; broad owner `FOR ALL` policies are insufficient.
+- Make Prisma relation delete behavior/nullability and checked-in `supabase/schema.sql` match the forward migration.
+- Treat canonical arrival/allocation query errors as failures rather than silently returning incoming zero.
+- Include existing factory-arrival fixtures, legacy inbound fixtures, actual FK creation, RLS isolation, no-replay inventory/transaction counts, and incoming preservation in behavioral tests.
+
 Do not implement mapping UI, fuzzy/name matching, Excel review UI, receipt allocation editing, overage/shortage actions, or correction UX in this step. Reason: those are ordered dependent slices and broadening this schema step would make migration verification unsafe.

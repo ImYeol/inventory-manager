@@ -8,8 +8,8 @@
       "step": 0,
       "name": "canonical-arrival-schema-and-legacy-migration",
       "status": "blocked",
-      "started_at": "2026-07-19T04:02:57+0900",
-      "result": "Implemented canonical inbound persistence boundary and passing code-level tests. Blocked verification: local Supabase Docker/Postgres access is denied by the sandbox; Next/Turbopack build rejects the workspace node_modules symlink outside its filesystem root."
+      "started_at": "2026-07-19T04:17:18+0900",
+      "result": "Corrected f692b7d composite FK keys, lifecycle-compatible writes, canonical allocation consistency, immutable evidence policies, and legacy draft synchronization. Focused tests, full tests, Prisma validation, lint, and build passed. Supabase db reset/test db remain blocked because Docker/Postgres is unavailable in this sandbox."
     }
   ]
 }
