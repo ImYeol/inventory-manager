@@ -65,3 +65,17 @@ The first attempt produced commit `f692b7d` and must be corrected, not treated a
 - Include existing factory-arrival fixtures, legacy inbound fixtures, actual FK creation, RLS isolation, no-replay inventory/transaction counts, and incoming preservation in behavioral tests.
 
 Do not implement mapping UI, fuzzy/name matching, Excel review UI, receipt allocation editing, overage/shortage actions, or correction UX in this step. Reason: those are ordered dependent slices and broadening this schema step would make migration verification unsafe.
+
+## Mandatory second audit corrections before completion
+
+The second attempt produced commit `e824714`. Correct all remaining P0/P1 findings below in this same step. These are persistence compatibility defects, not later receipt-UX scope:
+
+- Make `receive_factory_arrival` atomically update canonical allocation received counters and append immutable receipt event/line evidence linked to the stock transaction. Partial receipts must immediately reduce canonical `incoming` by the received amount; completing an arrival must not rely on a status filter to hide a stale remainder.
+- Make existing manual/CSV FactoryArrival creation resolve the ProductVariant-backed item and create a canonical warehouse allocation. A READY aggregate with zero allocations is invalid. Retain current UI/action compatibility while using canonical persistence.
+- Backfill existing FactoryArrival allocations for users with multiple warehouses without guessing: use warehouse evidence from linked legacy transactions where available and write explicit migration exceptions for genuinely ambiguous unresolved remainder. Preserve computable incoming. Handle historical `received_quantity > ordered_quantity` without aborting migration, preserving the discrepancy as explicit exception/evidence.
+- Link legacy `factory-arrival` transactions to migrated receipt events/lines without replaying stock. During inbound-draft compatibility, ensure every successful legacy receipt also creates canonical receipt evidence, or retire that RPC plus its application call atomically. Lifecycle calculation must not mark an arrival received while unresolved/unallocated sibling items exist.
+- Remove direct Data API mutation rights for canonical allocation receipt/shortage counters and receipt evidence. Writes must go through trusted RPC/server paths. Add aggregate-consistency validation across receipt event, allocation, item, warehouse, and transaction so immutable evidence cannot be fabricated across unrelated records.
+- Add same-owner composite integrity for `inbound_imports.supplier_id`; ensure one import revision can promote to at most one FactoryArrival. Add only the required RESTRICT protections for historically referenced warehouse/catalog records identified by this slice.
+- Bring checked-in `supabase/schema.sql` and `prisma/schema.prisma` into exact agreement with migration output for source type/nullability, FKs, triggers, policies, and delete behavior.
+- Update dashboard and sourcing reads so canonical English lifecycle values do not regress counts or labels.
+- Add executable database behavioral coverage (pgTAP or a repository test script invoked by the test suite) for legacy factory arrivals and untouched/partial/received inbound drafts, including a multi-warehouse owner, overage data, immutable evidence, owner isolation, no inventory/transaction replay, source preservation, receipt linkage, and canonical incoming. Static SQL assertions alone do not satisfy this step.

@@ -2,14 +2,12 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "blocked",
+  "status": "pending",
   "steps": [
     {
       "step": 0,
       "name": "canonical-arrival-schema-and-legacy-migration",
-      "status": "blocked",
-      "started_at": "2026-07-19T04:17:18+0900",
-      "result": "Corrected f692b7d composite FK keys, lifecycle-compatible writes, canonical allocation consistency, immutable evidence policies, and legacy draft synchronization. Focused tests, full tests, Prisma validation, lint, and build passed. Supabase db reset/test db remain blocked because Docker/Postgres is unavailable in this sandbox."
+      "status": "pending"
     }
   ]
 }
