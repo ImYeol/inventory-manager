@@ -37,7 +37,7 @@ describe('InboundRegistrationSheet', () => {
 
   it('uses the selected template to preview a file, then keeps the preview editable before draft save', async () => {
     mocks.previewInboundTemplateFile.mockResolvedValue({
-      supplierId: 4, warehouseId: 2, templateId: 7, templateVersionId: 11, sheetName: '입고', headerRowNumber: 1, headers: ['외부 SKU', '수량'],
+      supplierId: 4, warehouseId: 2, templateId: 7, templateVersionId: 11, sheetName: '입고', headerRowNumber: 1, headers: ['외부 SKU', '수량'], fileHash: 'hash',
       rows: [{ sourceRowNumber: 2, externalSku: 'EXT-1', quantity: 3, validationError: null, productVariantId: null, sourceValues: {} }],
     })
     mocks.saveInboundTemplateDraft.mockResolvedValue({ success: true, id: 88 })
@@ -56,10 +56,12 @@ describe('InboundRegistrationSheet', () => {
 
     await waitFor(() => expect(mocks.previewInboundTemplateFile).toHaveBeenCalledWith({ supplierId: 4, warehouseId: 2, templateVersionId: 11, file }))
     expect(await screen.findByDisplayValue('EXT-1')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('외부 출고 번호'), { target: { value: 'SHIP-1' } })
     fireEvent.change(screen.getByDisplayValue('3'), { target: { value: '4' } })
     fireEvent.click(screen.getByRole('button', { name: '초안 저장' }))
     await waitFor(() => expect(mocks.saveInboundTemplateDraft).toHaveBeenCalledWith(expect.objectContaining({
       rows: [expect.objectContaining({ externalSku: 'EXT-1', quantity: 4 })], file,
+      shipmentNumber: 'SHIP-1',
     })))
     expect(onSaved).toHaveBeenCalledWith(88)
   })

@@ -307,6 +307,48 @@ begin
   return true;
 end;
 $$;
+
+/* Step 5 bootstrap declarations are installed after all canonical tables below.
+-- bootstrap schema aligned with 20260719060000_import_deduplication_revisions_and_promotion.sql.
+create schema if not exists private;
+create or replace function private.normalize_external_shipment_number(p_value text) returns text language sql immutable strict set search_path=pg_catalog as $$ select btrim(p_value, E' \t\n\r\f\v' || U&'\0085\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000') $$;
+alter table public.inbound_imports add column if not exists external_shipment_number text;
+alter table public.inbound_import_revisions add column if not exists supersedes_revision_id bigint, add column if not exists template_id bigint, add column if not exists template_version_id bigint;
+alter table public.inbound_import_source_rows add column if not exists source_row_ordinal integer, add column if not exists raw_quantity text;
+create unique index if not exists inbound_imports_logical_shipment_key on public.inbound_imports(user_id,supplier_id,external_shipment_number) where external_shipment_number is not null;
+create unique index if not exists inbound_import_revisions_user_file_hash_key on public.inbound_import_revisions(user_id,source_file_hash) where source_file_hash is not null;
+create unique index if not exists inbound_import_revisions_one_supersession_key on public.inbound_import_revisions(supersedes_revision_id) where supersedes_revision_id is not null;
+create unique index if not exists inbound_import_source_rows_ordinal_key on public.inbound_import_source_rows(inbound_import_revision_id,source_row_ordinal) where source_row_ordinal is not null;
+create unique index if not exists factory_arrivals_one_import_revision_key on public.factory_arrivals(import_revision_id) where import_revision_id is not null;
+create index if not exists inbound_imports_owner_supplier_shipment_idx on public.inbound_imports(user_id,supplier_id,external_shipment_number);
+create index if not exists inbound_import_revisions_supersedes_idx on public.inbound_import_revisions(supersedes_revision_id);
+alter table public.inbound_import_revisions drop constraint if exists inbound_import_revisions_supersedes_user_id_fkey;
+alter table public.inbound_import_revisions add constraint inbound_import_revisions_supersedes_user_id_fkey foreign key (supersedes_revision_id,user_id) references public.inbound_import_revisions(id,user_id) on delete restrict;
+alter table public.inbound_import_revisions add constraint inbound_import_revisions_template_user_id_fkey foreign key (template_id,user_id) references public.inbound_templates(id,user_id) on delete restrict;
+alter table public.inbound_import_revisions add constraint inbound_import_revisions_template_version_user_id_fkey foreign key (template_version_id,user_id) references public.inbound_template_versions(id,user_id) on delete restrict;
+
+create or replace function public.register_inbound_import_revision(p_supplier_id bigint,p_external_shipment_number text,p_source_type text,p_source_filename text,p_source_storage_path text,p_source_file_hash text,p_template_id bigint,p_template_version_id bigint,p_sheet_name text,p_header_row_number integer,p_headers jsonb,p_rows jsonb) returns table(inbound_import_id bigint,revision_id bigint,revision_number integer,proposed_revision boolean) language plpgsql security definer set search_path=private,public as $$
+declare u uuid:=auth.uid(); shipment text:=private.normalize_external_shipment_number(p_external_shipment_number); imp public.inbound_imports%rowtype; previous public.inbound_import_revisions%rowtype; rev bigint; n integer; row_data jsonb; ordinal integer:=0;
+begin
+ if u is null then raise exception 'Authentication is required.'; end if; if shipment='' then raise exception 'External shipment/reference number is required.'; end if; if p_source_type not in ('FILE','MANUAL') then raise exception 'Invalid source type.'; end if; if p_source_type='FILE' and (p_source_file_hash is null or p_source_storage_path is null) then raise exception 'File hash and storage path are required.'; end if; if p_source_type='MANUAL' and p_source_file_hash is not null then raise exception 'Manual evidence cannot have a file hash.'; end if; if jsonb_typeof(p_rows) is distinct from 'array' or jsonb_array_length(p_rows)=0 then raise exception 'At least one source row is required.'; end if; if not exists(select 1 from public.factories where id=p_supplier_id and user_id=u) then raise exception 'Supplier not found.'; end if;
+ if p_source_file_hash is not null and exists(select 1 from public.inbound_import_revisions where user_id=u and source_file_hash=p_source_file_hash) then raise exception 'duplicate_file_hash'; end if;
+ select * into imp from public.inbound_imports where user_id=u and supplier_id=p_supplier_id and external_shipment_number=shipment for update;
+ if not found then insert into public.inbound_imports(user_id,supplier_id,source_type,external_shipment_number) values(u,p_supplier_id,p_source_type,shipment) returning * into imp; n:=1; else select * into previous from public.inbound_import_revisions where inbound_import_id=imp.id and user_id=u order by revision_number desc for update limit 1; if exists(select 1 from public.factory_arrivals a join public.factory_arrival_allocations al on al.factory_arrival_id=a.id and al.user_id=a.user_id where a.user_id=u and a.import_revision_id in(select id from public.inbound_import_revisions where inbound_import_id=imp.id) and al.normally_received_quantity>0) then raise exception 'supersession_after_receipt_evidence'; end if; n:=coalesce(previous.revision_number,0)+1; end if;
+ insert into public.inbound_import_revisions(user_id,inbound_import_id,revision_number,supersedes_revision_id,source_filename,source_storage_path,source_file_hash,template_id,template_version_id,source_sheet_name,source_header_row_number,source_headers) values(u,imp.id,n,case when n>1 then previous.id end,p_source_filename,p_source_storage_path,p_source_file_hash,p_template_id,p_template_version_id,p_sheet_name,p_header_row_number,coalesce(p_headers,'{}'::jsonb)) returning id into rev;
+ for row_data in select * from jsonb_array_elements(p_rows) loop ordinal:=ordinal+1; insert into public.inbound_import_source_rows(user_id,inbound_import_revision_id,source_row_ordinal,source_row_number,external_sku,raw_quantity,quantity,source_values,validation_error,product_variant_id) values(u,rev,ordinal,nullif(row_data->>'sourceRowNumber','')::integer,row_data->>'externalSku',row_data->>'rawQuantity',nullif(row_data->>'quantity','')::integer,coalesce(row_data->'sourceValues','{}'::jsonb),nullif(row_data->>'validationError',''),nullif(row_data->>'productVariantId','')::bigint); end loop;
+ return query select imp.id,rev,n,n>1;
+exception when unique_violation then if p_source_file_hash is not null then raise exception 'duplicate_file_hash'; end if; raise; end $$;
+
+create or replace function public.promote_inbound_import_revision(p_revision_id bigint,p_default_warehouse_id bigint) returns bigint language plpgsql security definer set search_path=private,public as $$
+declare u uuid:=auth.uid(); rev public.inbound_import_revisions%rowtype; imp public.inbound_imports%rowtype; arrival_id bigint; r public.inbound_import_source_rows%rowtype; item_id bigint;
+begin
+ if u is null then raise exception 'Authentication is required.'; end if; select * into rev from public.inbound_import_revisions where id=p_revision_id and user_id=u for update; if not found then raise exception 'Import revision not found.'; end if; select * into imp from public.inbound_imports where id=rev.inbound_import_id and user_id=u for update; if exists(select 1 from public.inbound_import_revisions where inbound_import_id=imp.id and user_id=u and revision_number>rev.revision_number) then raise exception 'Only the current import revision can be promoted.'; end if; if not exists(select 1 from public.warehouses where id=p_default_warehouse_id and user_id=u) then raise exception 'Warehouse not found.'; end if; if exists(select 1 from public.inbound_import_source_rows where inbound_import_revision_id=p_revision_id and user_id=u and (validation_error is not null or quantity is null or quantity<=0 or product_variant_id is null)) then raise exception 'Import review blockers must be resolved before promotion.'; end if;
+ insert into public.factory_arrivals(user_id,factory_id,reference_code,expected_date,status,source_channel,source_type,import_revision_id,external_shipment_reference) values(u,imp.supplier_id,imp.external_shipment_number,current_date,'DRAFT','inbound-import',imp.source_type,rev.id,imp.external_shipment_number) returning id into arrival_id;
+ for r in select * from public.inbound_import_source_rows where inbound_import_revision_id=p_revision_id and user_id=u order by source_row_ordinal,id loop insert into public.factory_arrival_items(user_id,factory_arrival_id,product_variant_id,inbound_import_source_row_id,external_sku_snapshot,ordered_quantity) values(u,arrival_id,r.product_variant_id,r.id,r.external_sku,r.quantity) returning id into item_id; insert into public.factory_arrival_allocations(user_id,factory_arrival_id,factory_arrival_item_id,product_variant_id,warehouse_id,allocated_quantity) values(u,arrival_id,item_id,r.product_variant_id,p_default_warehouse_id,r.quantity); end loop; return arrival_id;
+end $$;
+revoke all on function public.register_inbound_import_revision(bigint,text,text,text,text,text,bigint,bigint,text,integer,jsonb,jsonb),public.promote_inbound_import_revision(bigint,bigint) from public,anon;
+grant execute on function public.register_inbound_import_revision(bigint,text,text,text,text,text,bigint,bigint,text,integer,jsonb,jsonb),public.promote_inbound_import_revision(bigint,bigint) to authenticated;
+*/
 revoke execute on function public.finalize_order_fulfillment(bigint) from public, anon;
 grant execute on function public.finalize_order_fulfillment(bigint) to authenticated;
 
@@ -1411,3 +1453,17 @@ begin
   update public.inbound_drafts set status = case when v_open = 0 then 'received' else 'partial' end, updated_at = timezone('utc', now()) where id = p_draft_id and user_id = v_user_id;
 end;
 $$;
+
+-- Step 5 schema parity for immutable import identity. RPC bodies are defined in
+-- the checked-in forward migration so deployed databases and migration proof
+-- use the same trusted implementation.
+alter table public.inbound_imports add column if not exists external_shipment_number text;
+alter table public.inbound_import_revisions add column if not exists supersedes_revision_id bigint, add column if not exists template_id bigint, add column if not exists template_version_id bigint;
+alter table public.inbound_import_source_rows add column if not exists source_row_ordinal integer, add column if not exists raw_quantity text;
+create unique index if not exists inbound_imports_logical_shipment_key on public.inbound_imports(user_id,supplier_id,external_shipment_number) where external_shipment_number is not null;
+create unique index if not exists inbound_import_revisions_user_file_hash_key on public.inbound_import_revisions(user_id,source_file_hash) where source_file_hash is not null;
+create unique index if not exists inbound_import_revisions_one_supersession_key on public.inbound_import_revisions(supersedes_revision_id) where supersedes_revision_id is not null;
+create unique index if not exists inbound_import_source_rows_ordinal_key on public.inbound_import_source_rows(inbound_import_revision_id,source_row_ordinal) where source_row_ordinal is not null;
+create unique index if not exists factory_arrivals_one_import_revision_key on public.factory_arrivals(import_revision_id) where import_revision_id is not null;
+create index if not exists inbound_imports_owner_supplier_shipment_idx on public.inbound_imports(user_id,supplier_id,external_shipment_number);
+create index if not exists inbound_import_revisions_supersedes_idx on public.inbound_import_revisions(supersedes_revision_id);

@@ -42,6 +42,7 @@ export default function InboundRegistrationSheet({
   const [supplierId, setSupplierId] = useState('')
   const [warehouseId, setWarehouseId] = useState(initialWarehouseId ? String(initialWarehouseId) : '')
   const [templateVersionId, setTemplateVersionId] = useState('')
+  const [shipmentNumber, setShipmentNumber] = useState('')
   const [templateOptionsState, setTemplateOptionsState] = useState(templates)
   const [rows, setRows] = useState<DraftRow[]>([emptyRow])
   const [preview, setPreview] = useState<InboundFilePreview | null>(null)
@@ -119,13 +120,13 @@ export default function InboundRegistrationSheet({
   }
 
   const saveDraft = () => {
-    if (!supplierId || !warehouseId || !selectedTemplate || rows.length === 0) {
-      setMessage('공급자, 창고, 템플릿과 입고 행을 입력해주세요.')
+    if (!supplierId || !warehouseId || !selectedTemplate || rows.length === 0 || !shipmentNumber.trim()) {
+      setMessage('공급자, 창고, 템플릿, 외부 출고 번호와 입고 행을 입력해주세요.')
       return
     }
     const draftPreview: InboundFilePreview = preview ?? {
       supplierId: Number(supplierId), warehouseId: Number(warehouseId), templateId: selectedTemplate.id, templateVersionId: selectedTemplate.versionId,
-      sheetName: '', headerRowNumber: 0, headers: [], rows: [],
+      sheetName: '', headerRowNumber: 0, headers: [], fileHash: '', rows: [],
     }
     startTransition(async () => {
       try {
@@ -140,8 +141,9 @@ export default function InboundRegistrationSheet({
             sourceValues: row.sourceValues,
           })),
           ...(sourceFile ? { file: sourceFile } : {}),
+          shipmentNumber,
         })
-        setMessage('입고 초안을 저장했습니다. SKU를 확인한 뒤 검수 입고를 진행하세요.')
+        setMessage(result.proposedRevision ? '새 개정 증빙을 저장했습니다. 행 매핑을 검토한 뒤 입고 예정으로 전환하세요.' : '입고 증빙을 저장했습니다. 행 매핑을 검토한 뒤 입고 예정으로 전환하세요.')
         onSaved?.(result.id)
         if (!onSaved) window.location.assign('/sourcing/arrivals')
       } catch (error) {
@@ -152,10 +154,11 @@ export default function InboundRegistrationSheet({
 
   return (
     <div className="space-y-[var(--space-5)]">
-      <div className="grid gap-[var(--space-3)] md:grid-cols-3">
+      <div className="grid gap-[var(--space-3)] md:grid-cols-4">
         <label className="space-y-1"><span className={ui.label}>공급자</span><Select value={supplierId || EMPTY_VALUE} onValueChange={(value) => setSupplierId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="공급자"><SelectValue placeholder="공급자 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>공급자 선택</SelectItem>{suppliers.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></label>
         <label className="space-y-1"><span className={ui.label}>입고 창고</span><Select value={warehouseId || EMPTY_VALUE} onValueChange={(value) => setWarehouseId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="입고 창고"><SelectValue placeholder="창고 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>창고 선택</SelectItem>{warehouses.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></label>
         <div className="space-y-1"><span className={ui.label}>입고 템플릿</span><div className="flex gap-2"><Select value={templateVersionId || EMPTY_VALUE} onValueChange={(value) => setTemplateVersionId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="입고 템플릿"><SelectValue placeholder="템플릿 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>템플릿 선택</SelectItem>{templateOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Button type="button" variant="secondary" size="sm" onClick={() => { setEditingTemplateId(undefined); setTemplateName(''); setTemplateModalOpen(true) }}>템플릿 만들기</Button>{selectedTemplate ? <Button type="button" variant="secondary" size="sm" onClick={() => { setEditingTemplateId(selectedTemplate.id); setTemplateName(selectedTemplate.name); setTemplateModalOpen(true) }}>템플릿 수정</Button> : null}</div></div>
+        <label className="space-y-1"><span className={ui.label}>외부 출고 번호</span><Input aria-label="외부 출고 번호" value={shipmentNumber} onChange={(event) => setShipmentNumber(event.target.value)} /></label>
       </div>
 
       <div

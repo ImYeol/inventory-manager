@@ -1,12 +1,12 @@
 'use server'
 
-import { createHash } from 'node:crypto'
 import * as XLSX from 'xlsx'
 import { revalidatePath } from 'next/cache'
 import { getSupabaseWithUser } from '../db'
-import { createInboundDraft, getInboundTemplateVersion } from '../data'
+import { getInboundTemplateVersion } from '../data'
 import { parseInboundTemplateWorksheet } from '../inbound-import'
 import { suggestExactSupplierSkuLinks } from '../supplier-sku'
+import { normalizeExternalShipmentNumber, sha256OriginalBytes } from '../inbound-import-review'
 
 export type InboundTemplateSample = { sheets: Array<{ name: string; rows: string[][] }> }
 
@@ -61,6 +61,7 @@ export type InboundFilePreview = {
   sheetName: string
   headerRowNumber: number
   headers: string[]
+  fileHash: string
   rows: Array<{ sourceRowNumber: number; externalSku: string; quantity: number | null; validationError: string | null; productVariantId: number | null; sourceValues: Record<string, string> }>
 }
 
@@ -94,6 +95,7 @@ export async function previewInboundTemplateFile(input: { supplierId: number; wa
     sheetName: parsed.sheetName,
     headerRowNumber: parsed.headerRowNumber,
     headers: parsed.headers,
+    fileHash: await sha256OriginalBytes(bytes),
     rows: suggestExactSupplierSkuLinks(parsed.rows, linkMap, input.supplierId),
   }
 }
@@ -103,32 +105,53 @@ export async function saveInboundTemplateDraft(input: {
   preview: InboundFilePreview
   rows: InboundFilePreview['rows']
   file?: File
+  shipmentNumber: string
 }) {
   if (!input.rows.length) throw new Error('저장할 입고 행이 없습니다.')
+  const shipmentNumber = normalizeExternalShipmentNumber(input.shipmentNumber)
+  if (!shipmentNumber) throw new Error('외부 출고/참조 번호를 입력해주세요.')
   const { supabase, user } = await getSupabaseWithUser()
   let source: { storagePath: string; filename: string; fileHash: string; sheetName: string; headerRowNumber: number; headers: string[] } | undefined
   if (input.file) {
     const bytes = Buffer.from(await input.file.arrayBuffer())
-    const hash = createHash('sha256').update(bytes).digest('hex')
+    const hash = await sha256OriginalBytes(bytes)
     const storagePath = `${user.id}/${hash}-${input.file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
     const { error } = await supabase.storage.from('inbound-source-files').upload(storagePath, bytes, { contentType: input.file.type || 'application/octet-stream', upsert: false })
     if (error) throw new Error(error.message)
     source = { storagePath, filename: input.file.name, fileHash: hash, sheetName: input.preview.sheetName, headerRowNumber: input.preview.headerRowNumber, headers: input.preview.headers }
   }
   try {
-    const id = await createInboundDraft({
-      supplierId: input.preview.supplierId,
-      templateId: input.preview.templateId,
-      templateVersionId: input.preview.templateVersionId,
-      rows: input.rows.map((row) => ({ ...row, supplierId: input.preview.supplierId, warehouseId: input.preview.warehouseId, template: String(input.preview.templateId) })),
-      source,
+    const { data, error } = await supabase.rpc('register_inbound_import_revision', {
+      p_supplier_id: input.preview.supplierId,
+      p_external_shipment_number: shipmentNumber,
+      p_source_type: source ? 'FILE' : 'MANUAL',
+      p_source_filename: source?.filename ?? null,
+      p_source_storage_path: source?.storagePath ?? null,
+      p_source_file_hash: source?.fileHash ?? null,
+      p_template_id: input.preview.templateId,
+      p_template_version_id: input.preview.templateVersionId,
+      p_sheet_name: input.preview.sheetName || null,
+      p_header_row_number: input.preview.headerRowNumber || null,
+      p_headers: input.preview.headers,
+      p_rows: input.rows.map((row) => ({ ...row, rawQuantity: row.quantity === null ? '' : String(row.quantity) })),
     })
+    if (error || !data?.[0]) throw new Error(error?.message ?? '입고 증빙을 저장하지 못했습니다.')
+    const id = Number(data[0].revision_id)
     revalidatePath('/sourcing/arrivals')
-    return { success: true, id, saved: input.rows.length, invalid: input.rows.filter((row) => row.validationError).length }
+    return { success: true, id, importId: Number(data[0].inbound_import_id), proposedRevision: Boolean(data[0].proposed_revision), saved: input.rows.length, invalid: input.rows.filter((row) => row.validationError).length }
   } catch (error) {
     if (source) await supabase.storage.from('inbound-source-files').remove([source.storagePath])
     throw error
   }
+}
+
+/** Explicit second stage: evidence remains non-incoming until this RPC succeeds. */
+export async function promoteInboundImportRevision(input: { revisionId: number; defaultWarehouseId: number }) {
+  const { supabase } = await getSupabaseWithUser()
+  const { data, error } = await supabase.rpc('promote_inbound_import_revision', { p_revision_id: input.revisionId, p_default_warehouse_id: input.defaultWarehouseId })
+  if (error || !data) throw new Error(error?.message ?? '입고 예정으로 전환하지 못했습니다.')
+  revalidatePath('/sourcing/arrivals')
+  return Number(data)
 }
 
 /** @deprecated The registration UI is migrated in the following phase step. */

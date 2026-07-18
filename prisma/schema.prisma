@@ -178,9 +178,11 @@ model InboundImport {
   legacyInboundDraftId BigInt? @unique @map("legacy_inbound_draft_id") @db.BigInt
   supplierId BigInt? @map("supplier_id") @db.BigInt
   sourceType String @map("source_type")
+  externalShipmentNumber String? @map("external_shipment_number")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   @@unique([id, userId])
   @@index([userId], map: "inbound_imports_user_id_idx")
+  @@index([userId, supplierId, externalShipmentNumber], map: "inbound_imports_owner_supplier_shipment_idx")
   @@map("inbound_imports")
 }
 
@@ -189,6 +191,9 @@ model InboundImportRevision {
   userId String @map("user_id") @db.Uuid
   inboundImportId BigInt @map("inbound_import_id") @db.BigInt
   revisionNumber Int @map("revision_number")
+  supersedesRevisionId BigInt? @unique @map("supersedes_revision_id") @db.BigInt
+  templateId BigInt? @map("template_id") @db.BigInt
+  templateVersionId BigInt? @map("template_version_id") @db.BigInt
   sourceFilename String? @map("source_filename")
   sourceStoragePath String? @map("source_storage_path")
   sourceFileHash String? @map("source_file_hash")
@@ -199,6 +204,7 @@ model InboundImportRevision {
   @@unique([id, userId])
   @@unique([inboundImportId, revisionNumber])
   @@index([userId, inboundImportId], map: "inbound_import_revisions_user_import_idx")
+  @@index([supersedesRevisionId], map: "inbound_import_revisions_supersedes_idx")
   @@map("inbound_import_revisions")
 }
 
@@ -209,7 +215,9 @@ model InboundImportSourceRow {
   legacyInboundDraftRowId BigInt? @unique @map("legacy_inbound_draft_row_id") @db.BigInt
   externalSku String? @map("external_sku")
   sourceRowNumber Int? @map("source_row_number")
+  sourceRowOrdinal Int? @map("source_row_ordinal")
   quantity Int?
+  rawQuantity String? @map("raw_quantity")
   sourceValues Json @default("{}") @map("source_values")
   validationError String? @map("validation_error")
   productVariantId BigInt? @map("product_variant_id") @db.BigInt
