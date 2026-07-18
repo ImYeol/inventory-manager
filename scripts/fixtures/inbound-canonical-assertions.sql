@@ -49,6 +49,58 @@ end;
 $$;
 reset role;
 
+-- Step-9 executable contract: one source/item can split 30 -> 20+10, a single
+-- receipt request can partially receive repeated rows atomically, and all
+-- variance/correction evidence remains tied to the original aggregate.
+insert into public.factory_arrivals(user_id,factory_id,reference_code,expected_date,status,source_channel,source_type,memo,supplier_name_snapshot)
+values('00000000-0000-0000-0000-000000000011',140,'STEP9-PROOF',current_date,'READY','manual','MANUAL','step9 proof','Fixture Factory') returning id as step9_arrival_id \gset
+insert into public.factory_arrival_items(user_id,factory_arrival_id,model_id,size_id,color_id,product_variant_id,ordered_quantity,received_quantity,seller_sku_snapshot)
+select '00000000-0000-0000-0000-000000000011',:step9_arrival_id,model_id,size_id,color_id,id,30,0,seller_sku from public.product_variants where id=150 returning id as step9_item1_id \gset
+insert into public.factory_arrival_items(user_id,factory_arrival_id,model_id,size_id,color_id,product_variant_id,ordered_quantity,received_quantity,seller_sku_snapshot)
+select '00000000-0000-0000-0000-000000000011',:step9_arrival_id,model_id,size_id,color_id,id,5,0,seller_sku from public.product_variants where id=150 returning id as step9_item2_id \gset
+insert into public.factory_arrival_allocations(user_id,factory_arrival_id,factory_arrival_item_id,product_variant_id,warehouse_id,allocated_quantity,warehouse_name_snapshot)
+values('00000000-0000-0000-0000-000000000011',:step9_arrival_id,:step9_item1_id,150,130,30,'Fixture one') returning id as step9_alloc1_id \gset
+insert into public.factory_arrival_allocations(user_id,factory_arrival_id,factory_arrival_item_id,product_variant_id,warehouse_id,allocated_quantity,warehouse_name_snapshot)
+values('00000000-0000-0000-0000-000000000011',:step9_arrival_id,:step9_item2_id,150,130,5,'Fixture one') returning id as step9_alloc2_id \gset
+select set_config('inbound_fixture.step9_arrival_id', :'step9_arrival_id', false), set_config('inbound_fixture.step9_item1_id', :'step9_item1_id', false), set_config('inbound_fixture.step9_item2_id', :'step9_item2_id', false), set_config('inbound_fixture.step9_alloc1_id', :'step9_alloc1_id', false), set_config('inbound_fixture.step9_alloc2_id', :'step9_alloc2_id', false);
+set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000011',false);
+do $$
+declare arrival_id bigint:=current_setting('inbound_fixture.step9_arrival_id')::bigint; item1 bigint:=current_setting('inbound_fixture.step9_item1_id')::bigint; item2 bigint:=current_setting('inbound_fixture.step9_item2_id')::bigint; alloc1 bigint:=current_setting('inbound_fixture.step9_alloc1_id')::bigint; alloc2 bigint:=current_setting('inbound_fixture.step9_alloc2_id')::bigint; alloc1_other bigint; receipt jsonb; before_tx bigint; before_stock bigint; after_first_tx bigint; after_first_stock bigint; closure_id bigint; line2 bigint; correction jsonb; failed boolean:=false;
+begin
+  perform public.replace_factory_arrival_allocations(jsonb_build_object('arrival_id',arrival_id,'item_id',item1,'allocations',jsonb_build_array(jsonb_build_object('warehouse_id',130,'quantity',20),jsonb_build_object('warehouse_id',131,'quantity',10))));
+  if (select sum(allocated_quantity) from public.factory_arrival_allocations where factory_arrival_item_id=item1)<>30 or (select count(*) from public.factory_arrival_allocations where factory_arrival_item_id=item1)<>2 then raise exception '30 to 20+10 split failed'; end if;
+  select id into alloc1_other from public.factory_arrival_allocations where factory_arrival_item_id=item1 and warehouse_id=131;
+  select count(*),coalesce(sum(quantity),0) into before_tx,before_stock from public.transactions cross join lateral (select 0) ignored where user_id=auth.uid();
+  select coalesce(sum(quantity),0) into before_stock from public.inventory where user_id=auth.uid();
+  receipt:=jsonb_build_object('arrival_id',arrival_id,'receipt_request_id','step9-receipt-1','lines',jsonb_build_array(jsonb_build_object('allocation_id',alloc1,'quantity',5,'overage_quantity',2,'overage_reason','factory excess'),jsonb_build_object('allocation_id',alloc2,'quantity',2,'overage_quantity',0,'overage_reason','')));
+  perform public.receive_factory_arrival_request(receipt);
+  select count(*) into after_first_tx from public.transactions where user_id=auth.uid(); select coalesce(sum(quantity),0) into after_first_stock from public.inventory where user_id=auth.uid();
+  if after_first_tx<>before_tx+2 or after_first_stock<>before_stock+9 then raise exception 'multi-row receipt did not post stock/transactions'; end if;
+  if (select normally_received_quantity from public.factory_arrival_allocations where id=alloc1)<>5 or (select normally_received_quantity from public.factory_arrival_allocations where id=alloc2)<>2 then raise exception 'normal receipt counters failed'; end if;
+  if (select sum(allocated_quantity-normally_received_quantity-shortage_closed_quantity) from public.factory_arrival_allocations where factory_arrival_id=arrival_id)<>28 then raise exception 'incoming remainder inflated by overage'; end if;
+  perform public.receive_factory_arrival_request(receipt);
+  if (select count(*) from public.transactions where user_id=auth.uid())<>after_first_tx or (select coalesce(sum(quantity),0) from public.inventory where user_id=auth.uid())<>after_first_stock then raise exception 'identical receipt retry duplicated stock'; end if;
+  begin perform public.receive_factory_arrival_request(jsonb_set(receipt,'{lines,0,quantity}','6'::jsonb)); exception when others then failed:=sqlerrm='receipt_request_conflict'; end; if not failed then raise exception 'changed receipt retry did not conflict'; end if; failed:=false;
+  -- The received five stay in warehouse 130; only the other 25 can move.
+  perform public.replace_factory_arrival_allocations(jsonb_build_object('arrival_id',arrival_id,'item_id',item1,'allocations',jsonb_build_array(jsonb_build_object('warehouse_id',130,'quantity',7),jsonb_build_object('warehouse_id',131,'quantity',23))));
+  if (select normally_received_quantity from public.factory_arrival_allocations where id=alloc1)<>5 or (select allocated_quantity from public.factory_arrival_allocations where id=alloc1)<>7 then raise exception 'unreceived-only reallocation failed'; end if;
+  select (public.close_factory_arrival_shortage(jsonb_build_object('allocation_id',alloc1,'quantity',2,'reason','factory shortage'))->>'closure_id')::bigint into closure_id;
+  if (select sum(allocated_quantity-normally_received_quantity-shortage_closed_quantity) from public.factory_arrival_allocations where factory_arrival_id=arrival_id)<>26 then raise exception 'shortage did not remove incoming'; end if;
+  perform public.record_factory_arrival_follow_up(jsonb_build_object('closure_id',closure_id,'warehouse_id',131,'quantity',1,'reason','late carton','receipt_request_id','step9-follow-up-1'));
+  if (select sum(allocated_quantity-normally_received_quantity-shortage_closed_quantity) from public.factory_arrival_allocations where factory_arrival_id=arrival_id)<>26 then raise exception 'follow-up inflated expected quantity'; end if;
+  if not exists(select 1 from public.factory_receipt_lines where factory_arrival_shortage_closure_id=closure_id and overage_quantity=1 and normal_quantity=0) then raise exception 'follow-up closure linkage missing'; end if;
+  select l.id into line2 from public.factory_receipt_lines l join public.factory_receipt_events e on e.id=l.factory_receipt_event_id where e.receipt_request_id='step9-receipt-1' and l.factory_arrival_item_id=item2;
+  correction:=public.reverse_factory_receipt_line(jsonb_build_object('receipt_line_id',line2,'correction_request_id','step9-correction-1','reason','wrong box'));
+  if (select normally_received_quantity from public.factory_arrival_allocations where id=alloc2)<>0 or (select received_quantity from public.factory_arrival_items where id=item2)<>0 then raise exception 'correction did not restore counters'; end if;
+  perform public.reverse_factory_receipt_line(jsonb_build_object('receipt_line_id',line2,'correction_request_id','step9-correction-1','reason','wrong box'));
+  begin perform public.reverse_factory_receipt_line(jsonb_build_object('receipt_line_id',line2,'correction_request_id','step9-correction-1','reason','changed')); exception when others then failed:=sqlerrm='correction_request_conflict'; end; if not failed then raise exception 'changed correction retry did not conflict'; end if; failed:=false;
+  before_tx:=(select count(*) from public.transactions where user_id=auth.uid()); before_stock:=(select coalesce(sum(quantity),0) from public.inventory where user_id=auth.uid());
+  begin perform public.receive_factory_arrival_request(jsonb_build_object('arrival_id',arrival_id,'receipt_request_id','step9-invalid-atomic','lines',jsonb_build_array(jsonb_build_object('allocation_id',alloc1_other,'quantity',1,'overage_quantity',0),jsonb_build_object('allocation_id',alloc2,'quantity',999,'overage_quantity',0)))); exception when others then failed:=true; end;
+  if not failed or (select count(*) from public.transactions where user_id=auth.uid())<>before_tx or (select coalesce(sum(quantity),0) from public.inventory where user_id=auth.uid())<>before_stock then raise exception 'invalid multi-row receipt was not atomic'; end if;
+end $$;
+reset role;
+
 -- Step-5/6 RPC proof: this runs after the complete migration chain, using the
 -- real authenticated boundary rather than SQL-text inspection.
 insert into public.inbound_templates(user_id,name) values ('00000000-0000-0000-0000-000000000011','RPC fixture') returning id as template_id \gset

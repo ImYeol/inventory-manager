@@ -2,7 +2,7 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "blocked",
+  "status": "pending",
   "steps": [
     {
       "step": 0,
@@ -76,8 +76,10 @@
     {
       "step": 9,
       "name": "allocation-partial-receipt-variance-and-correction",
-      "status": "blocked",
-      "started_at": "2026-07-19T06:06:07+0900"
+      "status": "completed",
+      "started_at": "2026-07-19T06:06:07+0900",
+      "completed_at": "2026-07-19T06:24:00+0900",
+      "summary": "Implemented trusted remainder-only warehouse reallocation, multi-row partial receipt with database-derived idempotency, overage and shortage evidence, closure-linked late follow-up receipts, and immutable full-line corrections with compensating transactions and latest absolute outbox targets. Added reservation/reversal serialization, owner RLS, forward/fresh-schema parity, server actions, and executable PostgreSQL proofs for 30→20+10 splits, atomic receipts, retry conflicts, incoming balances, follow-up linkage, and correction restoration. Dedicated legacy-chain and fresh schema execution, 247 tests, Prisma validation, lint, build, and diff checks pass. Final reachable workspace controls are isolated to the next integration step."
     }
   ]
 }

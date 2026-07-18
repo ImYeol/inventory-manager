@@ -275,6 +275,8 @@ model FactoryReceiptLine {
   warehouseId BigInt? @map("warehouse_id") @db.BigInt
   normalQuantity Int @default(0) @map("normal_quantity")
   overageQuantity Int @default(0) @map("overage_quantity")
+  overageReason String? @map("overage_reason")
+  factoryArrivalShortageClosureId BigInt? @map("factory_arrival_shortage_closure_id") @db.BigInt
   sellerSkuSnapshot String? @map("seller_sku_snapshot")
   productNameSnapshot String? @map("product_name_snapshot")
   optionNameSnapshot String? @map("option_name_snapshot")
@@ -306,6 +308,7 @@ model FactoryArrivalShortageClosure {
   factoryArrivalAllocationId BigInt @map("factory_arrival_allocation_id") @db.BigInt
   quantity Int
   reason String
+  actorId String @map("actor_id") @db.Uuid
   closedAt DateTime @default(now()) @map("closed_at") @db.Timestamptz(6)
   @@unique([id, userId])
   @@index([userId, factoryArrivalAllocationId])
@@ -316,9 +319,12 @@ model FactoryReceiptLineCorrection {
   id BigInt @id @default(autoincrement()) @db.BigInt
   userId String @map("user_id") @db.Uuid
   correctionRequestId String @map("correction_request_id")
+  payloadHash String @map("payload_hash")
+  immutablePayload Json @map("immutable_payload")
   factoryReceiptLineId BigInt @unique @map("factory_receipt_line_id") @db.BigInt
   reason String
-  transactionId BigInt? @map("transaction_id") @db.BigInt
+  actorId String @map("actor_id") @db.Uuid
+  transactionId BigInt @map("transaction_id") @db.BigInt
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   @@unique([userId, correctionRequestId])
   @@unique([id, userId])
