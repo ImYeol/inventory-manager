@@ -145,6 +145,7 @@ export async function saveInboundTemplateDraft(input: {
     if (error || !data?.[0]) throw new Error(error?.message ?? '입고 증빙을 저장하지 못했습니다.')
     const id = Number(data[0].revision_id)
     revalidatePath('/sourcing/arrivals')
+    revalidatePath('/inventory')
     return { success: true, id, importId: Number(data[0].inbound_import_id), proposedRevision: Boolean(data[0].proposed_revision), saved: input.rows.length, invalid: input.rows.filter((row) => row.validationError).length }
   } catch (error) {
     if (source) await supabase.storage.from('inbound-source-files').remove([source.storagePath])
@@ -158,6 +159,7 @@ export async function promoteInboundImportRevision(input: { revisionId: number; 
   const { data, error } = await supabase.rpc('promote_inbound_import_revision', { p_revision_id: input.revisionId, p_default_warehouse_id: input.defaultWarehouseId })
   if (error || !data) throw new Error(error?.message ?? '입고 예정으로 전환하지 못했습니다.')
   revalidatePath('/sourcing/arrivals')
+  revalidatePath('/inventory')
   return Number(data)
 }
 

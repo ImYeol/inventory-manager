@@ -104,6 +104,8 @@ type FactoryArrivalItemRow = {
   received_quantity: number
   created_at: string
   updated_at: string
+  inbound_import_source_row_id?: number | null
+  external_sku_snapshot?: string | null
 }
 
 export type CatalogModel = {
@@ -212,6 +214,12 @@ export type FactoryArrivalData = {
   totalOrderedQuantity: number
   totalReceivedQuantity: number
   remainingQuantity: number
+  shortageClosures: Array<{ id: number; allocationId: number; quantity: number; reason: string; closedAt: string }>
+  receiptLines: Array<{
+    id: number; eventId: number; itemId: number | null; allocationId: number | null; warehouseId: number | null
+    receivedQuantity: number; normalQuantity: number; overageQuantity: number; overageReason: string | null
+    shortageClosureId: number | null; createdAt: string; corrected: boolean
+  }>
   items: Array<{
     id: number
     modelId: number
@@ -224,6 +232,12 @@ export type FactoryArrivalData = {
     orderedQuantity: number
     receivedQuantity: number
     remainingQuantity: number
+    sourceRowNumber: number | null
+    externalSku: string | null
+    allocations: Array<{
+      id: number; warehouseId: number; warehouseName: string; allocatedQuantity: number
+      normallyReceivedQuantity: number; shortageClosedQuantity: number; remainingQuantity: number
+    }>
   }>
 }
 
@@ -455,8 +469,10 @@ export type ProductWorkspaceVariant = {
   sellerSku: string
   onHand: number
   committed: number
+  committedByWarehouse: Record<number, number>
   available: number
   incoming: number
+  incomingByWarehouse: Record<number, number>
 }
 
 export type ProductWorkspaceChannelRef = {
@@ -490,10 +506,10 @@ export async function getProductWorkspaceData(): Promise<{
     supabase.from('sizes').select('id, name'),
     supabase.from('colors').select('id, name'),
     supabase.from('inventory').select('model_id, size_id, color_id, quantity'),
-    supabase.from('inventory_reservations').select('product_variant_id, quantity').eq('status', 'active'),
+    supabase.from('inventory_reservations').select('product_variant_id, warehouse_id, quantity').eq('status', 'active'),
     supabase.from('channel_product_refs').select('id, variant_id, channel, external_product_id, external_variant_id, product_name, option_name, seller_sku, listing_status, channel_attributes, channel_reported, last_synced_at, last_sync_error, sync_target_quantity, sync_status, verification_status'),
     supabase.from('factory_arrivals').select('id, status'),
-    supabase.from('factory_arrival_allocations').select('factory_arrival_id, product_variant_id, allocated_quantity, normally_received_quantity, shortage_closed_quantity'),
+    supabase.from('factory_arrival_allocations').select('factory_arrival_id, product_variant_id, warehouse_id, allocated_quantity, normally_received_quantity, shortage_closed_quantity'),
   ])
   if ([variantsRes, reservationsRes, refsRes].some((response) => isMissingSchemaError(response.error))) {
     return { variants: [], channelProductRefs: [] }
@@ -510,9 +526,12 @@ export async function getProductWorkspaceData(): Promise<{
     onHand.set(key, (onHand.get(key) ?? 0) + row.quantity)
   }
   const committed = new Map<number, number>()
+  const committedByVariantWarehouse = new Map<string, number>()
   for (const row of reservationsRes.data ?? []) {
     const id = Number(row.product_variant_id)
     committed.set(id, (committed.get(id) ?? 0) + row.quantity)
+    const warehouseKey = `${id}:${Number(row.warehouse_id)}`
+    committedByVariantWarehouse.set(warehouseKey, (committedByVariantWarehouse.get(warehouseKey) ?? 0) + row.quantity)
   }
   const openArrivalIds = new Set(
     (arrivalsRes.data ?? [])
@@ -520,12 +539,16 @@ export async function getProductWorkspaceData(): Promise<{
       .map((arrival) => Number(arrival.id)),
   )
   const incoming = new Map<string, number>()
+  const incomingByVariantWarehouse = new Map<string, number>()
   const variantKey = new Map((variantsRes.data ?? []).map((variant) => [Number(variant.id), `${variant.model_id}:${variant.size_id}:${variant.color_id}`]))
   for (const item of allocationsRes.data ?? []) {
     if (!openArrivalIds.has(Number(item.factory_arrival_id))) continue
     const key = variantKey.get(Number(item.product_variant_id))
     if (!key) continue
-    incoming.set(key, (incoming.get(key) ?? 0) + allocationRemainder({ allocatedQuantity: Number(item.allocated_quantity), normallyReceivedQuantity: Number(item.normally_received_quantity), shortageClosedQuantity: Number(item.shortage_closed_quantity) }))
+    const remainder = allocationRemainder({ allocatedQuantity: Number(item.allocated_quantity), normallyReceivedQuantity: Number(item.normally_received_quantity), shortageClosedQuantity: Number(item.shortage_closed_quantity) })
+    incoming.set(key, (incoming.get(key) ?? 0) + remainder)
+    const warehouseKey = `${Number(item.product_variant_id)}:${Number(item.warehouse_id)}`
+    incomingByVariantWarehouse.set(warehouseKey, (incomingByVariantWarehouse.get(warehouseKey) ?? 0) + remainder)
   }
   const variants = (variantsRes.data ?? []).map((row) => ({
     id: Number(row.id),
@@ -538,8 +561,10 @@ export async function getProductWorkspaceData(): Promise<{
     sellerSku: row.seller_sku,
     onHand: onHand.get(`${row.model_id}:${row.size_id}:${row.color_id}`) ?? 0,
     committed: committed.get(Number(row.id)) ?? 0,
+    committedByWarehouse: Object.fromEntries(Array.from(committedByVariantWarehouse.entries()).filter(([key]) => key.startsWith(`${Number(row.id)}:`)).map(([key, quantity]) => [Number(key.split(':')[1]), quantity])),
     available: (onHand.get(`${row.model_id}:${row.size_id}:${row.color_id}`) ?? 0) - (committed.get(Number(row.id)) ?? 0),
     incoming: incoming.get(`${row.model_id}:${row.size_id}:${row.color_id}`) ?? 0,
+    incomingByWarehouse: Object.fromEntries(Array.from(incomingByVariantWarehouse.entries()).filter(([key]) => key.startsWith(`${Number(row.id)}:`)).map(([key, quantity]) => [Number(key.split(':')[1]), quantity])),
   }))
   const channelProductRefs = (refsRes.data ?? []).map((row) => {
     const attributes = (row.channel_attributes ?? {}) as { imageUrl?: unknown; price?: unknown }
@@ -768,7 +793,7 @@ export async function getFactoriesData(): Promise<FactoriesDataResult> {
 
 export async function getFactoryArrivalsData(): Promise<FactoryArrivalsDataResult> {
   const { supabase } = await getSupabaseWithUser()
-  const [factoriesRes, arrivalsRes, arrivalItemsRes, modelsRes, sizesRes, colorsRes] = await Promise.all([
+  const [factoriesRes, arrivalsRes, arrivalItemsRes, sourceRowsRes, allocationsRes, receiptEventsRes, receiptLinesRes, closuresRes, correctionsRes, modelsRes, sizesRes, colorsRes] = await Promise.all([
     supabase.from('factories').select('id, name'),
     supabase
       .from('factory_arrivals')
@@ -777,13 +802,19 @@ export async function getFactoryArrivalsData(): Promise<FactoryArrivalsDataResul
       .order('created_at', { ascending: false }),
     supabase
       .from('factory_arrival_items')
-      .select('id, factory_arrival_id, model_id, size_id, color_id, ordered_quantity, received_quantity, created_at, updated_at'),
+      .select('id, factory_arrival_id, model_id, size_id, color_id, ordered_quantity, received_quantity, inbound_import_source_row_id, external_sku_snapshot, created_at, updated_at'),
+    supabase.from('inbound_import_source_rows').select('id, source_row_number, source_row_ordinal'),
+    supabase.from('factory_arrival_allocations').select('id, factory_arrival_id, factory_arrival_item_id, warehouse_id, allocated_quantity, normally_received_quantity, shortage_closed_quantity, warehouse_name_snapshot'),
+    supabase.from('factory_receipt_events').select('id, factory_arrival_id, receipt_request_id, event_kind'),
+    supabase.from('factory_receipt_lines').select('id, factory_receipt_event_id, factory_arrival_allocation_id, factory_arrival_item_id, warehouse_id, received_quantity, normal_quantity, overage_quantity, overage_reason, factory_arrival_shortage_closure_id, created_at'),
+    supabase.from('factory_arrival_shortage_closures').select('id, factory_arrival_allocation_id, quantity, reason, closed_at'),
+    supabase.from('factory_receipt_line_corrections').select('id, factory_receipt_line_id'),
     supabase.from('models').select('id, name'),
     supabase.from('sizes').select('id, name'),
     supabase.from('colors').select('id, name, rgb_code'),
   ])
 
-  const schemaState = getSourcingSchemaState([factoriesRes.error, arrivalsRes.error, arrivalItemsRes.error])
+  const schemaState = getSourcingSchemaState([factoriesRes.error, arrivalsRes.error, arrivalItemsRes.error, sourceRowsRes.error, allocationsRes.error, receiptEventsRes.error, receiptLinesRes.error, closuresRes.error, correctionsRes.error])
 
   if (schemaState.status === 'missing') {
     return {
@@ -795,6 +826,12 @@ export async function getFactoryArrivalsData(): Promise<FactoryArrivalsDataResul
   const factories = ensure(factoriesRes.data as Array<{ id: number; name: string }> | null, factoriesRes.error)
   const arrivals = ensure(arrivalsRes.data as FactoryArrivalRow[] | null, arrivalsRes.error)
   const arrivalItems = ensure(arrivalItemsRes.data as FactoryArrivalItemRow[] | null, arrivalItemsRes.error)
+  const sourceRows = new Map(ensure(sourceRowsRes.data as Array<{ id: number; source_row_number: number | null; source_row_ordinal: number | null }> | null, sourceRowsRes.error).map((row) => [Number(row.id), row]))
+  const allocations = ensure(allocationsRes.data as Array<{ id: number; factory_arrival_id: number; factory_arrival_item_id: number; warehouse_id: number; allocated_quantity: number; normally_received_quantity: number; shortage_closed_quantity: number; warehouse_name_snapshot: string | null }> | null, allocationsRes.error)
+  const receiptEvents = ensure(receiptEventsRes.data as Array<{ id: number; factory_arrival_id: number }> | null, receiptEventsRes.error)
+  const receiptLines = ensure(receiptLinesRes.data as Array<{ id: number; factory_receipt_event_id: number; factory_arrival_allocation_id: number | null; factory_arrival_item_id: number | null; warehouse_id: number | null; received_quantity: number; normal_quantity: number; overage_quantity: number; overage_reason: string | null; factory_arrival_shortage_closure_id: number | null; created_at: string }> | null, receiptLinesRes.error)
+  const closures = ensure(closuresRes.data as Array<{ id: number; factory_arrival_allocation_id: number; quantity: number; reason: string; closed_at: string }> | null, closuresRes.error)
+  const correctedLineIds = new Set(ensure(correctionsRes.data as Array<{ factory_receipt_line_id: number }> | null, correctionsRes.error).map((row) => Number(row.factory_receipt_line_id)))
   const models = ensure(modelsRes.data as Array<{ id: number; name: string }> | null, modelsRes.error)
   const sizes = ensure(sizesRes.data as Array<{ id: number; name: string }> | null, sizesRes.error)
   const colors = ensure(colorsRes.data as Array<{ id: number; name: string; rgb_code: string }> | null, colorsRes.error)
@@ -809,7 +846,13 @@ export async function getFactoryArrivalsData(): Promise<FactoryArrivalsDataResul
     arrivals: arrivals.map((arrival) => {
       const items = arrivalItems
         .filter((item) => item.factory_arrival_id === arrival.id)
-        .map((item) => ({
+        .map((item) => {
+        const itemAllocations = allocations.filter((allocation) => allocation.factory_arrival_item_id === item.id).map((allocation) => ({
+          id: Number(allocation.id), warehouseId: Number(allocation.warehouse_id), warehouseName: allocation.warehouse_name_snapshot ?? `창고 #${allocation.warehouse_id}`,
+          allocatedQuantity: Number(allocation.allocated_quantity), normallyReceivedQuantity: Number(allocation.normally_received_quantity), shortageClosedQuantity: Number(allocation.shortage_closed_quantity),
+          remainingQuantity: allocationRemainder({ allocatedQuantity: Number(allocation.allocated_quantity), normallyReceivedQuantity: Number(allocation.normally_received_quantity), shortageClosedQuantity: Number(allocation.shortage_closed_quantity) }),
+        }))
+        return ({
         id: item.id,
         modelId: item.model_id,
         modelName: modelMap.get(item.model_id) ?? '',
@@ -820,8 +863,11 @@ export async function getFactoryArrivalsData(): Promise<FactoryArrivalsDataResul
         colorRgb: colorMap.get(item.color_id)?.rgb_code ?? '#888888',
         orderedQuantity: item.ordered_quantity,
         receivedQuantity: item.received_quantity,
-        remainingQuantity: Math.max(item.ordered_quantity - item.received_quantity, 0),
-      }))
+        remainingQuantity: itemAllocations.reduce((sum, allocation) => sum + allocation.remainingQuantity, 0),
+        sourceRowNumber: item.inbound_import_source_row_id == null ? null : Number(sourceRows.get(Number(item.inbound_import_source_row_id))?.source_row_number ?? sourceRows.get(Number(item.inbound_import_source_row_id))?.source_row_ordinal ?? 0) || null,
+        externalSku: item.external_sku_snapshot ?? null,
+        allocations: itemAllocations,
+      })})
 
     const totalOrderedQuantity = items.reduce((sum, item) => sum + item.orderedQuantity, 0)
     const totalReceivedQuantity = items.reduce((sum, item) => sum + item.receivedQuantity, 0)
@@ -839,7 +885,11 @@ export async function getFactoryArrivalsData(): Promise<FactoryArrivalsDataResul
       updatedAt: arrival.updated_at,
       totalOrderedQuantity,
       totalReceivedQuantity,
-      remainingQuantity: Math.max(totalOrderedQuantity - totalReceivedQuantity, 0),
+      remainingQuantity: items.reduce((sum, item) => sum + item.remainingQuantity, 0),
+      shortageClosures: closures.filter((closure) => allocations.some((allocation) => allocation.factory_arrival_id === arrival.id && allocation.id === closure.factory_arrival_allocation_id)).map((closure) => ({ id: Number(closure.id), allocationId: Number(closure.factory_arrival_allocation_id), quantity: Number(closure.quantity), reason: closure.reason, closedAt: closure.closed_at })),
+      receiptLines: receiptLines.filter((line) => receiptEvents.some((event) => event.factory_arrival_id === arrival.id && event.id === line.factory_receipt_event_id)).map((line) => ({
+        id: Number(line.id), eventId: Number(line.factory_receipt_event_id), itemId: line.factory_arrival_item_id === null ? null : Number(line.factory_arrival_item_id), allocationId: line.factory_arrival_allocation_id === null ? null : Number(line.factory_arrival_allocation_id), warehouseId: line.warehouse_id === null ? null : Number(line.warehouse_id), receivedQuantity: Number(line.received_quantity), normalQuantity: Number(line.normal_quantity), overageQuantity: Number(line.overage_quantity), overageReason: line.overage_reason, shortageClosureId: line.factory_arrival_shortage_closure_id === null ? null : Number(line.factory_arrival_shortage_closure_id), createdAt: line.created_at, corrected: correctedLineIds.has(Number(line.id)),
+      })),
       items,
     }
     }),

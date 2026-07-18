@@ -69,20 +69,20 @@ describe('Supabase data mappers', () => {
       sizes: { data: [{ id: 10, name: 'S' }], error: null },
       colors: { data: [{ id: 20, name: '네이비' }], error: null },
       inventory: { data: [{ model_id: 1, size_id: 10, color_id: 20, quantity: 3 }], error: null },
-      inventory_reservations: { data: [], error: null },
+      inventory_reservations: { data: [{ product_variant_id: 9, warehouse_id: 3, quantity: 1 }], error: null },
       channel_product_refs: { data: [], error: null },
       factory_arrivals: { data: [{ id: 7, status: 'READY' }, { id: 8, status: 'RECEIVED' }], error: null },
       factory_arrival_allocations: {
         data: [
-          { factory_arrival_id: 7, product_variant_id: 9, allocated_quantity: 12, normally_received_quantity: 5, shortage_closed_quantity: 2 },
-          { factory_arrival_id: 8, product_variant_id: 9, allocated_quantity: 99, normally_received_quantity: 0, shortage_closed_quantity: 0 },
+          { factory_arrival_id: 7, product_variant_id: 9, warehouse_id: 3, allocated_quantity: 12, normally_received_quantity: 5, shortage_closed_quantity: 2 },
+          { factory_arrival_id: 8, product_variant_id: 9, warehouse_id: 3, allocated_quantity: 99, normally_received_quantity: 0, shortage_closed_quantity: 0 },
         ], error: null,
       },
     })
     mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
 
     await expect(getProductWorkspaceData()).resolves.toMatchObject({
-      variants: [{ id: 9, incoming: 5, onHand: 3, available: 3 }],
+      variants: [{ id: 9, committed: 1, committedByWarehouse: { 3: 1 }, incoming: 5, incomingByWarehouse: { 3: 5 }, onHand: 3, available: 2 }],
     })
     expect(supabase.from).not.toHaveBeenCalledWith('inbound_draft_rows')
     expect(supabase.from).not.toHaveBeenCalledWith('inbound_import_source_rows')
@@ -507,6 +507,12 @@ describe('Supabase data mappers', () => {
         ],
         error: null,
       },
+      inbound_import_source_rows: { data: [], error: null },
+      factory_arrival_allocations: { data: [{ id: 501, factory_arrival_id: 10, factory_arrival_item_id: 100, warehouse_id: 7, allocated_quantity: 12, normally_received_quantity: 3, shortage_closed_quantity: 2, warehouse_name_snapshot: '오금동' }], error: null },
+      factory_receipt_events: { data: [], error: null },
+      factory_receipt_lines: { data: [], error: null },
+      factory_arrival_shortage_closures: { data: [{ id: 601, factory_arrival_allocation_id: 501, quantity: 2, reason: '미발송', closed_at: '2026-04-21T00:00:00.000Z' }], error: null },
+      factory_receipt_line_corrections: { data: [], error: null },
       models: { data: [{ id: 1, name: 'LP01' }], error: null },
       sizes: { data: [{ id: 10, name: 'S' }], error: null },
       colors: { data: [{ id: 20, name: '네이비', rgb_code: '#0f172a' }], error: null },
@@ -563,7 +569,9 @@ describe('Supabase data mappers', () => {
           updatedAt: '2026-04-19T00:00:00.000Z',
           totalOrderedQuantity: 12,
           totalReceivedQuantity: 0,
-          remainingQuantity: 12,
+          remainingQuantity: 7,
+          shortageClosures: [{ id: 601, allocationId: 501, quantity: 2, reason: '미발송', closedAt: '2026-04-21T00:00:00.000Z' }],
+          receiptLines: [],
           items: [
             {
               id: 100,
@@ -576,7 +584,10 @@ describe('Supabase data mappers', () => {
               colorRgb: '#0f172a',
               orderedQuantity: 12,
               receivedQuantity: 0,
-              remainingQuantity: 12,
+              remainingQuantity: 7,
+              sourceRowNumber: null,
+              externalSku: null,
+              allocations: [{ id: 501, warehouseId: 7, warehouseName: '오금동', allocatedQuantity: 12, normallyReceivedQuantity: 3, shortageClosedQuantity: 2, remainingQuantity: 7 }],
             },
           ],
         },
@@ -590,6 +601,12 @@ describe('Supabase data mappers', () => {
       factories: { data: null, error: missingTableError },
       factory_arrivals: { data: null, error: missingTableError },
       factory_arrival_items: { data: null, error: missingTableError },
+      inbound_import_source_rows: { data: null, error: missingTableError },
+      factory_arrival_allocations: { data: null, error: missingTableError },
+      factory_receipt_events: { data: null, error: missingTableError },
+      factory_receipt_lines: { data: null, error: missingTableError },
+      factory_arrival_shortage_closures: { data: null, error: missingTableError },
+      factory_receipt_line_corrections: { data: null, error: missingTableError },
       models: { data: [{ id: 1, name: 'LP01' }], error: null },
       sizes: { data: [{ id: 10, name: 'S' }], error: null },
       colors: { data: [{ id: 20, name: '네이비', rgb_code: '#0f172a' }], error: null },

@@ -3,6 +3,12 @@ import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 
+const navigation = vi.hoisted(() => ({ refresh: vi.fn() }))
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: navigation.refresh }),
+}))
+
 vi.mock('next/link', () => ({
   default: ({
     href,
@@ -197,6 +203,28 @@ describe('InventoryWorkspace', () => {
     expect(screen.getByText('조회 조건에 맞는 재고가 없습니다.')).toBeTruthy()
     expect(screen.queryByText('운영 SKU')).toBeNull()
     expect(screen.queryByText('주의 항목')).toBeNull()
+  })
+
+  it('renders warehouse-specific incoming stock before an inventory row exists', () => {
+    render(
+      React.createElement(InventoryWorkspace, {
+        warehouses: [{ id: 1, name: '오금동' }],
+        models: [{
+          id: 1,
+          name: 'LP01',
+          sizes: [{ id: 11, name: 'S', sortOrder: 1, modelId: 1 }],
+          colors: [{ id: 21, name: '네이비', rgbCode: '#111111', textWhite: true, sortOrder: 1, modelId: 1 }],
+          inventory: [],
+        }],
+        transactions: [],
+        variants: [{ id: 501, modelId: 1, sizeId: 11, colorId: 21 }],
+        incomingByVariant: { '1:11:21:1': 7 },
+      }),
+    )
+
+    expect(screen.getByText('오금동')).toBeTruthy()
+    expect(screen.getAllByText('0').length).toBeGreaterThan(0)
+    expect(screen.getByRole('link', { name: '7' }).getAttribute('href')).toBe('/sourcing/arrivals')
   })
 
   it('summarizes explicit channel mappings in the SKU cell and distinguishes sync errors from unmapped SKUs', () => {

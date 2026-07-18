@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from 'react'
+import Link from 'next/link'
 import { motion, type Variants } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { ui } from '@/app/components/ui'
@@ -27,6 +28,7 @@ export type InventoryDataRow = {
   committed: number
   available: number
   incoming: number
+  incomingHref?: string
   status: {
     label: string
     variant: InventoryStatusVariant
@@ -102,7 +104,7 @@ export function InventoryDataTable({
                   )}
                   {visibleColumns.has('committed') && <TableCell className="text-right">{row.committed}</TableCell>}
                   {visibleColumns.has('available') && <TableCell className="text-right">{row.available}</TableCell>}
-                  {visibleColumns.has('incoming') && <TableCell className="text-right">{row.incoming}</TableCell>}
+                  {visibleColumns.has('incoming') && <TableCell className="text-right">{row.incomingHref && row.incoming > 0 ? <Link href={row.incomingHref} className="font-medium text-[color:var(--primary)] underline-offset-4 hover:underline" aria-label={`입고 예정 ${row.incoming}개 보기`}>{row.incoming}</Link> : row.incoming}</TableCell>}
                   {visibleColumns.has('status') && (
                     <TableCell>
                       <StatusBadge tone={row.status.variant}>

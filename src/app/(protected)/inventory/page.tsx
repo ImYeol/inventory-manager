@@ -20,9 +20,10 @@ export default async function InventoryPage() {
     channelProductRefs={workspace.channelProductRefs}
     suppliers={factories.filter((factory) => factory.isActive).map((factory) => ({ id: factory.id, name: factory.name }))}
     inboundTemplates={inboundTemplates}
-    incomingByVariant={Object.fromEntries(workspace.variants.map((variant) => [
-      `${variant.modelId}:${variant.sizeId}:${variant.colorId}`,
-      variant.incoming,
-    ]))}
+    committedByVariant={Object.fromEntries(workspace.variants.flatMap((variant) => Object.entries(variant.committedByWarehouse ?? {}).map(([warehouseId, quantity]) => [`${variant.modelId}:${variant.sizeId}:${variant.colorId}:${warehouseId}`, quantity])))}
+    incomingByVariant={Object.fromEntries(workspace.variants.flatMap((variant) => Object.entries(variant.incomingByWarehouse ?? {}).map(([warehouseId, quantity]) => [
+      `${variant.modelId}:${variant.sizeId}:${variant.colorId}:${warehouseId}`,
+      quantity,
+    ])))}
   />
 }

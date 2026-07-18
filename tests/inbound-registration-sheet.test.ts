@@ -10,13 +10,14 @@ const mocks = vi.hoisted(() => ({
   createInboundTemplateVersion: vi.fn(),
   promoteInboundImportRevision: vi.fn(),
   confirmSupplierSkuMapping: vi.fn(),
+  refresh: vi.fn(),
 }))
 
 vi.mock('@/lib/actions/inbound-import', () => mocks)
 vi.mock('@/lib/actions/supplier-sku-mapping', () => ({ confirmSupplierSkuMapping: mocks.confirmSupplierSkuMapping }))
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ refresh: mocks.refresh }),
 }))
 
 import InboundRegistrationSheet from '@/app/components/inventory/InboundRegistrationSheet'
@@ -95,5 +96,17 @@ describe('InboundRegistrationSheet', () => {
     fireEvent.click(screen.getByRole('button', { name: '템플릿 만들기' }))
     expect(screen.getByRole('dialog', { name: '입고 템플릿 만들기' })).toBeTruthy()
     expect(screen.getByLabelText('샘플 파일')).toBeTruthy()
+  })
+
+  it('keeps the upload draft open while a missing SKU is created in product management', () => {
+    render(React.createElement(InboundRegistrationSheet, {
+      suppliers: [{ id: 4, name: '한빛 공장' }], warehouses: [{ id: 2, name: '대자동' }], templates,
+    }))
+
+    const productLink = screen.getByRole('link', { name: '상품 관리에서 SKU 만들기' })
+    expect(productLink.getAttribute('target')).toBe('_blank')
+    expect(productLink.getAttribute('href')).toContain('returnTo=%2Finventory')
+    fireEvent.click(screen.getByRole('button', { name: '상품 목록 새로고침' }))
+    expect(mocks.refresh).toHaveBeenCalledTimes(1)
   })
 })

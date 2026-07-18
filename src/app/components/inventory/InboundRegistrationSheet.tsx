@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { FileUp } from 'lucide-react'
 import { createInboundTemplateVersion, inspectInboundTemplateSample, previewInboundTemplateFile, promoteInboundImportRevision, saveInboundTemplateDraft, type InboundFilePreview, type InboundTemplateSample } from '@/lib/actions/inbound-import'
 import { confirmSupplierSkuMapping } from '@/lib/actions/supplier-sku-mapping'
@@ -42,6 +43,7 @@ export default function InboundRegistrationSheet({
   productVariants?: ProductVariantOption[]
   onSaved?: (draftId: number) => void
 }) {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const inputRef = useRef<HTMLInputElement>(null)
   const [supplierId, setSupplierId] = useState('')
@@ -223,7 +225,7 @@ export default function InboundRegistrationSheet({
         }}
       />
 
-      {rows.some((row) => !row.productVariantId) ? <a href="/products" className="text-sm text-[color:var(--link)] underline underline-offset-4">상품 관리에서 SKU 만들기</a> : null}
+      {rows.some((row) => !row.productVariantId) ? <div className="flex items-center gap-3"><a href="/products?returnTo=%2Finventory" target="_blank" rel="noreferrer" className="text-sm text-[color:var(--link)] underline underline-offset-4">상품 관리에서 SKU 만들기</a><Button type="button" variant="secondary" size="sm" onClick={() => router.refresh()}>상품 목록 새로고침</Button></div> : null}
 
       {message ? <p role="alert" className="text-sm text-[color:var(--muted)]">{message}</p> : null}
       {savedRevisionId ? <div className="flex items-end justify-between gap-3 border-t border-[color:var(--border)] pt-[var(--space-4)]"><div><p className="text-sm font-medium text-[color:var(--foreground)]">2단계 · 입고 예정 전환</p><p className="text-sm text-[color:var(--muted)]">기본 창고 하나로 입고 예정 수량을 만듭니다.</p></div><label className="space-y-1"><span className={ui.label}>입고 창고</span><Select value={warehouseId || EMPTY_VALUE} onValueChange={(value) => setWarehouseId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="입고 창고"><SelectValue placeholder="창고 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>창고 선택</SelectItem>{warehouses.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></label><Button type="button" disabled={isPending || !warehouseId} onClick={promote}>입고 예정 전환</Button></div> : <div className="flex justify-end"><Button type="button" disabled={isPending || rows.some((row) => Boolean(row.validationError) || !row.productVariantId)} onClick={saveDraft}>검토 저장</Button></div>}

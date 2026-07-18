@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import HistoryView, { type HistoryFilterState } from '@/app/(protected)/history/HistoryView'
 import InOutForm from '@/app/(protected)/inout/InOutForm'
 import InboundRegistrationSheet, { type InboundTemplateOption } from '@/app/components/inventory/InboundRegistrationSheet'
@@ -126,6 +127,7 @@ export default function InventoryWorkspace({
   suppliers?: WarehouseLookup[]
   inboundTemplates?: InboundTemplateOption[]
 }) {
+  const router = useRouter()
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | 'all'>('all')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'normal' | 'warning' | 'danger'>('all')
@@ -185,22 +187,28 @@ export default function InventoryWorkspace({
     return models.flatMap((model) =>
       model.colors.flatMap((color) =>
         model.sizes.flatMap((size): InventoryOverviewRow[] => {
-          return model.inventory
-            .filter((item) => item.colorId === color.id && item.sizeId === size.id)
-            .map((item) => {
+          const variantId = `${model.id}:${size.id}:${color.id}`
+          const mappedVariant = variantsByInventoryKey.get(variantId)
+          const matchingInventory = model.inventory.filter((candidate) => candidate.colorId === color.id && candidate.sizeId === size.id)
+          const rowWarehouses = mappedVariant
+            ? warehouses
+            : warehouses.filter((warehouse) => matchingInventory.some((item) => item.warehouseId === warehouse.id))
+
+          return rowWarehouses.map((warehouse) => {
+              const item = matchingInventory.find((candidate) => candidate.warehouseId === warehouse.id)
               const variantId = `${model.id}:${size.id}:${color.id}`
-              const committed = committedByVariant[variantId] ?? 0
-              const onHand = item.quantity
+              const committed = committedByVariant[`${variantId}:${warehouse.id}`] ?? 0
+              const incoming = incomingByVariant[`${variantId}:${warehouse.id}`] ?? 0
+              const onHand = item?.quantity ?? 0
               const available = onHand - committed
               const status = inventoryStatus(available)
-              const mappedVariant = variantsByInventoryKey.get(variantId)
               const channelRefs = mappedVariant ? channelRefsByVariantId.get(mappedVariant.id) ?? [] : []
               const naverCount = channelRefs.filter((ref) => ref.channel === 'naver').length
               const coupangCount = channelRefs.filter((ref) => ref.channel === 'coupang').length
               const syncErrorRefs = channelRefs.filter((ref) => ref.lastSyncError !== null || ref.listingStatus === 'sync-error')
 
               return {
-                key: `${item.id}`,
+                key: `${variantId}:${warehouse.id}`,
                 modelName: model.name,
                 skuOption: (
                   <div className="space-y-1 text-[color:var(--muted)]">
@@ -225,12 +233,13 @@ export default function InventoryWorkspace({
                     )}
                   </div>
                 ),
-                warehouseName: item.warehouseName,
-                warehouseId: item.warehouseId,
+                warehouseName: warehouse.name,
+                warehouseId: warehouse.id,
                 onHand,
                 committed,
                 available,
-                incoming: incomingByVariant[variantId] ?? 0,
+                incoming,
+                incomingHref: incoming > 0 ? '/sourcing/arrivals' : undefined,
                 status: {
                   label: status.label,
                   variant: status.tone,
@@ -241,7 +250,7 @@ export default function InventoryWorkspace({
         }),
       ),
     )
-  }, [channelRefsByVariantId, committedByVariant, incomingByVariant, models, variantsByInventoryKey])
+  }, [channelRefsByVariantId, committedByVariant, incomingByVariant, models, variantsByInventoryKey, warehouses])
 
   const filteredRows = useMemo(() => {
     return overviewRows.filter((row) => {
@@ -329,7 +338,7 @@ export default function InventoryWorkspace({
           templates={inboundTemplates}
           productVariants={inboundProductVariants}
           initialWarehouseId={typeof selectedWarehouseId === 'number' ? selectedWarehouseId : undefined}
-          onSaved={() => setOverlayMode(null)}
+          onSaved={() => { setOverlayMode(null); router.refresh() }}
         /> : overlayMode === 'transfer' ? <WarehouseTransferForm
           models={normalizedModels}
           warehouses={warehouses}
