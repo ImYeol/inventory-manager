@@ -161,10 +161,10 @@ model FactoryArrivalItem {
   optionNameSnapshot String?      @map("option_name_snapshot")
   createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime       @default(now()) @map("updated_at") @db.Timestamptz(6)
-  arrival          FactoryArrival @relation(fields: [factoryArrivalId, userId], references: [id, userId], onDelete: Cascade)
-  model            Model?         @relation(fields: [modelId, userId], references: [id, userId], onDelete: Cascade)
-  size             Size?          @relation(fields: [modelId, sizeId, userId], references: [modelId, id, userId], onDelete: Cascade)
-  color            Color?         @relation(fields: [modelId, colorId, userId], references: [modelId, id, userId], onDelete: Cascade)
+  arrival          FactoryArrival @relation(fields: [factoryArrivalId, userId], references: [id, userId], onDelete: Restrict)
+  model            Model?         @relation(fields: [modelId, userId], references: [id, userId], onDelete: Restrict)
+  size             Size?          @relation(fields: [modelId, sizeId, userId], references: [modelId, id, userId], onDelete: Restrict)
+  color            Color?         @relation(fields: [modelId, colorId, userId], references: [modelId, id, userId], onDelete: Restrict)
 
   @@index([factoryArrivalId, userId], map: "factory_arrival_items_arrival_id_user_id_idx")
   @@unique([id, userId])
@@ -190,6 +190,11 @@ model InboundImportRevision {
   inboundImportId BigInt @map("inbound_import_id") @db.BigInt
   revisionNumber Int @map("revision_number")
   sourceFilename String? @map("source_filename")
+  sourceStoragePath String? @map("source_storage_path")
+  sourceFileHash String? @map("source_file_hash")
+  sourceSheetName String? @map("source_sheet_name")
+  sourceHeaderRowNumber Int? @map("source_header_row_number")
+  sourceHeaders Json @default("{}") @map("source_headers")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   @@unique([id, userId])
   @@unique([inboundImportId, revisionNumber])
@@ -203,7 +208,10 @@ model InboundImportSourceRow {
   inboundImportRevisionId BigInt @map("inbound_import_revision_id") @db.BigInt
   legacyInboundDraftRowId BigInt? @unique @map("legacy_inbound_draft_row_id") @db.BigInt
   externalSku String? @map("external_sku")
+  sourceRowNumber Int? @map("source_row_number")
   quantity Int?
+  sourceValues Json @default("{}") @map("source_values")
+  validationError String? @map("validation_error")
   productVariantId BigInt? @map("product_variant_id") @db.BigInt
   sellerSkuSnapshot String? @map("seller_sku_snapshot")
   productNameSnapshot String? @map("product_name_snapshot")
@@ -226,6 +234,8 @@ model FactoryArrivalAllocation {
   normallyReceivedQuantity Int @default(0) @map("normally_received_quantity")
   shortageClosedQuantity Int @default(0) @map("shortage_closed_quantity")
   warehouseNameSnapshot String? @map("warehouse_name_snapshot")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
   @@unique([id, userId])
   @@index([userId, factoryArrivalId], map: "factory_arrival_allocations_user_arrival_idx")
   @@index([userId, productVariantId, warehouseId], map: "factory_arrival_allocations_user_variant_warehouse_idx")
@@ -239,6 +249,7 @@ model FactoryReceiptEvent {
   eventKind String @map("event_kind")
   receivedAt DateTime @map("received_at") @db.Timestamptz(6)
   immutablePayload Json @map("immutable_payload")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   @@unique([id, userId])
   @@index([userId, factoryArrivalId], map: "factory_receipt_events_user_arrival_idx")
   @@map("factory_receipt_events")
@@ -251,6 +262,11 @@ model FactoryReceiptLine {
   factoryArrivalAllocationId BigInt? @map("factory_arrival_allocation_id") @db.BigInt
   transactionId BigInt? @map("transaction_id") @db.BigInt
   receivedQuantity Int @map("received_quantity")
+  sellerSkuSnapshot String? @map("seller_sku_snapshot")
+  productNameSnapshot String? @map("product_name_snapshot")
+  optionNameSnapshot String? @map("option_name_snapshot")
+  warehouseNameSnapshot String? @map("warehouse_name_snapshot")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   @@unique([id, userId])
   @@index([userId, factoryReceiptEventId, transactionId], map: "factory_receipt_lines_user_event_transaction_idx")
   @@map("factory_receipt_lines")
@@ -262,6 +278,7 @@ model InboundMigrationException {
   inboundImportSourceRowId BigInt? @map("inbound_import_source_row_id") @db.BigInt
   exceptionType String @map("exception_type")
   details Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   @@unique([id, userId])
   @@index([userId, inboundImportSourceRowId], map: "inbound_migration_exceptions_user_row_idx")
   @@map("inbound_migration_exceptions")

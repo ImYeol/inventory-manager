@@ -85,7 +85,7 @@ export async function getOperationsDashboard(): Promise<OperationsDashboardData>
     supabase
       .from('factory_arrivals')
       .select('id,expected_date,reference_code,status,factories(name),factory_arrival_items(ordered_quantity,received_quantity)')
-      .in('status', ['예정', '부분입고'])
+      .in('status', ['READY', 'PARTIAL'])
       .gte('expected_date', todayDate)
       .order('expected_date', { ascending: true })
       .limit(6),

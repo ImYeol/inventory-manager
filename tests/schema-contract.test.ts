@@ -45,9 +45,34 @@ describe('schema contract', () => {
     expect(migration).toContain('sync_legacy_inbound_draft_receipt')
     expect(migration).toContain('unallocated_legacy_arrival')
     expect(migration).toContain('unmapped_or_invalid_source_row')
+    expect(migration).toContain('factory_arrival_receipt_consistency')
+    expect(migration).toContain('legacy_factory_arrival_transaction')
+    expect(migration).toContain('over_received_legacy_arrival')
+    expect(migration).toContain('create_factory_arrival_with_allocations')
+    expect(migration).toContain('grant execute on function public.create_factory_arrival_with_allocations')
+    expect(migration).toContain('revoke insert, update, delete on table public.factory_arrival_allocations')
+    expect(migration).toContain('revoke insert, update, delete on table public.factory_receipt_events')
+    expect(migration).toContain('revoke insert, update, delete on table public.factory_receipt_lines')
+    expect(migration).toContain('unique (import_revision_id)')
+    expect(migration).toContain('inbound_imports_supplier_id_user_id_fkey')
     expect(prisma).toContain('model inboundimport')
     expect(prisma).toContain('model factoryreceiptevent')
     expect(prisma).toContain('ondelete: restrict')
+  })
+
+  it('keeps canonical allocation and receipt writes behind trusted functions', () => {
+    const root = process.cwd()
+    const migration = normalizedSql(fs.readFileSync(
+      path.join(root, 'supabase/migrations/20260718190437_canonical_arrival_schema_and_legacy_migration.sql'),
+      'utf8',
+    ))
+
+    expect(migration).toContain('create or replace function public.receive_factory_arrival')
+    expect(migration).toContain('insert into public.factory_receipt_events')
+    expect(migration).toContain('insert into public.factory_receipt_lines')
+    expect(migration).toContain('normally_received_quantity = normally_received_quantity + v_quantity')
+    expect(migration).toContain("revoke insert, update, delete on table public.factory_arrival_allocations from authenticated")
+    expect(migration).toContain('drop policy if exists "users manage own factory_arrival_allocations"')
   })
 
   it('models verified inbound drafts with exact supplier SKU links only', () => {

@@ -533,6 +533,7 @@ export async function createFactoryArrivalBatch(input: {
   expectedDate: string
   memo?: string
   sourceChannel: 'manual' | 'csv'
+  warehouseId?: number
   items: Array<{
     modelId: number
     sizeId: number
@@ -566,35 +567,17 @@ export async function createFactoryArrivalBatch(input: {
   }
 
   const { supabase } = await getSupabaseWithUser()
-  const { data: arrival, error: arrivalError } = await supabase
-    .from('factory_arrivals')
-    .insert({
-      factory_id: input.factoryId,
-      expected_date: input.expectedDate,
-      // FactoryArrival persists the canonical lifecycle vocabulary. Korean
-      // labels remain a presentation concern, never a database value.
-      status: 'READY',
-      source_channel: input.sourceChannel,
-      source_type: input.sourceChannel === 'csv' ? 'FILE' : 'MANUAL',
-      memo: input.memo?.trim() || null,
-    })
-    .select('id')
-    .single()
+  const { error } = await supabase.rpc('create_factory_arrival_with_allocations', {
+    p_factory_id: input.factoryId,
+    p_expected_date: input.expectedDate,
+    p_memo: input.memo?.trim() || null,
+    p_source_channel: input.sourceChannel,
+    p_warehouse_id: input.warehouseId ?? null,
+    p_items: normalizedItems,
+  })
 
-  if (arrivalError || !arrival?.id) {
-    throw new Error(normalizeSourcingErrorMessage(arrivalError, '예정 입고 등록에 실패했습니다.'))
-  }
-
-  const { error: itemsError } = await supabase.from('factory_arrival_items').insert(
-    normalizedItems.map((item) => ({
-      factory_arrival_id: arrival.id,
-      ...item,
-    })),
-  )
-
-  if (itemsError) {
-    await supabase.from('factory_arrivals').delete().eq('id', arrival.id)
-    throw new Error(normalizeSourcingErrorMessage(itemsError, '예정 입고 등록에 실패했습니다.'))
+  if (error) {
+    throw new Error(normalizeSourcingErrorMessage(error, '예정 입고 등록에 실패했습니다.'))
   }
 
   revalidatePath('/sourcing/arrivals')

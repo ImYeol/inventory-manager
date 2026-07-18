@@ -498,7 +498,7 @@ export async function getProductWorkspaceData(): Promise<{
   if ([variantsRes, reservationsRes, refsRes].some((response) => isMissingSchemaError(response.error))) {
     return { variants: [], channelProductRefs: [] }
   }
-  const responses = [variantsRes, modelsRes, sizesRes, colorsRes, inventoryRes, reservationsRes, refsRes]
+  const responses = [variantsRes, modelsRes, sizesRes, colorsRes, inventoryRes, reservationsRes, refsRes, arrivalsRes, allocationsRes]
   if (responses.some((response) => response.error)) throw new Error('상품 작업공간 데이터를 불러오지 못했습니다.')
 
   const models = new Map((modelsRes.data ?? []).map((row) => [Number(row.id), row.name]))
@@ -515,19 +515,17 @@ export async function getProductWorkspaceData(): Promise<{
     committed.set(id, (committed.get(id) ?? 0) + row.quantity)
   }
   const openArrivalIds = new Set(
-    (arrivalsRes.error ? [] : arrivalsRes.data ?? [])
+    (arrivalsRes.data ?? [])
       .filter((arrival) => isCanonicalIncomingArrival(arrival.status))
       .map((arrival) => Number(arrival.id)),
   )
   const incoming = new Map<string, number>()
-  if (!allocationsRes.error) {
-    const variantKey = new Map((variantsRes.data ?? []).map((variant) => [Number(variant.id), `${variant.model_id}:${variant.size_id}:${variant.color_id}`]))
-    for (const item of allocationsRes.data ?? []) {
-      if (!openArrivalIds.has(Number(item.factory_arrival_id))) continue
-      const key = variantKey.get(Number(item.product_variant_id))
-      if (!key) continue
-      incoming.set(key, (incoming.get(key) ?? 0) + allocationRemainder({ allocatedQuantity: Number(item.allocated_quantity), normallyReceivedQuantity: Number(item.normally_received_quantity), shortageClosedQuantity: Number(item.shortage_closed_quantity) }))
-    }
+  const variantKey = new Map((variantsRes.data ?? []).map((variant) => [Number(variant.id), `${variant.model_id}:${variant.size_id}:${variant.color_id}`]))
+  for (const item of allocationsRes.data ?? []) {
+    if (!openArrivalIds.has(Number(item.factory_arrival_id))) continue
+    const key = variantKey.get(Number(item.product_variant_id))
+    if (!key) continue
+    incoming.set(key, (incoming.get(key) ?? 0) + allocationRemainder({ allocatedQuantity: Number(item.allocated_quantity), normallyReceivedQuantity: Number(item.normally_received_quantity), shortageClosedQuantity: Number(item.shortage_closed_quantity) }))
   }
   const variants = (variantsRes.data ?? []).map((row) => ({
     id: Number(row.id),

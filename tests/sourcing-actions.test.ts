@@ -63,24 +63,10 @@ describe('sourcing actions', () => {
     })
   })
 
-  it('creates a staging arrival and its items', async () => {
-    const arrivalInsert = vi.fn(() => ({
-      select: vi.fn(() => ({
-        single: vi.fn(() => Promise.resolve({ data: { id: 55 }, error: null })),
-      })),
-    }))
-    const itemsInsert = vi.fn(() => Promise.resolve({ error: null }))
-
+  it('creates a canonical arrival, ProductVariant items, and allocations through one RPC', async () => {
+    const rpc = vi.fn(() => Promise.resolve({ error: null }))
     const supabase = {
-      from: vi.fn((table: string) => {
-        if (table === 'factory_arrivals') {
-          return { insert: arrivalInsert, delete: vi.fn(() => ({ eq: vi.fn() })) }
-        }
-        if (table === 'factory_arrival_items') {
-          return { insert: itemsInsert }
-        }
-        throw new Error(`unexpected table ${table}`)
-      }),
+      rpc,
     }
 
     mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
@@ -95,15 +81,14 @@ describe('sourcing actions', () => {
       }),
     ).resolves.toEqual({ success: true, count: 1 })
 
-    expect(itemsInsert).toHaveBeenCalledWith([
-      {
-        factory_arrival_id: 55,
-        model_id: 1,
-        size_id: 10,
-        color_id: 20,
-        ordered_quantity: 12,
-      },
-    ])
+    expect(rpc).toHaveBeenCalledWith('create_factory_arrival_with_allocations', {
+      p_factory_id: 1,
+      p_expected_date: '2026-04-21',
+      p_memo: '1차 납품',
+      p_source_channel: 'csv',
+      p_warehouse_id: null,
+      p_items: [{ model_id: 1, size_id: 10, color_id: 20, ordered_quantity: 12 }],
+    })
   })
   it('receives a factory arrival through the RPC and revalidates inventory and sourcing paths', async () => {
     mocks.runReceiveFactoryArrival.mockResolvedValue(undefined)
@@ -134,19 +119,14 @@ describe('sourcing actions', () => {
     const missingSchemaError = { message: "relation 'public.factory_arrivals' does not exist" }
     const insert = vi.fn(() => Promise.resolve({ error: missingSchemaError }))
     const update = vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: missingSchemaError })) }))
-    const arrivalInsert = vi.fn(() => ({
-      select: vi.fn(() => ({
-        single: vi.fn(() => Promise.resolve({ data: null, error: missingSchemaError })),
-      })),
-    }))
+    const rpc = vi.fn(() => Promise.resolve({ error: missingSchemaError }))
 
     const supabase = {
       from: vi.fn((table: string) => {
         if (table === 'factories') return { insert, update }
-        if (table === 'factory_arrivals') return { insert: arrivalInsert, delete: vi.fn(() => ({ eq: vi.fn() })) }
-        if (table === 'factory_arrival_items') return { insert: vi.fn(() => Promise.resolve({ error: missingSchemaError })) }
         throw new Error(`unexpected table ${table}`)
       }),
+      rpc,
     }
 
     mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })

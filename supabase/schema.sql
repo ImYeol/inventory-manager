@@ -1263,6 +1263,29 @@ end;
 $$;
 create trigger inbound_draft_row_canonical_receipt after update of received_quantity on public.inbound_draft_rows for each row execute function public.sync_legacy_inbound_draft_receipt();
 
+-- Canonical receipt hardening, kept equivalent to the forward migration.
+alter table public.inbound_imports drop constraint if exists inbound_imports_supplier_id_fkey;
+alter table public.inbound_imports add constraint inbound_imports_supplier_id_user_id_fkey foreign key (supplier_id,user_id) references public.factories(id,user_id) on delete restrict;
+alter table public.factory_arrivals add constraint factory_arrivals_one_import_revision_key unique (import_revision_id);
+drop policy if exists "Users manage own factory_arrival_allocations" on public.factory_arrival_allocations;
+drop policy if exists "Users insert own factory_receipt_events" on public.factory_receipt_events;
+drop policy if exists "Users insert own factory_receipt_lines" on public.factory_receipt_lines;
+create policy "Users read own factory_arrival_allocations" on public.factory_arrival_allocations for select to authenticated using ((select auth.uid())=user_id);
+revoke insert, update, delete on table public.factory_arrival_allocations from authenticated;
+revoke insert, update, delete on table public.factory_receipt_events from authenticated;
+revoke insert, update, delete on table public.factory_receipt_lines from authenticated;
+
+create or replace function public.assert_factory_arrival_receipt_consistency() returns trigger language plpgsql set search_path = public as $$
+declare e public.factory_receipt_events%rowtype; declare a public.factory_arrival_allocations%rowtype; declare t public.transactions%rowtype;
+begin
+  select * into e from public.factory_receipt_events where id=new.factory_receipt_event_id and user_id=new.user_id;
+  if not found then raise exception 'factory_arrival_receipt_consistency'; end if;
+  if new.factory_arrival_allocation_id is not null then select * into a from public.factory_arrival_allocations where id=new.factory_arrival_allocation_id and user_id=new.user_id; if not found or a.factory_arrival_id<>e.factory_arrival_id then raise exception 'factory_arrival_receipt_consistency'; end if; end if;
+  if new.transaction_id is not null then select * into t from public.transactions where id=new.transaction_id and user_id=new.user_id; if not found or t.warehouse_id<>a.warehouse_id or t.quantity<>new.received_quantity then raise exception 'factory_arrival_receipt_consistency'; end if; end if;
+  return new;
+end; $$;
+create trigger factory_receipt_line_consistency before insert on public.factory_receipt_lines for each row execute function public.assert_factory_arrival_receipt_consistency();
+
 create or replace function public.receive_inbound_draft_rows(p_draft_id bigint, p_rows jsonb)
 returns void language plpgsql security invoker set search_path = '' as $$
 declare
