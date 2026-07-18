@@ -2,14 +2,12 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "in_progress",
+  "status": "blocked",
   "steps": [
     {
       "step": 0,
       "name": "canonical-arrival-schema-and-legacy-migration",
-      "status": "completed",
-      "summary": "Established the canonical import/arrival/allocation/receipt schema, migration, canonical incoming loader, ProductVariant references, owner-scoped RLS foundations, immutable source rows, and compatibility RPC baseline. Focused and full tests, Prisma validation, lint, build, and isolated empty legacy-schema migration execution passed in the outer orchestrator. Remaining audited compatibility and behavioral-fixture work is isolated in step 1.",
-      "completed_at": "2026-07-19T04:41:00+0900"
+      "status": "blocked"
     },
     {
       "step": 1,
@@ -60,7 +58,10 @@
     {
       "step": 7,
       "name": "first-upload-mapping-review-and-promotion-ui",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-07-19T05:46:14+0900",
+      "completed_at": "2026-07-19T05:51:00+0900",
+      "summary": "Implemented and tested the reachable first-upload review and separate warehouse-promotion flow, plus moved duplicate-hash reconciliation before the unique index, removed colliding policies, and corrected behavioral fixture custom setting names/failure reset. Focused and full tests (244), lint, Prisma validation, and diff checks passed. The dedicated behavioral command remains blocked by sandbox tsx IPC permissions and build by unavailable Google Fonts. This step remains blocked because the required fresh supabase/schema.sql executable-RPC equivalence has not been completed or proven in this session."
     }
   ]
 }

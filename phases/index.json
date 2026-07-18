@@ -132,7 +132,7 @@
     },
     {
       "dir": "inbound-import-factory-arrival",
-      "status": "completed"
+      "status": "blocked"
     }
   ]
 }
