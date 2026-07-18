@@ -2,7 +2,7 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "pending",
+  "status": "completed",
   "steps": [
     {
       "step": 0,
@@ -28,7 +28,10 @@
     {
       "step": 3,
       "name": "supplier-sku-mapping-and-audit",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-07-19T05:06:36+0900",
+      "summary": "Added template-independent exact supplier SKU normalization, active mapping identity, immutable audit evidence, trusted confirm/reassign/deactivate RPCs, legacy same-target collapse/conflict deactivation, targeted canonical source snapshot updates, and owner-scoped RLS/grants in a forward migration. Inbound preview now performs supplier-only exact active lookup and receipt code no longer creates mappings. Added server actions and an optional supplier SKU pre-map control in the existing 상품 관리 SKU modal. Focused and full tests (239) passed; Prisma validation and lint passed (four pre-existing warnings). The behavioral runner could not start because this sandbox denies tsx IPC socket creation; production build reached Next font fetch and failed only because Google Fonts is unreachable in the sandbox.",
+      "completed_at": "2026-07-19T05:13:30+0900"
     }
   ]
 }
