@@ -7,6 +7,7 @@ import { getInboundTemplateVersion } from '../data'
 import { parseInboundTemplateWorksheet } from '../inbound-import'
 import { suggestExactSupplierSkuLinks } from '../supplier-sku'
 import { normalizeExternalShipmentNumber, sha256OriginalBytes } from '../inbound-import-review'
+import { classifyInboundReviewRows } from '../inbound-import-review'
 
 export type InboundTemplateSample = { sheets: Array<{ name: string; rows: string[][] }> }
 
@@ -108,6 +109,7 @@ export async function saveInboundTemplateDraft(input: {
   shipmentNumber: string
 }) {
   if (!input.rows.length) throw new Error('저장할 입고 행이 없습니다.')
+  if (!classifyInboundReviewRows(input.rows).valid) throw new Error('입고 검토 차단 항목을 먼저 해결해주세요.')
   const shipmentNumber = normalizeExternalShipmentNumber(input.shipmentNumber)
   if (!shipmentNumber) throw new Error('외부 출고/참조 번호를 입력해주세요.')
   const { supabase, user } = await getSupabaseWithUser()
@@ -135,11 +137,7 @@ export async function saveInboundTemplateDraft(input: {
       p_headers: input.preview.headers,
       // Evidence values are parser output. In particular, never rebuild the raw
       // cell from a parsed number (001, 1,000 and invalid cells are material).
-      p_rows: input.rows.map((row) => {
-        const evidenceRow = { ...row }
-        delete evidenceRow.productVariantId
-        return evidenceRow
-      }),
+      p_rows: input.rows.map(({ productVariantId: _ignoredClientVariantId, ...evidenceRow }) => evidenceRow),
     })
     if (error || !data?.[0]) throw new Error(error?.message ?? '입고 증빙을 저장하지 못했습니다.')
     const id = Number(data[0].revision_id)

@@ -2,7 +2,9 @@
 
 import { useMemo, useRef, useState, useTransition } from 'react'
 import { FileUp } from 'lucide-react'
-import { createInboundTemplateVersion, inspectInboundTemplateSample, previewInboundTemplateFile, saveInboundTemplateDraft, type InboundFilePreview, type InboundTemplateSample } from '@/lib/actions/inbound-import'
+import { createInboundTemplateVersion, inspectInboundTemplateSample, previewInboundTemplateFile, promoteInboundImportRevision, saveInboundTemplateDraft, type InboundFilePreview, type InboundTemplateSample } from '@/lib/actions/inbound-import'
+import { confirmSupplierSkuMapping } from '@/lib/actions/supplier-sku-mapping'
+import { normalizeSupplierExternalSku } from '@/lib/supplier-sku'
 import { EditableTable } from '@/components/ui/editable-table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ui } from '@/app/components/ui'
 
 type Lookup = { id: number; name: string }
+type ProductVariantOption = { id: number; label: string }
 export type InboundTemplateOption = { id: number; name: string; versionId: number; versionNumber: number }
 type DraftRow = InboundFilePreview['rows'][number] & { key: string }
 
@@ -29,12 +32,14 @@ export default function InboundRegistrationSheet({
   warehouses,
   templates,
   initialWarehouseId,
+  productVariants = [],
   onSaved,
 }: {
   suppliers: Lookup[]
   warehouses: Lookup[]
   templates: InboundTemplateOption[]
   initialWarehouseId?: number
+  productVariants?: ProductVariantOption[]
   onSaved?: (draftId: number) => void
 }) {
   const [isPending, startTransition] = useTransition()
@@ -44,7 +49,7 @@ export default function InboundRegistrationSheet({
   const [templateVersionId, setTemplateVersionId] = useState('')
   const [shipmentNumber, setShipmentNumber] = useState('')
   const [templateOptionsState, setTemplateOptionsState] = useState(templates)
-  const [rows, setRows] = useState<DraftRow[]>([emptyRow])
+  const [rows, setRows] = useState<DraftRow[]>([emptyRow()])
   const [preview, setPreview] = useState<InboundFilePreview | null>(null)
   const [sourceFile, setSourceFile] = useState<File | undefined>()
   const [message, setMessage] = useState<string | null>(null)
@@ -56,6 +61,8 @@ export default function InboundRegistrationSheet({
   const [externalSkuColumn, setExternalSkuColumn] = useState('')
   const [quantityColumn, setQuantityColumn] = useState('')
   const [editingTemplateId, setEditingTemplateId] = useState<number | undefined>()
+  const [savedRevisionId, setSavedRevisionId] = useState<number | null>(null)
+  const [confirmedSkus, setConfirmedSkus] = useState<Set<string>>(new Set())
 
   const selectedTemplate = useMemo(() => templateOptionsState.find((template) => template.versionId === Number(templateVersionId)) ?? null, [templateVersionId, templateOptionsState])
   const templateOptions = templateOptionsState.map((template) => ({ value: String(template.versionId), label: `${template.name} v${template.versionNumber}` }))
@@ -113,6 +120,7 @@ export default function InboundRegistrationSheet({
         setPreview(result)
         setSourceFile(file)
         setRows(result.rows.map((row) => ({ ...row, key: rowKey() })))
+        setConfirmedSkus(new Set(result.rows.filter((row) => row.productVariantId).map((row) => normalizeSupplierExternalSku(row.externalSku))))
       } catch (error) {
         setMessage(error instanceof Error ? error.message : '파일을 미리보기 하지 못했습니다.')
       }
@@ -144,12 +152,39 @@ export default function InboundRegistrationSheet({
           ...(sourceFile ? { file: sourceFile } : {}),
           shipmentNumber,
         })
-        setMessage(result.proposedRevision ? '새 개정 증빙을 저장했습니다. 행 매핑을 검토한 뒤 입고 예정으로 전환하세요.' : '입고 증빙을 저장했습니다. 행 매핑을 검토한 뒤 입고 예정으로 전환하세요.')
-        onSaved?.(result.id)
-        if (!onSaved) window.location.assign('/sourcing/arrivals')
+        setSavedRevisionId(result.id)
+        setMessage(result.proposedRevision ? '새 개정 증빙을 저장했습니다. 기본 창고를 확인한 뒤 입고 예정으로 전환하세요.' : '입고 증빙을 저장했습니다. 기본 창고를 확인한 뒤 입고 예정으로 전환하세요.')
       } catch (error) {
         setMessage(error instanceof Error ? error.message : '입고 초안을 저장하지 못했습니다.')
       }
+    })
+  }
+
+  const confirmMapping = (row: DraftRow) => {
+    if (!supplierId || !row.productVariantId) return
+    const productVariantId = row.productVariantId
+    startTransition(async () => {
+      try {
+        await confirmSupplierSkuMapping({ supplierId: Number(supplierId), externalSku: row.externalSku, productVariantId })
+        const exactSku = normalizeSupplierExternalSku(row.externalSku)
+        setRows((current) => current.map((candidate) => normalizeSupplierExternalSku(candidate.externalSku) === exactSku
+          ? { ...candidate, productVariantId }
+          : candidate))
+        setConfirmedSkus((current) => new Set([...current, exactSku]))
+        setMessage(null)
+      } catch (error) { setMessage(error instanceof Error ? error.message : '공급자 SKU를 연결하지 못했습니다.') }
+    })
+  }
+
+  const promote = () => {
+    if (!savedRevisionId || !warehouseId) return
+    startTransition(async () => {
+      try {
+        const arrivalId = await promoteInboundImportRevision({ revisionId: savedRevisionId, defaultWarehouseId: Number(warehouseId) })
+        setMessage('입고 예정으로 전환했습니다.')
+        onSaved?.(arrivalId)
+        if (!onSaved) window.location.assign('/sourcing/arrivals')
+      } catch (error) { setMessage(error instanceof Error ? error.message : '입고 예정으로 전환하지 못했습니다.') }
     })
   }
 
@@ -180,16 +215,19 @@ export default function InboundRegistrationSheet({
         getRowKey={(row) => row.key}
         onAddRow={() => setRows((current) => [...current, emptyRow()])}
         onDeleteRow={(key) => setRows((current) => current.length > 1 ? current.filter((row) => row.key !== key) : current)}
-        rowError={(row) => row.validationError ?? (row.productVariantId ? null : '내부 SKU는 초안 저장 후 입고 예정에서 지정해야 합니다.')}
+        rowError={(row) => row.validationError ?? (row.productVariantId ? null : '내부 SKU 연결이 필요합니다.')}
         renderCell={(row, key) => {
           if (key === 'externalSku') return <Input aria-label="외부 SKU" value={row.externalSku} onChange={(event) => updateRow(row.key, { externalSku: event.target.value })} />
           if (key === 'quantity') return <Input aria-label="수량" type="number" min="1" value={row.quantity ?? ''} onChange={(event) => updateRow(row.key, { quantity: event.target.value === '' ? null : Number(event.target.value) })} />
-          return <span className={row.productVariantId ? 'text-[color:var(--success-foreground)]' : 'text-[color:var(--warning-foreground)]'}>{row.productVariantId ? '자동 제안됨' : '지정 필요'}</span>
+          if (row.productVariantId && confirmedSkus.has(normalizeSupplierExternalSku(row.externalSku))) return <span className="text-[color:var(--success-foreground)]">연결됨</span>
+          return <div className="flex items-center gap-2"><Select value={row.productVariantId ? String(row.productVariantId) : EMPTY_VALUE} onValueChange={(value) => updateRow(row.key, { productVariantId: value === EMPTY_VALUE ? null : Number(value) })}><SelectTrigger aria-label="내부 SKU"><SelectValue placeholder="내부 SKU 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>내부 SKU 선택</SelectItem>{productVariants.map((variant) => <SelectItem key={variant.id} value={String(variant.id)}>{variant.label}</SelectItem>)}</SelectContent></Select><Button type="button" variant="secondary" size="sm" disabled={isPending || !row.productVariantId} onClick={() => confirmMapping(row)}>연결</Button></div>
         }}
       />
 
+      {rows.some((row) => !row.productVariantId) ? <a href="/products" className="text-sm text-[color:var(--link)] underline underline-offset-4">상품 관리에서 SKU 만들기</a> : null}
+
       {message ? <p role="alert" className="text-sm text-[color:var(--muted)]">{message}</p> : null}
-      <div className="flex justify-end"><Button type="button" disabled={isPending} onClick={saveDraft}>초안 저장</Button></div>
+      {savedRevisionId ? <div className="flex items-end justify-between gap-3 border-t border-[color:var(--border)] pt-[var(--space-4)]"><div><p className="text-sm font-medium text-[color:var(--foreground)]">2단계 · 입고 예정 전환</p><p className="text-sm text-[color:var(--muted)]">기본 창고 하나로 입고 예정 수량을 만듭니다.</p></div><Button type="button" disabled={isPending || !warehouseId} onClick={promote}>입고 예정 전환</Button></div> : <div className="flex justify-end"><Button type="button" disabled={isPending || rows.some((row) => Boolean(row.validationError) || !row.productVariantId)} onClick={saveDraft}>검토 저장</Button></div>}
 
       <Modal open={templateModalOpen} title="입고 템플릿 만들기" description="샘플 파일에서 시트·헤더 행과 외부 SKU, 수량 열을 선택해 저장합니다." onOpenChange={setTemplateModalOpen} footer={<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setTemplateModalOpen(false)}>닫기</Button><Button type="button" disabled={isPending || !sampleSheet || !templateName.trim() || !externalSkuColumn || !quantityColumn} onClick={saveTemplate}>템플릿 저장</Button></div>}>
         <div className="space-y-4">

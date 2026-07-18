@@ -11,6 +11,22 @@ alter table public.inbound_import_revisions add column if not exists template_id
 alter table public.inbound_import_revisions add column if not exists template_version_id bigint;
 alter table public.inbound_import_source_rows add column if not exists source_row_ordinal integer;
 alter table public.inbound_import_source_rows add column if not exists raw_quantity text;
+-- This must happen before the physical-file unique index. Legacy evidence is
+-- retained: the oldest deterministic claim keeps the hash and later claims
+-- are represented as migration exceptions.
+alter table public.inbound_import_revisions disable trigger inbound_import_revision_immutable;
+with ranked as (
+  select id, user_id, source_file_hash,
+    row_number() over (partition by user_id, source_file_hash order by created_at, id) as position
+  from public.inbound_import_revisions where source_file_hash is not null
+), changed as (
+  update public.inbound_import_revisions r set source_file_hash=null
+  from ranked x where r.id=x.id and x.position>1 returning r.id,r.user_id,x.source_file_hash
+)
+insert into public.inbound_migration_exceptions(user_id, exception_type, details)
+select user_id, 'duplicate_legacy_import_file_hash', jsonb_build_object('revision_id',id,'file_hash',source_file_hash)
+from changed;
+alter table public.inbound_import_revisions enable trigger inbound_import_revision_immutable;
 -- Existing migration imports have no trustworthy logical shipment identity; keep
 -- them ungrouped rather than inferring one from filenames.
 create unique index if not exists inbound_imports_logical_shipment_key on public.inbound_imports(user_id,supplier_id,external_shipment_number) where external_shipment_number is not null;

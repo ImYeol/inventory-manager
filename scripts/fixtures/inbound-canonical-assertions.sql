@@ -54,7 +54,7 @@ reset role;
 insert into public.inbound_templates(user_id,name) values ('00000000-0000-0000-0000-000000000011','RPC fixture') returning id as template_id \gset
 insert into public.inbound_template_versions(user_id,template_id,version_number,sheet_name,header_row_number,headers,mappings)
 values ('00000000-0000-0000-0000-000000000011', :template_id, 1, 'Sheet1', 1, '["SKU","Qty"]', '{"externalSku":"SKU","quantity":"Qty"}') returning id as version_id \gset
-select set_config('template_id', :'template_id', false), set_config('version_id', :'version_id', false);
+select set_config('inbound_fixture.template_id', :'template_id', false), set_config('inbound_fixture.version_id', :'version_id', false);
 set role authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000011',false);
 select public.confirm_supplier_sku_mapping(140,'IMP-001',150,'{}');
@@ -63,12 +63,13 @@ declare r1 bigint; r2 bigint; arrival bigint; inventory_before bigint; transacti
 begin
  select coalesce(sum(quantity),0) into inventory_before from public.inventory;
  select count(*) into transaction_before from public.transactions;
- select revision_id into r1 from public.register_inbound_import_revision(140,E'\u00a0SHIP-1\u3000','FILE','a.xlsx','owner/a.xlsx','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',current_setting('template_id')::bigint,current_setting('version_id')::bigint,'Sheet1',1,'[]','[{"sourceRowNumber":2,"externalSku":"IMP-001","rawQuantity":"001","quantity":1},{"sourceRowNumber":3,"externalSku":"IMP-001","rawQuantity":"1,000","quantity":1000}]');
- select revision_id into r2 from public.register_inbound_import_revision(140,'SHIP-1','FILE','b.xlsx','owner/b.xlsx','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',current_setting('template_id')::bigint,current_setting('version_id')::bigint,'Sheet1',1,'[]','[{"sourceRowNumber":2,"externalSku":"IMP-001","rawQuantity":"1","quantity":1}]');
+ select revision_id into r1 from public.register_inbound_import_revision(140,E'\u00a0SHIP-1\u3000','FILE','a.xlsx','owner/a.xlsx','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',current_setting('inbound_fixture.template_id')::bigint,current_setting('inbound_fixture.version_id')::bigint,'Sheet1',1,'[]','[{"sourceRowNumber":2,"externalSku":"IMP-001","rawQuantity":"001","quantity":1},{"sourceRowNumber":3,"externalSku":"IMP-001","rawQuantity":"1,000","quantity":1000}]');
+ select revision_id into r2 from public.register_inbound_import_revision(140,'SHIP-1','FILE','b.xlsx','owner/b.xlsx','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',current_setting('inbound_fixture.template_id')::bigint,current_setting('inbound_fixture.version_id')::bigint,'Sheet1',1,'[]','[{"sourceRowNumber":2,"externalSku":"IMP-001","rawQuantity":"1","quantity":1}]');
  if r1=r2 or (select supersedes_revision_id from public.inbound_import_revisions where id=r2)<>r1 then raise exception 'logical revision linkage failed'; end if;
  if (select array_agg(raw_quantity order by source_row_ordinal) from public.inbound_import_source_rows where inbound_import_revision_id=r1) <> array['001','1,000'] then raise exception 'raw quantity/order proof failed'; end if;
- begin perform public.register_inbound_import_revision(140,'SHIP-X','FILE','x.xlsx','owner/x.xlsx','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',current_setting('template_id')::bigint,current_setting('version_id')::bigint,'Sheet1',1,'[]','[{"externalSku":"IMP-001","rawQuantity":"1","quantity":1}]'); exception when others then failed:=sqlerrm='duplicate_file_hash'; end;
+ begin perform public.register_inbound_import_revision(140,'SHIP-X','FILE','x.xlsx','owner/x.xlsx','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',current_setting('inbound_fixture.template_id')::bigint,current_setting('inbound_fixture.version_id')::bigint,'Sheet1',1,'[]','[{"externalSku":"IMP-001","rawQuantity":"1","quantity":1}]'); exception when others then failed:=sqlerrm='duplicate_file_hash'; end;
  if not failed then raise exception 'user-wide hash block failed'; end if;
+ failed:=false;
  select public.promote_inbound_import_revision(r2,130) into arrival;
  if (select count(*) from public.factory_arrival_items where factory_arrival_id=arrival)<>1 or (select count(*) from public.factory_arrival_allocations where factory_arrival_id=arrival and warehouse_id=130 and allocated_quantity=1)<>1 then raise exception 'atomic default allocation failed'; end if;
  begin perform public.promote_inbound_import_revision(r2,130); exception when others then failed:=true; end;
@@ -82,7 +83,7 @@ update public.factory_arrival_allocations set normally_received_quantity=1 where
 set role authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000011',false);
 do $$ declare failed boolean:=false; begin
- begin perform public.register_inbound_import_revision(140,'SHIP-1','FILE','d.xlsx','owner/d.xlsx','dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',current_setting('template_id')::bigint,current_setting('version_id')::bigint,'Sheet1',1,'[]','[{"externalSku":"IMP-001","rawQuantity":"1","quantity":1}]'); exception when others then failed:=sqlerrm='supersession_after_receipt_evidence'; end;
+ begin perform public.register_inbound_import_revision(140,'SHIP-1','FILE','d.xlsx','owner/d.xlsx','dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',current_setting('inbound_fixture.template_id')::bigint,current_setting('inbound_fixture.version_id')::bigint,'Sheet1',1,'[]','[{"externalSku":"IMP-001","rawQuantity":"1","quantity":1}]'); exception when others then failed:=sqlerrm='supersession_after_receipt_evidence'; end;
  if not failed then raise exception 'post-receipt supersession rejection failed'; end if;
 end $$;
 reset role;

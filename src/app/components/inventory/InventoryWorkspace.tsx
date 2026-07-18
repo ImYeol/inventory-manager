@@ -153,6 +153,14 @@ export default function InventoryWorkspace({
     [models],
   )
 
+  const inboundProductVariants = useMemo(() => variants.flatMap((variant) => {
+    const model = models.find((candidate) => candidate.id === variant.modelId)
+    const size = model?.sizes.find((candidate) => candidate.id === variant.sizeId)
+    const color = model?.colors.find((candidate) => candidate.id === variant.colorId)
+    if (!model || !size || !color) return []
+    return [{ id: variant.id, label: `${model.name} · ${size.name} / ${color.name} · ${model.name}-${color.name}-${size.name}` }]
+  }), [models, variants])
+
   const variantsByInventoryKey = useMemo(
     () => new Map(
       variants
@@ -319,6 +327,7 @@ export default function InventoryWorkspace({
           suppliers={suppliers}
           warehouses={warehouses}
           templates={inboundTemplates}
+          productVariants={inboundProductVariants}
           initialWarehouseId={typeof selectedWarehouseId === 'number' ? selectedWarehouseId : undefined}
           onSaved={() => setOverlayMode(null)}
         /> : overlayMode === 'transfer' ? <WarehouseTransferForm

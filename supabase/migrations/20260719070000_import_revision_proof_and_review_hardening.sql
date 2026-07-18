@@ -2,20 +2,6 @@
 -- deliberately ignored: only the active exact supplier mapping is evidence.
 create schema if not exists private;
 
--- Preserve legacy evidence when an old deployment has duplicate hash claims.
--- A deterministic canonical claim survives; ambiguity is recorded, never lost.
-with ranked as (
-  select id, user_id, source_file_hash,
-    row_number() over (partition by user_id, source_file_hash order by created_at, id) as position
-  from public.inbound_import_revisions where source_file_hash is not null
-), changed as (
-  update public.inbound_import_revisions r set source_file_hash=null
-  from ranked x where r.id=x.id and x.position>1 returning r.id,r.user_id,x.source_file_hash
-)
-insert into public.inbound_migration_exceptions(user_id, exception_type, details)
-select user_id, 'duplicate_legacy_import_file_hash', jsonb_build_object('revision_id',id,'file_hash',source_file_hash)
-from changed;
-
 alter table public.inbound_import_revisions drop constraint if exists inbound_import_revisions_template_version_template_fkey;
 alter table public.inbound_template_versions add constraint inbound_template_versions_id_template_user_key unique(id,template_id,user_id);
 alter table public.inbound_import_revisions add constraint inbound_import_revisions_template_version_template_fkey
@@ -27,6 +13,9 @@ drop policy if exists "Users insert own inbound_import_source_rows" on public.in
 drop policy if exists "Users manage own factory_arrival_allocations" on public.factory_arrival_allocations;
 drop policy if exists "Users manage own factory arrivals" on public.factory_arrivals;
 drop policy if exists "Users manage own factory arrival items" on public.factory_arrival_items;
+drop policy if exists "Users read own factory arrivals" on public.factory_arrivals;
+drop policy if exists "Users read own factory arrival items" on public.factory_arrival_items;
+drop policy if exists "Users read own inbound imports" on public.inbound_imports;
 create policy "Users read own inbound imports" on public.inbound_imports for select to authenticated using ((select auth.uid())=user_id);
 create policy "Users read own factory arrivals" on public.factory_arrivals for select to authenticated using ((select auth.uid())=user_id);
 create policy "Users read own factory arrival items" on public.factory_arrival_items for select to authenticated using ((select auth.uid())=user_id);
@@ -59,6 +48,7 @@ begin
  for v_row in select * from jsonb_array_elements(p_rows) loop
    v_sku:=private.normalize_supplier_external_sku(v_row->>'externalSku');
    select product_variant_id into v_variant from public.supplier_sku_links where user_id=v_user and supplier_id=p_supplier_id and normalized_external_sku=v_sku and is_active;
+   if nullif(v_row->>'validationError','') is not null or nullif(v_row->>'quantity','')::integer is null or nullif(v_row->>'quantity','')::integer<=0 then raise exception 'review_blocker:%', coalesce(v_row->>'sourceRowNumber',''); end if;
    if coalesce(v_sku,'')='' or v_variant is null then raise exception 'mapping_blocker:%', coalesce(v_row->>'externalSku',''); end if;
  end loop;
  insert into public.inbound_import_revisions(user_id,inbound_import_id,revision_number,supersedes_revision_id,source_filename,source_storage_path,source_file_hash,template_id,template_version_id,source_sheet_name,source_header_row_number,source_headers)
