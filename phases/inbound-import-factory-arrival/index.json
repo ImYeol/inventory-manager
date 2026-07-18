@@ -2,7 +2,7 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     {
       "step": 0,
@@ -52,7 +52,10 @@
     {
       "step": 6,
       "name": "import-revision-proof-and-review-hardening",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-07-19T05:38:46+0900",
+      "completed_at": "2026-07-19T05:45:00+0900",
+      "summary": "Hardened trusted import registration and promotion with exact active mapping resolution, lowercase SHA-256 validation, logical-shipment advisory serialization, template/version relationship validation, direct-insert revocations, legacy duplicate-hash exception preservation, and raw quantity evidence preservation. Extended the disposable behavioral runner and fixture with RPC-level revision/promotion assertions. Focused/full tests (244), Prisma validation, lint, and diff checks passed; the behavioral runner is blocked by sandbox tsx IPC permissions, and build reaches the existing Google Fonts network failure."
     }
   ]
 }
