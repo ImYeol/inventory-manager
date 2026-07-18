@@ -1,0 +1,13 @@
+{
+  "project": "Seleccase Inventory",
+  "phase": "inbound-import-factory-arrival",
+  "issue": 11,
+  "status": "pending",
+  "steps": [
+    {
+      "step": 0,
+      "name": "canonical-arrival-schema-and-legacy-migration",
+      "status": "pending"
+    }
+  ]
+}

@@ -129,6 +129,10 @@
     {
       "dir": "unified-inbound-template-operations",
       "status": "pending"
+    },
+    {
+      "dir": "inbound-import-factory-arrival",
+      "status": "pending"
     }
   ]
 }
