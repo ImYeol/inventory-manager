@@ -2,12 +2,15 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "pending",
+  "status": "blocked",
   "steps": [
     {
       "step": 0,
       "name": "canonical-arrival-schema-and-legacy-migration",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-07-19T04:38:15+0900",
+      "finished_at": "2026-07-19T04:40:28+0900",
+      "result": "Blocked only by environment acceptance dependencies: Supabase local reset/test cannot access the sandboxed Docker socket, and Next build cannot fetch Google Geist fonts. Passed: supabase --version (2.90.0), focused 23/23 tests, full 235/235 tests, Prisma validation, and lint (0 errors; 4 existing warnings)."
     }
   ]
 }
