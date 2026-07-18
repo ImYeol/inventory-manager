@@ -2,12 +2,14 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "pending",
+  "status": "blocked",
   "steps": [
     {
       "step": 0,
       "name": "canonical-arrival-schema-and-legacy-migration",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-07-19T04:02:57+0900",
+      "result": "Implemented canonical inbound persistence boundary and passing code-level tests. Blocked verification: local Supabase Docker/Postgres access is denied by the sandbox; Next/Turbopack build rejects the workspace node_modules symlink outside its filesystem root."
     }
   ]
 }
