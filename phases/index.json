@@ -132,7 +132,8 @@
     },
     {
       "dir": "inbound-import-factory-arrival",
-      "status": "pending"
+      "status": "blocked",
+      "blocked_at": "2026-07-19T10:52:00+0900"
     }
   ]
 }
