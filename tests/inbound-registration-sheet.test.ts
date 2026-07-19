@@ -32,6 +32,17 @@ beforeEach(() => {
 })
 
 describe('InboundRegistrationSheet', () => {
+  it('offers only active template options for a new file preview', () => {
+    render(React.createElement(InboundRegistrationSheet, {
+      suppliers: [{ id: 4, name: '한빛 공장' }], warehouses: [{ id: 2, name: '대자동' }],
+      templates: [{ id: 7, name: '사용 중 양식', versionId: 11, versionNumber: 1 }],
+    }))
+
+    fireEvent.click(screen.getByRole('combobox', { name: '입고 파싱 템플릿' }))
+    expect(screen.getByRole('option', { name: '사용 중 양식 v1' })).toBeTruthy()
+    expect(screen.queryByRole('option', { name: /이전 양식/ })).toBeNull()
+  })
+
   it('requires a supplier file and keeps manual row entry out of the import surface', () => {
     render(React.createElement(InboundRegistrationSheet, {
       suppliers: [{ id: 4, name: '한빛 공장' }], warehouses: [{ id: 2, name: '대자동' }], templates,

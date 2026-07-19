@@ -1154,6 +1154,21 @@ export async function getActiveInboundTemplates(): Promise<Array<{ id: number; n
   })
 }
 
+/** Settings history includes inactive templates; inbound registration uses the active-only query above. */
+export async function getInboundTemplates(): Promise<Array<{ id: number; name: string; versionId: number; versionNumber: number; active: boolean }>> {
+  const { supabase } = await getSupabaseWithUser()
+  const { data, error } = await supabase
+    .from('inbound_templates')
+    .select('id, name, is_active, inbound_template_versions(id, version_number)')
+    .order('name')
+  if (error) throw new Error(error.message)
+  return (data ?? []).flatMap((template) => {
+    const versions = (template.inbound_template_versions as Array<{ id: number; version_number: number }> | null) ?? []
+    const latest = versions.reduce<{ id: number; version_number: number } | null>((current, version) => (!current || version.version_number > current.version_number ? version : current), null)
+    return latest ? [{ id: Number(template.id), name: String(template.name), versionId: Number(latest.id), versionNumber: Number(latest.version_number), active: Boolean(template.is_active) }] : []
+  })
+}
+
 export async function runReceiveInboundDraftRows(draftId: number, rows: Array<{ rowId: number; quantity: number }>) {
   if (!draftId || rows.length === 0) throw new Error('입고 반영 행을 선택해주세요.')
   const { supabase } = await getSupabaseWithUser()

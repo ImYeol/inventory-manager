@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { createInboundTemplateVersion, inspectInboundTemplateSample, type InboundTemplateSample } from '@/lib/actions/inbound-import'
+import { createInboundTemplateVersion, inspectInboundTemplateSample, setInboundTemplateActive, type InboundTemplateSample } from '@/lib/actions/inbound-import'
 import { saveTrackingPreset, type SavedTrackingPreset } from '@/lib/actions/tracking-import'
 import { BUILT_IN_TRACKING_PRESETS, type TrackingColumnMapping } from '@/lib/excel'
 import { BasicDataTable } from '@/components/ui/basic-data-table'
@@ -14,7 +14,7 @@ import { StatusBadge } from '@/components/ui/badge-1'
 import { ParseTemplateBuilder, type ParseTemplateRole } from '@/components/ui/parse-template-builder'
 import { ui } from '@/app/components/ui'
 
-export type InboundParseTemplateRow = { id: number; name: string; versionId: number; versionNumber: number }
+export type InboundParseTemplateRow = { id: number; name: string; versionId: number; versionNumber: number; active: boolean }
 
 const inboundRoles: ParseTemplateRole<'externalSku' | 'quantity'>[] = [
   { key: 'externalSku', label: '외부 SKU', required: true },
@@ -102,6 +102,18 @@ export default function ParseTemplatesSettingsView({
     })
   }
 
+  const toggleInboundTemplate = (template: InboundParseTemplateRow) => {
+    startTransition(async () => {
+      try {
+        await setInboundTemplateActive({ templateId: template.id, active: !template.active })
+        setMessage(template.active ? '입고 파싱 템플릿 사용을 중지했습니다.' : '입고 파싱 템플릿을 사용합니다.')
+        router.refresh()
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : '입고 템플릿 사용 상태를 변경하지 못했습니다.')
+      }
+    })
+  }
+
   return (
     <div className="space-y-6">
       {message ? <p role="status" aria-live="polite" className="text-sm text-[color:var(--muted)]">{message}</p> : null}
@@ -118,7 +130,7 @@ export default function ParseTemplatesSettingsView({
         </CardHeader>
         <CardContent>
           <BasicDataTable
-            columns={[{ key: 'name', label: '이름' }, { key: 'version', label: '최신 버전' }, { key: 'action', label: <span className="sr-only">작업</span>, align: 'right' }]}
+            columns={[{ key: 'name', label: '이름' }, { key: 'version', label: '최신 버전' }, { key: 'status', label: '상태' }, { key: 'action', label: <span className="sr-only">작업</span>, align: 'right' }]}
             rows={inboundTemplates}
             rowKey={(template) => template.id}
             emptyState="등록된 입고 파싱 템플릿이 없습니다."
@@ -126,7 +138,9 @@ export default function ParseTemplatesSettingsView({
               ? <span className="font-medium text-[color:var(--foreground)]">{template.name}</span>
               : key === 'version'
                 ? <span className="tabular-nums text-[color:var(--muted)]">v{template.versionNumber}</span>
-                : <Button type="button" variant="outline" size="sm" onClick={() => openNewVersion(template)}>새 버전 만들기</Button>}
+                : key === 'status'
+                  ? <StatusBadge tone={template.active ? 'success' : 'neutral'}>{template.active ? '사용 중' : '사용 중지'}</StatusBadge>
+                  : <div className="flex justify-end gap-2"><Button type="button" variant="outline" size="sm" onClick={() => openNewVersion(template)}>새 버전 만들기</Button><Button type="button" variant="outline" size="sm" disabled={isPending} onClick={() => toggleInboundTemplate(template)}>{template.active ? '사용 중지' : '사용'}</Button></div>}
           />
         </CardContent>
       </Card>

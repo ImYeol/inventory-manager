@@ -5,16 +5,18 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 
 const mocks = vi.hoisted(() => ({
   getActiveInboundTemplates: vi.fn(),
+  getInboundTemplates: vi.fn(),
   listTrackingPresets: vi.fn(),
   createInboundTemplateVersion: vi.fn(),
   inspectInboundTemplateSample: vi.fn(),
+  setInboundTemplateActive: vi.fn(),
   saveTrackingPreset: vi.fn(),
   refresh: vi.fn(),
 }))
 
-vi.mock('@/lib/data', () => ({ getActiveInboundTemplates: mocks.getActiveInboundTemplates }))
+vi.mock('@/lib/data', () => ({ getInboundTemplates: mocks.getInboundTemplates }))
 vi.mock('@/lib/actions/tracking-import', () => ({ listTrackingPresets: mocks.listTrackingPresets, saveTrackingPreset: mocks.saveTrackingPreset }))
-vi.mock('@/lib/actions/inbound-import', () => ({ createInboundTemplateVersion: mocks.createInboundTemplateVersion, inspectInboundTemplateSample: mocks.inspectInboundTemplateSample }))
+vi.mock('@/lib/actions/inbound-import', () => ({ createInboundTemplateVersion: mocks.createInboundTemplateVersion, inspectInboundTemplateSample: mocks.inspectInboundTemplateSample, setInboundTemplateActive: mocks.setInboundTemplateActive }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh }) }))
 vi.mock('next/link', () => ({
   default: ({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) =>
@@ -31,7 +33,10 @@ afterEach(() => {
 
 describe('SettingsParseTemplatesPage', () => {
   it('lists inbound parse templates and tracking parse presets under Settings ownership', async () => {
-    mocks.getActiveInboundTemplates.mockResolvedValue([{ id: 7, name: '중국 공장 기본', versionId: 11, versionNumber: 2 }])
+    mocks.getInboundTemplates.mockResolvedValue([
+      { id: 7, name: '중국 공장 기본', versionId: 11, versionNumber: 2, active: true },
+      { id: 8, name: '이전 양식', versionId: 12, versionNumber: 4, active: false },
+    ])
     mocks.listTrackingPresets.mockResolvedValue([{ id: 5, name: '내 프리셋', channel: null, mapping: { orderNumber: '주문번호', trackingNumber: '운송장번호', carrier: '', recipientName: '', address: '', shippedAt: '' } }])
 
     render(await SettingsParseTemplatesPage())
@@ -41,6 +46,10 @@ describe('SettingsParseTemplatesPage', () => {
     expect(screen.getByRole('heading', { name: '주문 송장 파싱 프리셋' })).toBeTruthy()
     expect(screen.getByText('중국 공장 기본')).toBeTruthy()
     expect(screen.getByText('v2')).toBeTruthy()
+    expect(screen.getByText('이전 양식')).toBeTruthy()
+    expect(screen.getByText('v4')).toBeTruthy()
+    expect(screen.getByText('사용 중')).toBeTruthy()
+    expect(screen.getAllByText('사용 중지')).not.toHaveLength(0)
     expect(screen.getByText('내 프리셋')).toBeTruthy()
     expect(screen.getByText('쿠팡 송장')).toBeTruthy()
     const returnLink = screen.getByRole('link', { name: /설정으로/ })
@@ -49,12 +58,24 @@ describe('SettingsParseTemplatesPage', () => {
 })
 
 describe('ParseTemplatesSettingsView', () => {
+  it('toggles only an inbound template lifecycle from its settings row', async () => {
+    mocks.setInboundTemplateActive.mockResolvedValue({ id: 8, active: true })
+    render(React.createElement(ParseTemplatesSettingsView, {
+      inboundTemplates: [{ id: 8, name: '이전 양식', versionId: 12, versionNumber: 4, active: false }],
+      trackingPresets: [],
+    }))
+
+    fireEvent.click(screen.getByRole('button', { name: '사용' }))
+    await waitFor(() => expect(mocks.setInboundTemplateActive).toHaveBeenCalledWith({ templateId: 8, active: true }))
+    expect(mocks.refresh).toHaveBeenCalled()
+  })
+
   it('creates a new inbound parse-template version from a sample file', async () => {
     mocks.inspectInboundTemplateSample.mockResolvedValue({ sheets: [{ name: '입고', rows: [['외부 SKU', '수량'], ['EXT-1', '3']] }] })
     mocks.createInboundTemplateVersion.mockResolvedValue({ id: 7, name: '중국 공장 기본', versionId: 12, versionNumber: 3 })
 
     render(React.createElement(ParseTemplatesSettingsView, {
-      inboundTemplates: [{ id: 7, name: '중국 공장 기본', versionId: 11, versionNumber: 2 }],
+      inboundTemplates: [{ id: 7, name: '중국 공장 기본', versionId: 11, versionNumber: 2, active: true }],
       trackingPresets: [],
     }))
 

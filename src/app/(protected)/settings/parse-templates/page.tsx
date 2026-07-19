@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
-import { getActiveInboundTemplates } from '@/lib/data'
+import { getInboundTemplates } from '@/lib/data'
 import { listTrackingPresets } from '@/lib/actions/tracking-import'
 import { PageHeader, ui } from '@/app/components/ui'
 import ParseTemplatesSettingsView from './ParseTemplatesSettingsView'
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function SettingsParseTemplatesPage() {
   const [inboundTemplates, trackingPresets] = await Promise.all([
-    getActiveInboundTemplates(),
+    getInboundTemplates(),
     listTrackingPresets(),
   ])
 

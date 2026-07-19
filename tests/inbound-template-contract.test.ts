@@ -25,4 +25,15 @@ describe('versioned inbound template contract', () => {
     expect(schema).toContain("'inbound-source-files', 'inbound-source-files', false")
     expect(schema).toContain('security invoker set search_path =')
   })
+
+  it('keeps inactive templates in Settings history while limiting new inbound selection and previews to active templates', () => {
+    const data = readFileSync(resolve(process.cwd(), 'src/lib/data.ts'), 'utf8')
+    const actions = readFileSync(resolve(process.cwd(), 'src/lib/actions/inbound-import.ts'), 'utf8')
+
+    expect(data).toContain('export async function getInboundTemplates()')
+    expect(data).toContain(".eq('is_active', true)")
+    expect(actions).toContain('export async function setInboundTemplateActive')
+    expect(actions).toContain(".from('inbound_templates').update({ is_active: input.active })")
+    expect(actions).toContain("if (!template.active) throw new Error('비활성 템플릿은 새 입고에 사용할 수 없습니다.')")
+  })
 })

@@ -54,6 +54,22 @@ export async function createInboundTemplateVersion(input: {
   return { id: templateId, name: input.name.trim(), versionId: Number(version.id), versionNumber }
 }
 
+/** Changes only the authenticated owner's template lifecycle; audit evidence and immutable versions remain intact. */
+export async function setInboundTemplateActive(input: { templateId: number; active: boolean }) {
+  if (!input.templateId) throw new Error('입고 템플릿을 선택해주세요.')
+  const { supabase } = await getSupabaseWithUser()
+  const { data, error } = await supabase
+    .from('inbound_templates').update({ is_active: input.active })
+    .eq('id', input.templateId)
+    .select('id, is_active')
+    .single()
+  if (error || !data) throw new Error(error?.message ?? '입고 템플릿 사용 상태를 변경하지 못했습니다.')
+  revalidatePath('/settings/parse-templates')
+  revalidatePath('/inventory')
+  revalidatePath('/sourcing/arrivals')
+  return { id: Number(data.id), active: Boolean(data.is_active) }
+}
+
 export type InboundFilePreview = {
   supplierId: number
   warehouseId?: number
