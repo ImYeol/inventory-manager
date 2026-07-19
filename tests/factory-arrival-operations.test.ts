@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assertAllocationSplit, receiptPayloadHash } from '@/lib/factory-arrival'
+import { assertAllocationSplit, koreaLocalDate, receiptPayloadHash } from '@/lib/factory-arrival'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -15,6 +15,12 @@ describe('factory arrival operation contracts', () => {
     const payload = { arrivalId: 9, receiptRequestId: 'r-1', lines: [{ allocationId: 2, quantity: 3, overageQuantity: 0 }] }
     await expect(receiptPayloadHash(payload)).resolves.toBe(await receiptPayloadHash(payload))
     await expect(receiptPayloadHash({ ...payload, lines: [{ allocationId: 2, quantity: 4, overageQuantity: 0 }] })).resolves.not.toBe(await receiptPayloadHash(payload))
+  })
+
+  it('treats the business receipt date as part of the idempotency payload', async () => {
+    const payload = { arrivalId: 9, receiptRequestId: 'r-1', receiptBusinessDate: '2026-07-19', lines: [{ allocationId: 2, quantity: 3, overageQuantity: 0 }] }
+    await expect(receiptPayloadHash(payload)).resolves.not.toBe(await receiptPayloadHash({ ...payload, receiptBusinessDate: '2026-07-20' }))
+    expect(koreaLocalDate(new Date('2026-07-18T15:30:00.000Z'))).toBe('2026-07-19')
   })
 
   it('ships executable follow-up and correction RPCs in migration and fresh schema', () => {

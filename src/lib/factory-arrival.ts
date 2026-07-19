@@ -43,3 +43,12 @@ export async function receiptPayloadHash(payload: unknown) {
   const digest = await crypto.subtle.digest('SHA-256', bytes)
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
+
+/** Business dates are Korean local calendar dates, never a UTC date slice. */
+export function koreaLocalDate(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now)
+  const part = (type: string) => parts.find((entry) => entry.type === type)?.value
+  return `${part('year')}-${part('month')}-${part('day')}`
+}

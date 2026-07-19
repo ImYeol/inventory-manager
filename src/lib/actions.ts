@@ -652,9 +652,9 @@ export async function closeFactoryArrivalShortage(input: { allocationId: number;
   return { success: true }
 }
 
-export async function recordFactoryArrivalFollowUp(input: { closureId: number; warehouseId: number; quantity: number; reason: string; receiptRequestId: string }) {
-  if (!input.closureId || !input.warehouseId || !Number.isInteger(input.quantity) || input.quantity <= 0 || !input.reason.trim() || !input.receiptRequestId.trim()) throw new Error('후속 입고 정보를 모두 입력해주세요.')
-  await runFactoryArrivalOperation('record_factory_arrival_follow_up', { closure_id: input.closureId, warehouse_id: input.warehouseId, quantity: input.quantity, reason: input.reason.trim(), receipt_request_id: input.receiptRequestId.trim() })
+export async function recordFactoryArrivalFollowUp(input: { closureId: number; warehouseId: number; quantity: number; reason: string; receiptRequestId: string; receiptBusinessDate: string }) {
+  if (!input.closureId || !input.warehouseId || !Number.isInteger(input.quantity) || input.quantity <= 0 || !input.reason.trim() || !input.receiptRequestId.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(input.receiptBusinessDate)) throw new Error('후속 입고 정보를 모두 입력해주세요.')
+  await runFactoryArrivalOperation('record_factory_arrival_follow_up', { closure_id: input.closureId, warehouse_id: input.warehouseId, quantity: input.quantity, reason: input.reason.trim(), receipt_request_id: input.receiptRequestId.trim(), receipt_business_date: input.receiptBusinessDate })
   revalidateInventoryPaths(); revalidatePath('/sourcing/arrivals')
   return { success: true }
 }

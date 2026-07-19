@@ -40,6 +40,9 @@ create table public.factory_receipt_line_corrections (
 );
 
 alter table public.factory_receipt_events add column if not exists receipt_request_id text;
+-- Kept nullable until the corrective migration backfills historical evidence;
+-- trusted receipt functions below already require an explicit business date.
+alter table public.factory_receipt_events add column if not exists receipt_business_date date;
 alter table public.factory_receipt_lines
   add column if not exists factory_arrival_item_id bigint,
   add column if not exists warehouse_id bigint,
@@ -150,10 +153,10 @@ begin
 end $$;
 
 create or replace function public.receive_factory_arrival_request(p_payload jsonb) returns jsonb language plpgsql security definer set search_path=private,public as $$
-declare u uuid:=auth.uid(); request_id text:=btrim(p_payload->>'receipt_request_id'); canonical jsonb; hash text; existing public.factory_receipt_requests%rowtype; a public.factory_arrivals%rowtype; line jsonb; x public.factory_arrival_allocations%rowtype; i public.factory_arrival_items%rowtype; v public.product_variants%rowtype; q integer; oq integer; event_id bigint; tx bigint; seen bigint[]:='{}';
+declare u uuid:=auth.uid(); request_id text:=btrim(p_payload->>'receipt_request_id'); business_date date:=nullif(p_payload->>'receipt_business_date','')::date; canonical jsonb; hash text; existing public.factory_receipt_requests%rowtype; a public.factory_arrivals%rowtype; line jsonb; x public.factory_arrival_allocations%rowtype; i public.factory_arrival_items%rowtype; v public.product_variants%rowtype; q integer; oq integer; event_id bigint; tx bigint; seen bigint[]:='{}';
 begin
-  if u is null or coalesce(request_id,'')='' or jsonb_typeof(p_payload->'lines')<>'array' or jsonb_array_length(p_payload->'lines')=0 then raise exception 'Invalid receipt request.'; end if;
-  canonical:=jsonb_build_object('arrival_id',(p_payload->>'arrival_id')::bigint,'lines',p_payload->'lines'); hash:=private.factory_payload_hash(canonical);
+  if u is null or coalesce(request_id,'')='' or business_date is null or jsonb_typeof(p_payload->'lines')<>'array' or jsonb_array_length(p_payload->'lines')=0 then raise exception 'Invalid receipt request.'; end if;
+  canonical:=jsonb_build_object('arrival_id',(p_payload->>'arrival_id')::bigint,'receipt_business_date',business_date,'lines',p_payload->'lines'); hash:=private.factory_payload_hash(canonical);
   perform pg_advisory_xact_lock(hashtextextended(u::text||':'||request_id,0));
   select * into existing from public.factory_receipt_requests where user_id=u and receipt_request_id=request_id;
   if found then if existing.payload_hash<>hash then raise exception 'receipt_request_conflict'; end if; return jsonb_build_object('receipt_event_id',existing.receipt_event_id,'idempotent',true); end if;
@@ -165,7 +168,7 @@ begin
     select * into x from public.factory_arrival_allocations where id=(line->>'allocation_id')::bigint and factory_arrival_id=a.id and user_id=u for update;
     if not found or q<0 or oq<0 or (q=0 and oq=0) or q>x.allocated_quantity-x.normally_received_quantity-x.shortage_closed_quantity or (oq>0 and btrim(coalesce(line->>'overage_reason',''))='') then raise exception 'Invalid receipt line.'; end if;
   end loop;
-  insert into public.factory_receipt_events(user_id,factory_arrival_id,event_kind,received_at,immutable_payload,receipt_request_id) values(u,a.id,'RECEIPT',timezone('utc',now()),canonical,request_id) returning id into event_id;
+  insert into public.factory_receipt_events(user_id,factory_arrival_id,event_kind,received_at,receipt_business_date,immutable_payload,receipt_request_id) values(u,a.id,'RECEIPT',timezone('utc',now()),business_date,canonical,request_id) returning id into event_id;
   insert into public.factory_receipt_requests(user_id,receipt_request_id,payload_hash,factory_arrival_id,immutable_payload,receipt_event_id) values(u,request_id,hash,a.id,canonical,event_id);
   for line in select value from jsonb_array_elements(p_payload->'lines') loop
     q:=coalesce((line->>'quantity')::integer,0); oq:=coalesce((line->>'overage_quantity')::integer,0);
@@ -173,7 +176,7 @@ begin
     select * into i from public.factory_arrival_items where id=x.factory_arrival_item_id and user_id=u;
     select * into v from public.product_variants where id=x.product_variant_id and user_id=u;
     insert into public.inventory(user_id,model_id,size_id,color_id,warehouse_id,quantity) values(u,v.model_id,v.size_id,v.color_id,x.warehouse_id,q+oq) on conflict(user_id,model_id,size_id,color_id,warehouse_id) do update set quantity=public.inventory.quantity+excluded.quantity,updated_at=timezone('utc',now());
-    insert into public.transactions(user_id,date,model_id,size_id,color_id,type,quantity,warehouse_id,source_channel,reference_type,reference_id,memo) values(u,current_date,v.model_id,v.size_id,v.color_id,'INBOUND',q+oq,x.warehouse_id,'factory-arrival','factory_receipt_event',event_id,case when oq>0 then btrim(line->>'overage_reason') else '검수 입고' end) returning id into tx;
+    insert into public.transactions(user_id,date,model_id,size_id,color_id,type,quantity,warehouse_id,source_channel,reference_type,reference_id,memo) values(u,business_date,v.model_id,v.size_id,v.color_id,'INBOUND',q+oq,x.warehouse_id,'factory-arrival','factory_receipt_event',event_id,case when oq>0 then btrim(line->>'overage_reason') else '검수 입고' end) returning id into tx;
     insert into public.factory_receipt_lines(user_id,factory_receipt_event_id,factory_arrival_allocation_id,factory_arrival_item_id,warehouse_id,transaction_id,received_quantity,normal_quantity,overage_quantity,overage_reason,seller_sku_snapshot,product_name_snapshot,option_name_snapshot,warehouse_name_snapshot) values(u,event_id,x.id,i.id,x.warehouse_id,tx,q+oq,q,oq,case when oq>0 then btrim(line->>'overage_reason') end,i.seller_sku_snapshot,i.product_name_snapshot,i.option_name_snapshot,x.warehouse_name_snapshot);
     update public.factory_arrival_allocations set normally_received_quantity=normally_received_quantity+q,updated_at=timezone('utc',now()) where id=x.id;
     update public.factory_arrival_items set received_quantity=received_quantity+q,updated_at=timezone('utc',now()) where id=i.id;
@@ -196,18 +199,18 @@ begin
 end $$;
 
 create or replace function public.record_factory_arrival_follow_up(p_payload jsonb) returns jsonb language plpgsql security definer set search_path=private,public as $$
-declare u uuid:=auth.uid(); request_id text:=btrim(p_payload->>'receipt_request_id'); canonical jsonb; hash text; existing public.factory_receipt_requests%rowtype; c public.factory_arrival_shortage_closures%rowtype; x public.factory_arrival_allocations%rowtype; i public.factory_arrival_items%rowtype; a public.factory_arrivals%rowtype; w public.warehouses%rowtype; v public.product_variants%rowtype; q integer:=(p_payload->>'quantity')::integer; event_id bigint; line_id bigint; tx bigint;
+declare u uuid:=auth.uid(); request_id text:=btrim(p_payload->>'receipt_request_id'); business_date date:=nullif(p_payload->>'receipt_business_date','')::date; canonical jsonb; hash text; existing public.factory_receipt_requests%rowtype; c public.factory_arrival_shortage_closures%rowtype; x public.factory_arrival_allocations%rowtype; i public.factory_arrival_items%rowtype; a public.factory_arrivals%rowtype; w public.warehouses%rowtype; v public.product_variants%rowtype; q integer:=(p_payload->>'quantity')::integer; event_id bigint; line_id bigint; tx bigint;
 begin
-  if u is null or coalesce(request_id,'')='' or q is null or q<=0 or btrim(coalesce(p_payload->>'reason',''))='' then raise exception 'Invalid follow-up receipt.'; end if;
-  canonical:=jsonb_build_object('closure_id',(p_payload->>'closure_id')::bigint,'warehouse_id',(p_payload->>'warehouse_id')::bigint,'quantity',q,'reason',btrim(p_payload->>'reason')); hash:=private.factory_payload_hash(canonical);
+  if u is null or coalesce(request_id,'')='' or business_date is null or q is null or q<=0 or btrim(coalesce(p_payload->>'reason',''))='' then raise exception 'Invalid follow-up receipt.'; end if;
+  canonical:=jsonb_build_object('closure_id',(p_payload->>'closure_id')::bigint,'warehouse_id',(p_payload->>'warehouse_id')::bigint,'quantity',q,'reason',btrim(p_payload->>'reason'),'receipt_business_date',business_date); hash:=private.factory_payload_hash(canonical);
   perform pg_advisory_xact_lock(hashtextextended(u::text||':'||request_id,0)); select * into existing from public.factory_receipt_requests where user_id=u and receipt_request_id=request_id;
   if found then if existing.payload_hash<>hash then raise exception 'receipt_request_conflict'; end if; return jsonb_build_object('receipt_event_id',existing.receipt_event_id,'idempotent',true); end if;
   select * into c from public.factory_arrival_shortage_closures where id=(p_payload->>'closure_id')::bigint and user_id=u for update; if not found then raise exception 'Shortage closure not found.'; end if;
   select * into x from public.factory_arrival_allocations where id=c.factory_arrival_allocation_id and user_id=u for update; select * into i from public.factory_arrival_items where id=x.factory_arrival_item_id and user_id=u; select * into a from public.factory_arrivals where id=x.factory_arrival_id and user_id=u for update; select * into w from public.warehouses where id=(p_payload->>'warehouse_id')::bigint and user_id=u; if not found then raise exception 'Warehouse not found.'; end if; select * into v from public.product_variants where id=x.product_variant_id and user_id=u;
-  insert into public.factory_receipt_events(user_id,factory_arrival_id,event_kind,received_at,immutable_payload,receipt_request_id) values(u,a.id,'FOLLOW_UP',timezone('utc',now()),canonical,request_id) returning id into event_id;
+  insert into public.factory_receipt_events(user_id,factory_arrival_id,event_kind,received_at,receipt_business_date,immutable_payload,receipt_request_id) values(u,a.id,'FOLLOW_UP',timezone('utc',now()),business_date,canonical,request_id) returning id into event_id;
   insert into public.factory_receipt_requests(user_id,receipt_request_id,payload_hash,factory_arrival_id,immutable_payload,receipt_event_id) values(u,request_id,hash,a.id,canonical,event_id);
   insert into public.inventory(user_id,model_id,size_id,color_id,warehouse_id,quantity) values(u,v.model_id,v.size_id,v.color_id,w.id,q) on conflict(user_id,model_id,size_id,color_id,warehouse_id) do update set quantity=public.inventory.quantity+excluded.quantity,updated_at=timezone('utc',now());
-  insert into public.transactions(user_id,date,model_id,size_id,color_id,type,quantity,warehouse_id,source_channel,reference_type,reference_id,memo) values(u,current_date,v.model_id,v.size_id,v.color_id,'INBOUND',q,w.id,'factory-arrival','factory_receipt_event',event_id,btrim(p_payload->>'reason')) returning id into tx;
+  insert into public.transactions(user_id,date,model_id,size_id,color_id,type,quantity,warehouse_id,source_channel,reference_type,reference_id,memo) values(u,business_date,v.model_id,v.size_id,v.color_id,'INBOUND',q,w.id,'factory-arrival','factory_receipt_event',event_id,btrim(p_payload->>'reason')) returning id into tx;
   insert into public.factory_receipt_lines(user_id,factory_receipt_event_id,factory_arrival_allocation_id,factory_arrival_item_id,warehouse_id,factory_arrival_shortage_closure_id,transaction_id,received_quantity,normal_quantity,overage_quantity,overage_reason,seller_sku_snapshot,product_name_snapshot,option_name_snapshot,warehouse_name_snapshot) values(u,event_id,null,i.id,w.id,c.id,tx,q,0,q,btrim(p_payload->>'reason'),i.seller_sku_snapshot,i.product_name_snapshot,i.option_name_snapshot,w.name) returning id into line_id;
   perform private.enqueue_factory_variant(u,v.id); return jsonb_build_object('receipt_event_id',event_id,'receipt_line_id',line_id,'idempotent',false);
 end $$;

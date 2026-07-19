@@ -48,8 +48,9 @@ begin
  for v_row in select * from jsonb_array_elements(p_rows) loop
    v_sku:=private.normalize_supplier_external_sku(v_row->>'externalSku');
    select product_variant_id into v_variant from public.supplier_sku_links where user_id=v_user and supplier_id=p_supplier_id and normalized_external_sku=v_sku and is_active;
-   if nullif(v_row->>'validationError','') is not null or nullif(v_row->>'quantity','')::integer is null or nullif(v_row->>'quantity','')::integer<=0 then raise exception 'review_blocker:%', coalesce(v_row->>'sourceRowNumber',''); end if;
-   if coalesce(v_sku,'')='' or v_variant is null then raise exception 'mapping_blocker:%', coalesce(v_row->>'externalSku',''); end if;
+   -- Invalid and unmapped rows are immutable review evidence. The former
+   -- mapping_blocker registration error is intentionally deferred: promotion,
+   -- not registration, is the trusted blocker for these rows.
  end loop;
  insert into public.inbound_import_revisions(user_id,inbound_import_id,revision_number,supersedes_revision_id,source_filename,source_storage_path,source_file_hash,template_id,template_version_id,source_sheet_name,source_header_row_number,source_headers)
  values(v_user,v_import.id,v_number,case when v_number>1 then v_previous.id end,p_source_filename,p_source_storage_path,p_source_file_hash,p_template_id,p_template_version_id,p_sheet_name,p_header_row_number,coalesce(p_headers,'{}'::jsonb)) returning id into v_revision;
@@ -57,7 +58,7 @@ begin
    v_ordinal:=v_ordinal+1; v_sku:=private.normalize_supplier_external_sku(v_row->>'externalSku');
    select product_variant_id into v_variant from public.supplier_sku_links where user_id=v_user and supplier_id=p_supplier_id and normalized_external_sku=v_sku and is_active;
    insert into public.inbound_import_source_rows(user_id,inbound_import_revision_id,source_row_ordinal,source_row_number,external_sku,raw_quantity,quantity,source_values,validation_error,product_variant_id,seller_sku_snapshot,product_name_snapshot,option_name_snapshot,supplier_name_snapshot)
-   select v_user,v_revision,v_ordinal,nullif(v_row->>'sourceRowNumber','')::integer,v_row->>'externalSku',v_row->>'rawQuantity',nullif(v_row->>'quantity','')::integer,coalesce(v_row->'sourceValues','{}'::jsonb),nullif(v_row->>'validationError',''),v_variant,pv.seller_sku,m.name,concat_ws(' / ',c.name,s.name),f.name from public.factories f join public.product_variants pv on pv.id=v_variant and pv.user_id=v_user left join public.models m on m.id=pv.model_id and m.user_id=v_user left join public.sizes s on s.id=pv.size_id and s.user_id=v_user left join public.colors c on c.id=pv.color_id and c.user_id=v_user where f.id=p_supplier_id and f.user_id=v_user;
+   select v_user,v_revision,v_ordinal,nullif(v_row->>'sourceRowNumber','')::integer,v_row->>'externalSku',v_row->>'rawQuantity',nullif(v_row->>'quantity','')::integer,coalesce(v_row->'sourceValues','{}'::jsonb),nullif(v_row->>'validationError',''),v_variant,pv.seller_sku,m.name,concat_ws(' / ',c.name,s.name),f.name from public.factories f left join public.product_variants pv on pv.id=v_variant and pv.user_id=v_user left join public.models m on m.id=pv.model_id and m.user_id=v_user left join public.sizes s on s.id=pv.size_id and s.user_id=v_user left join public.colors c on c.id=pv.color_id and c.user_id=v_user where f.id=p_supplier_id and f.user_id=v_user;
  end loop;
  return query select v_import.id,v_revision,v_number,v_number>1;
 exception when unique_violation then
