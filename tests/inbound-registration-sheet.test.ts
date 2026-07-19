@@ -25,7 +25,7 @@ import InboundRegistrationSheet from '@/app/components/inventory/InboundRegistra
 const templates = [{ id: 7, name: '중국 공장 기본', versionId: 11, versionNumber: 1 }]
 
 describe('InboundRegistrationSheet', () => {
-  it('shows one unified entry surface with template, a large upload area, and editable manual rows', () => {
+  it('requires a supplier file and keeps manual row entry out of the import surface', () => {
     render(React.createElement(InboundRegistrationSheet, {
       suppliers: [{ id: 4, name: '한빛 공장' }], warehouses: [{ id: 2, name: '대자동' }], templates,
       initialWarehouseId: 2,
@@ -34,7 +34,8 @@ describe('InboundRegistrationSheet', () => {
     expect(screen.getByRole('combobox', { name: '입고 템플릿' })).toBeTruthy()
     expect(screen.getByLabelText('입고 파일 업로드')).toBeTruthy()
     expect(screen.getByText('파일을 놓거나 선택하세요')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '행 추가' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '행 추가' })).toBeNull()
+    expect(screen.queryByLabelText('외부 SKU')).toBeNull()
     expect(screen.getByRole('button', { name: '검토 저장' })).toBeTruthy()
     expect(screen.queryByRole('combobox', { name: '입고 창고' })).toBeNull()
     expect(screen.queryByRole('tab')).toBeNull()
@@ -67,7 +68,7 @@ describe('InboundRegistrationSheet', () => {
 
     await waitFor(() => expect(mocks.previewInboundTemplateFile).toHaveBeenCalledWith({ supplierId: 4, templateVersionId: 11, file }))
     expect(screen.queryByRole('combobox', { name: '입고 창고' })).toBeNull()
-    await waitFor(() => expect(screen.getAllByLabelText('외부 SKU')).toHaveLength(2))
+    await waitFor(() => expect(screen.getAllByText('EXT-1')).toHaveLength(2))
     expect(screen.getByText('상품 관리에서 SKU 만들기')).toBeTruthy()
     fireEvent.click(screen.getAllByRole('combobox', { name: '내부 SKU' })[0])
     fireEvent.click(await screen.findByRole('option', { name: '티셔츠 · M / 블랙 · TS-M-BLK' }))
@@ -98,24 +99,21 @@ describe('InboundRegistrationSheet', () => {
     expect(screen.getByLabelText('샘플 파일')).toBeTruthy()
   })
 
-  it('keeps the upload draft open while a missing SKU is created in product management', () => {
+  it('does not expose product creation until file review finds an unresolved SKU', () => {
     render(React.createElement(InboundRegistrationSheet, {
       suppliers: [{ id: 4, name: '한빛 공장' }], warehouses: [{ id: 2, name: '대자동' }], templates,
     }))
 
-    const productLink = screen.getByRole('link', { name: '상품 관리에서 SKU 만들기' })
-    expect(productLink.getAttribute('target')).toBe('_blank')
-    expect(productLink.getAttribute('href')).toContain('returnTo=%2Finventory')
-    fireEvent.click(screen.getByRole('button', { name: '상품 목록 새로고침' }))
-    expect(mocks.refresh).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('link', { name: '상품 관리에서 SKU 만들기' })).toBeNull()
+    expect(mocks.refresh).not.toHaveBeenCalled()
   })
 
-  it('preserves the sourcing return path when launched from arrivals', () => {
+  it('does not create a separate manual supplier-import path when launched from arrivals', () => {
     render(React.createElement(InboundRegistrationSheet, {
       suppliers: [], warehouses: [], templates: [], returnTo: '/sourcing/arrivals',
     }))
 
-    expect(screen.getByRole('link', { name: '상품 관리에서 SKU 만들기' }).getAttribute('href'))
-      .toContain('returnTo=%2Fsourcing%2Farrivals')
+    expect(screen.queryByRole('button', { name: '행 추가' })).toBeNull()
+    expect(screen.getByText('파일을 올리면 원본 행을 검토하고 내부 SKU를 연결할 수 있습니다.')).toBeTruthy()
   })
 })
