@@ -5,6 +5,14 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 import { ui } from '@/app/components/ui'
 
+/**
+ * Button size ROLE hierarchy (docs/design/components.md §Button 크기 역할 계층,
+ * enforced by ADR-018 UI-system-check via tests/ui-token-presets.test.ts):
+ * - 주 동작(primary/main action) -> size="default" (44px, --control-h)
+ * - 보조 동작(secondary action)  -> size="sm" (40px, --control-h-md)
+ * - 부가 동작(tertiary/low-emphasis) -> variant="ghost" (배경/보더 없음, size는 그대로 유지)
+ * 화면의 모든 버튼을 size="sm"으로 통일하지 않는다 — 강조 예산(docs/design/ui-guide.md §인지·그룹핑 원칙)의 1차 도구다.
+ */
 const buttonVariants = cva(ui.button, {
   variants: {
     variant: {

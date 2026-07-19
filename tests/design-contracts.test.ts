@@ -77,4 +77,47 @@ describe('design composition contracts', () => {
     expect(screen.getByText('연속 본문').className).toContain('ui-card-content-continuous')
     expect(screen.getByText('연속 본문').className).toContain('p-0')
   })
+
+  it('keeps the card composition contract elevation token aligned with the card = elevation-2 baseline', () => {
+    const contract = readContract()
+
+    expect(contract.compositions.length).toBeGreaterThan(0)
+    for (const composition of contract.compositions) {
+      expect(composition.tokens.elevation).toBe('var(--elevation-2)')
+    }
+  })
+})
+
+describe('elevation baseline (ADR-018 UI-system-check)', () => {
+  const globalsSource = fs.readFileSync(path.resolve(process.cwd(), 'src/app/globals.css'), 'utf8')
+
+  function expectElevation(className: string, level: number) {
+    const pattern = new RegExp(`\\.${className}(?![\\w-])[^{}]*\\{[^}]*box-shadow:\\s*var\\(--elevation-${level}\\)`)
+    expect(globalsSource).toMatch(pattern)
+  }
+
+  it('raises the card surface baseline to elevation-2', () => {
+    expectElevation('ui-card', 2)
+  })
+
+  it('keeps dropdown/select overlays at elevation-3', () => {
+    expectElevation('ui-select-content', 3)
+    expectElevation('ui-dropdown-menu-content', 3)
+  })
+
+  it('keeps modal and fixed-sheet surfaces at elevation-4', () => {
+    expectElevation('ui-modal', 4)
+    expectElevation('ui-surface-strong', 4)
+  })
+
+  it('gives .ui-card its own elevation-2 override rule after the shared surface/card baseline block', () => {
+    // The shared `.surface, .ui-surface, .ui-card` block still carries the generic elevation-1
+    // hairline; a later dedicated `.ui-card { box-shadow: var(--elevation-2) }` rule must win the
+    // cascade so cards actually render at the raised baseline.
+    const sharedBlockIndex = globalsSource.indexOf('box-shadow: var(--elevation-1);')
+    const dedicatedCardRuleIndex = globalsSource.search(/\.ui-card\s*\{\s*box-shadow:\s*var\(--elevation-2\);\s*\}/)
+
+    expect(sharedBlockIndex).toBeGreaterThan(-1)
+    expect(dedicatedCardRuleIndex).toBeGreaterThan(sharedBlockIndex)
+  })
 })

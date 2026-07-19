@@ -123,9 +123,11 @@ one-off shadow는 금지한다.
 | 1 | `--elevation-1`: `0 1px 2px rgba(28, 25, 23, 0.05)` | subtle / hairline |
 | 2 | `--elevation-2`: `0 4px 12px rgba(28, 25, 23, 0.08)` | card |
 | 3 | `--elevation-3`: `0 16px 40px rgba(28, 25, 23, 0.10)` | dropdown / overlay |
-| 4 | `--elevation-4`: `0 28px 70px rgba(28, 25, 23, 0.16)` | modal |
+| 4 | `--elevation-4`: `0 28px 70px rgba(28, 25, 23, 0.16)` | modal / fixed-sheet |
 
 `--shadow`는 legacy alias이며 `var(--elevation-1)`과 동일하다.
+
+elevation baseline은 surface 종류로 고정한다: `card`(`Card`, `ui.card`)는 `--elevation-2`, dropdown/select/overlay(`ui-select-content`, `ui-dropdown-menu-content`)는 `--elevation-3`, modal과 fixed-sheet(`ui-modal`, `ui-surface-strong`)는 `--elevation-4`다. 근접성·공통 영역·강조 예산 등 인지 원칙은 [UI_GUIDE.md 인지·그룹핑 원칙](./ui-guide.md#인지그룹핑-원칙)을 따르며, [ADR-018](../adr/0018-ui-system-checks.md) UI-system-check가 `tests/design-contracts.test.ts`로 이 baseline을 강제한다.
 
 ## Usage Rules
 

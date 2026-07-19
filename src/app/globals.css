@@ -199,6 +199,17 @@
     border-width: 2px;
   }
 
+  /* Elevation baseline (ADR-018 UI-system-check / docs/design/ui-guide.md §인지·그룹핑 원칙):
+     card = elevation-2, dropdown/overlay = elevation-3, modal/fixed-sheet = elevation-4. */
+  .ui-card {
+    box-shadow: var(--elevation-2);
+  }
+
+  /* FixedSheet is the only consumer of ui-surface-strong; it is a modal-tier fixed overlay. */
+  .ui-surface-strong {
+    box-shadow: var(--elevation-4);
+  }
+
   .ui-label {
     display: block;
     margin-bottom: var(--space-1);

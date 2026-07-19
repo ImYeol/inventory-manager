@@ -16,7 +16,7 @@
 | `ChannelBadge`, `Channel`, `ChannelListingStatus` | `channel-badge.tsx` | 채널명과 판매/동기화 상태를 함께 노출하는 canonical badge | `channel`: `naver` \| `coupang`; `listingStatus`: `active` \| `unregistered` \| `paused` \| `sync-error`; 선택 `compact` | 주문, 상품 관리, 채널 동기화의 channel/listing 상태 | page-local channel chip 또는 채널 색만으로 상태를 만들지 않는다. |
 | `ProductVariantCombobox` | `product-variant-combobox.tsx` | 내부 판매 옵션을 검색·명시 선택하는 combobox | `variants`, `value`, `onValueChange` | 미연결 채널 상품의 수동 variant 연결 | 상품명으로 자동 선택하거나 free-text 상품 생성을 넣지 않는다. |
 | `BasicDataTable` | `basic-data-table.tsx` | generic 조회·preview table | `columns`, `rows`, `rowKey`, `renderCell`, `emptyState`; 선택적으로 `onRowClick`, `rowAriaLabel`, `getRowClassName`, `bare` | 열과 셀 렌더러를 화면이 제공하는 조회 table. `bare`는 자체 border를 빼고 `TableSurface` 안에서 seamless하게 쓴다 | 편집 input table이나 화면별 `<table>`을 만들지 않는다. |
-| `Button`, `buttonVariants`, `ButtonProps` | `button.tsx` | tokenized action/button | `variant`: `default`, `success`, `warning`, `destructive`, `outline`, `secondary`, `ghost`, `link`; `size`: `default`, `sm`, `lg`, `icon`; `asChild` | 링크/행동을 구분한 모든 공용 버튼 | page-local 색상·border 버튼을 만들지 않는다. |
+| `Button`, `buttonVariants`, `ButtonProps` | `button.tsx` | tokenized action/button | `variant`: `default`, `success`, `warning`, `destructive`, `outline`, `secondary`, `ghost`, `link`; `size`: `default`, `sm`, `lg`, `icon`; `asChild` | 링크/행동을 구분한 모든 공용 버튼. `size`는 역할 계층이다 — [Button 크기 역할 계층](#button-크기-역할-계층) 참고 | page-local 색상·border 버튼을 만들지 않는다. 화면의 모든 버튼을 `size="sm"`으로 통일하지 않는다. |
 | `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter` | `card.tsx` | bordered surface 구조 | `Card.surface`: `default`, `muted`, `strong`; `CardContent.contentLayout`: `inset`, `continuous` | 필요한 card/surface와 header-body-footer 구조 | [card composition contract](../../design-system/contracts/card.composition.json)를 따르고, 화면에서 divider/body spacing을 className으로 재정의하지 않는다. |
 | `ColumnVisibilityMenu`, `ColumnOption` | `column-visibility-menu.tsx` | 컬럼 토글 dropdown | `columns`, `visibleColumns`, `onToggle` | `InventoryTableToolbar`의 재고 조회 컬럼 표시 control | 화면별 컬럼 토글 dropdown을 새로 만들지 않는다. |
 | `DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuCheckboxItem`, `DropdownMenuRadioItem`, `DropdownMenuLabel`, `DropdownMenuSeparator`, `DropdownMenuGroup`, `DropdownMenuPortal`, `DropdownMenuSub`, `DropdownMenuSubTrigger`, `DropdownMenuSubContent`, `DropdownMenuRadioGroup`, `DropdownMenuShortcut` | `dropdown-menu.tsx` | Radix 기반 action/selection menu | Radix props; 일부 item/label/sub-trigger는 `inset`; content는 `sideOffset` | menu, checkbox/radio 선택, sub-menu | native menu 또는 페이지별 popup menu를 만들지 않는다. |
@@ -36,6 +36,21 @@
 | `TableSurface` | `table-surface.tsx` | filter toolbar + table을 하나로 묶는 통합 data surface | `toolbar`, `children`, `footer`, `className`, `scrollClassName` | 조회 화면의 canonical shell. toolbar strip → divider → table body → footer가 하나의 bordered surface로 읽힌다 | filter 박스와 table shell을 별도 카드 2개로 쌓지 않는다. child table은 자체 border(`ui-table-shell`)를 갖지 않는다. |
 | `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent` | `tabs.tsx` | Radix view switch | Radix tabs props와 `className` | 같은 page의 상위 view switch | filter chip 또는 action toggle로 쓰지 않는다. |
 | `ActionToolbar`, `ToolbarLinkAction`, `ToolbarButtonAction`, `ToolbarIconButton` | `toolbar.tsx` | compact action rail | link: `href`; button: button props; icon button: `label`, `icon` | 인접 surface에 붙는 navigation/data action group | navigation과 data mutation을 같은 element 역할로 섞지 않는다. |
+
+## Button 크기 역할 계층
+
+`Button`의 `size`는 임의 선택이 아니라 액션의 역할을 나타내는 계층이다. 화면의 모든 버튼을 `size="sm"`으로 통일하면 무엇이 중요한 동작인지 구분되지 않는다([ui-guide.md 강조 예산](./ui-guide.md#인지그룹핑-원칙) 참고).
+
+| 역할 | `size` | 높이 토큰 ([DESIGN.md](./tokens.md#control-size--density)) | 예시 |
+| --- | --- | --- | --- |
+| 주 동작 (primary/main action) | `default` (`md`) | `--control-h` (44px) | `저장`, `등록`, `입고` |
+| 보조 동작 (secondary action) | `sm` | `--control-h-md` (40px) | `취소`, `필터`, 보조 CTA |
+| 부가 동작 (tertiary/low-emphasis) | `variant="ghost"` (size는 `sm` 또는 `default` 그대로 유지) | 동일 높이, 배경/보더 없음 | 아이콘 액션, 목록 내 저노이즈 버튼 |
+
+- 한 surface(카드/toolbar/시트) 안에서 filled primary 버튼은 최대 1개다.
+- `ghost`는 배경/보더를 없애 강조를 낮추는 variant이며 `size`와 독립적으로 조합한다.
+- 기존 화면을 이 규칙에 맞춰 한 번에 재작성할 필요는 없다. 새로 만들거나 고치는 화면부터 이 계층을 따른다.
+- 이 규칙은 [ADR-018](../adr/0018-ui-system-checks.md) UI-system-check가 `tests/ui-token-presets.test.ts`로 강제한다.
 
 ## Preset 카탈로그
 

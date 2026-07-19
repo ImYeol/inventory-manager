@@ -14,7 +14,8 @@
       "tokens": {
         "bodyInset": "var(--space-4)",
         "border": "var(--border-strong)",
-        "radius": "var(--radius-lg)"
+        "radius": "var(--radius-lg)",
+        "elevation": "var(--elevation-2)"
       }
     },
     {
@@ -22,7 +23,8 @@
       "contentLayout": "continuous",
       "tokens": {
         "border": "var(--border-strong)",
-        "radius": "var(--radius-lg)"
+        "radius": "var(--radius-lg)",
+        "elevation": "var(--elevation-2)"
       }
     }
   ]

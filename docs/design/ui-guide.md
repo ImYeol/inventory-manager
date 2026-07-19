@@ -403,6 +403,47 @@ src/components/ui/
 - page-local border patch로 임시 봉합하지 말고 shared card/surface primitive의 variant와 padding/token을 고쳐서 해결한다.
 - Card의 divider/body 관계는 [card composition contract](../../design-system/contracts/card.composition.json)가 정의한다. 이 문서는 의도를 설명하고, contract는 component composition을 정의하며, code와 harness가 이를 검증한다.
 
+## 인지·그룹핑 원칙
+
+새 화면이 flat·무계층 baseline으로 회귀하지 않도록, 아래 원칙을 모든 화면 설계·리뷰에 적용한다. 이 원칙은 [ADR-025](../adr/0025-visual-token-hierarchy.md)의 토큰 계층을 인지 차원으로 확장한 것이며, [ADR-018](../adr/0018-ui-system-checks.md) UI-system-check가 `tests/design-contracts.test.ts`, `tests/ui-token-presets.test.ts`, `tests/shared-primitives-tokens.test.ts`로 강제한다.
+
+### 1. 근접성 (Proximity)
+- 같은 그룹에 속한 control 사이 간격은 그룹 간 간격보다 항상 작아야 한다.
+- 그룹 내부는 `--space-1`~`--space-2`, 그룹 사이는 `--space-4` 이상을 기본 리듬으로 삼는다.
+- 하나의 spacing 값으로 모든 간격을 통일하지 않는다. 간격 차이 자체가 그룹 경계를 표현한다.
+
+### 2. 공통 영역 (Common Region)
+- 관련 control은 하나의 region(카드, 클러스터, toolbar segment) 안에 담는다.
+- 관련 없는 control을 구분 없이 한 줄에 flat하게 나열하지 않는다(예: 서로 다른 목적의 select를 경계 없이 한 줄에 배치).
+- region 경계는 `Card`, `FilterToolbar`의 cluster, `actionGroupDense` 같은 shared primitive/preset으로 표현하고, page-local wrapper div로 새로 만들지 않는다(ADR-019).
+
+### 3. 시각 계층 (Visual Hierarchy: size / weight / contrast)
+- 제목, 섹션 라벨, 본문, 메타 텍스트는 크기·굵기·대비로 구분되어야 하며 같은 크기·굵기를 반복하지 않는다.
+- 타입 강조 tier:
+
+| tier | 용도 | 토큰 |
+| --- | --- | --- |
+| heading | page/section 제목 | `--text-lg` 이상 + `--fw-semibold` |
+| section-label | 카드/그룹 소제목 | `--text-xs`/`--text-sm` + `--fw-semibold` |
+| body | 본문/표 셀 | `--text-base`/`--text-md` + `--fw-regular` |
+| meta | 보조 설명, 타임스탬프 | `--text-xs` + `--fw-regular`, `--muted-foreground` |
+
+### 4. 강조 예산 (Emphasis Budget)
+- 하나의 surface(카드/toolbar/시트)에서 강하게 강조된 요소는 1~2개로 제한한다(filled primary 버튼 1개, 강조 배지 1개 수준).
+- 강조를 늘리고 싶다면 기존 강조 요소를 먼저 낮출 수 있는지 검토한다. 전부 강조하면 아무것도 강조되지 않는다.
+- [Button 크기 역할 계층](./components.md#button-크기-역할-계층)이 강조 예산의 1차 도구다: 주 동작=`default`, 보조=`sm`, 부가=`ghost`.
+
+### 5. Elevation 계층 (Surface depth)
+- surface 종류별 elevation baseline은 [DESIGN.md](./tokens.md#elevation)가 SoT다: `card = --elevation-2`, `dropdown/overlay = --elevation-3`, `modal/fixed-sheet = --elevation-4`.
+- 새 표면을 추가할 때 임의 shadow를 만들지 않고 이 baseline 중 하나를 고른다.
+
+### 외부 근거
+- [NN/g Visual Hierarchy](https://www.nngroup.com/articles/visual-hierarchy-ux-definition/)
+- [NN/g Common Region](https://www.nngroup.com/articles/common-region/)
+- [NN/g 5 Principles of Visual Design](https://www.nngroup.com/articles/principles-visual-design/)
+- [IxDF Visual Hierarchy](https://ixdf.org/literature/topics/visual-hierarchy)
+- [Gestalt Common Region](https://www.gestaltprinciples.com/principles/common-region)
+
 ## 모션
 - duration, easing, reduced-motion의 SoT는 [MOTION.md](./motion.md)다.
 - 허용:
