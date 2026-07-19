@@ -52,6 +52,7 @@ describe('SettingsParseTemplatesPage', () => {
     expect(screen.getAllByText('사용 중지')).not.toHaveLength(0)
     expect(screen.getByText('내 프리셋')).toBeTruthy()
     expect(screen.getByText('쿠팡 송장')).toBeTruthy()
+    expect(screen.getByText('입고·주문 송장 가져오기가 공유하는 파일 파싱 템플릿을 목록·버전·프리셋으로 관리합니다.')).toBeTruthy()
     const returnLink = screen.getByRole('link', { name: /설정으로/ })
     expect(returnLink.getAttribute('href')).toBe('/settings')
   })

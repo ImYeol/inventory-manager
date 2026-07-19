@@ -13,6 +13,7 @@ import {
   PackageSearch,
   KeyRound,
   ClipboardList,
+  FileCode2,
 } from 'lucide-react'
 import { logout } from '@/app/login/actions'
 import { MenuLink, MenuSection } from '@/components/ui/menu'
@@ -145,6 +146,12 @@ function NavigationContent({
               <Link href="/settings?section=store-connections" onClick={onNavigate}>
                 <KeyRound className="h-4 w-4" />
                 API 설정
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild className="gap-2">
+              <Link href="/settings/parse-templates" onClick={onNavigate}>
+                <FileCode2 className="h-4 w-4" />
+                파싱 템플릿
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />

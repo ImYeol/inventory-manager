@@ -103,11 +103,12 @@ describe('Nav', () => {
     expect(screen.getAllByText('hong@example.com')).toHaveLength(2)
   })
 
-  it('keeps API settings in the account menu on desktop and mobile', () => {
+  it('keeps settings and parse-template management deep links in the account menu on desktop and mobile', () => {
     render(React.createElement(Nav, { user: { name: '홍길동', email: 'hong@example.com' } }))
 
     fireEvent.pointerDown(screen.getAllByRole('button', { name: /홍길동/ })[0], { button: 0, ctrlKey: false })
     expect(screen.getByRole('menuitem', { name: 'API 설정' }).getAttribute('href')).toBe('/settings?section=store-connections')
+    expect(screen.getByRole('menuitem', { name: '파싱 템플릿' }).getAttribute('href')).toBe('/settings/parse-templates')
     expect(screen.getByText('로그아웃')).toBeTruthy()
 
     cleanup()
@@ -116,5 +117,6 @@ describe('Nav', () => {
     const mobileMenu = within(screen.getByRole('dialog', { name: '모바일 메뉴' }))
     fireEvent.pointerDown(mobileMenu.getByRole('button', { name: /홍길동/ }), { button: 0, ctrlKey: false })
     expect(screen.getAllByRole('menuitem', { name: 'API 설정' }).some((item) => item.getAttribute('href') === '/settings?section=store-connections')).toBe(true)
+    expect(screen.getAllByRole('menuitem', { name: '파싱 템플릿' }).some((item) => item.getAttribute('href') === '/settings/parse-templates')).toBe(true)
   })
 })
