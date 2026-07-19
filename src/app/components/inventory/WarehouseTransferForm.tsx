@@ -21,13 +21,15 @@ function Picker({ label, value, onChange, options, disabled = false }: { label: 
   return <div><label className={ui.label}>{label}</label><Select value={value === '' ? EMPTY : String(value)} onValueChange={(next) => onChange(next === EMPTY || !next ? '' : Number(next))} disabled={disabled}><SelectTrigger aria-label={label} className={ui.controlSm}><SelectValue placeholder={`${label} 선택`} /></SelectTrigger><SelectContent><SelectItem value={EMPTY}>{label} 선택</SelectItem>{options.map((option) => <SelectItem key={option.id} value={String(option.id)}>{option.name}</SelectItem>)}</SelectContent></Select></div>
 }
 
-export default function WarehouseTransferForm({ models, warehouses, initialWarehouseId, onSubmitted }: { models: Model[]; warehouses: Warehouse[]; initialWarehouseId?: number; onSubmitted?: () => void }) {
+type InitialVariant = { modelId: number; sizeId: number; colorId: number }
+
+export default function WarehouseTransferForm({ models, warehouses, initialWarehouseId, initialVariant, onSubmitted }: { models: Model[]; warehouses: Warehouse[]; initialWarehouseId?: number; initialVariant?: InitialVariant; onSubmitted?: () => void }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [date, setDate] = useState(today)
-  const [modelId, setModelId] = useState<number | ''>('')
-  const [sizeId, setSizeId] = useState<number | ''>('')
-  const [colorId, setColorId] = useState<number | ''>('')
+  const [modelId, setModelId] = useState<number | ''>(initialVariant?.modelId ?? '')
+  const [sizeId, setSizeId] = useState<number | ''>(initialVariant?.sizeId ?? '')
+  const [colorId, setColorId] = useState<number | ''>(initialVariant?.colorId ?? '')
   const [fromWarehouseId, setFromWarehouseId] = useState<number | ''>(initialWarehouseId ?? '')
   const [toWarehouseId, setToWarehouseId] = useState<number | ''>('')
   const [quantity, setQuantity] = useState<number | ''>('')

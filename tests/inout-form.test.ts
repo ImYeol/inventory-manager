@@ -215,6 +215,38 @@ describe('InOutForm', () => {
     expect(screen.getByText('-3')).toBeTruthy()
   })
 
+  it('pre-fills the first row with the requested variant and looks up its stock without requiring the user to re-pick product/size/color', async () => {
+    mocks.getCurrentStock.mockResolvedValue(5)
+
+    render(
+      React.createElement(InOutForm, {
+        warehouses: [{ id: 7, name: '본사 창고' }],
+        lockedWarehouseId: 7,
+        operation: 'count-adjustment',
+        initialVariant: { modelId: 1, sizeId: 11, colorId: 21 },
+        models: [
+          {
+            id: 1,
+            name: 'LP01',
+            sizes: [{ id: 11, name: 'S', sortOrder: 1, modelId: 1 }],
+            colors: [{ id: 21, name: '네이비', rgbCode: '#111111', textWhite: true, sortOrder: 1, modelId: 1 }],
+          },
+        ],
+      }),
+    )
+
+    expect(screen.getAllByRole('combobox', { name: '상품' })[0].textContent).toContain('LP01')
+    expect(screen.getAllByRole('combobox', { name: '사이즈' })[0].textContent).toContain('S')
+    expect(screen.getAllByRole('combobox', { name: '색상' })[0].textContent).toContain('네이비')
+    expect(mocks.getCurrentStock).toHaveBeenCalledWith(1, 11, 21, 7)
+    await waitFor(() => expect(screen.getByText('5')).toBeTruthy())
+
+    // The absolute count semantics still hold for a pre-filled row: quantity is
+    // an absolute physical count, not a delta added on top of current stock.
+    fireEvent.change(screen.getAllByRole('spinbutton')[0], { target: { value: '5' } })
+    expect(screen.getByText('0')).toBeTruthy()
+  })
+
   it('uses product language rather than the legacy model label in the editor', () => {
     render(
       React.createElement(InOutForm, {

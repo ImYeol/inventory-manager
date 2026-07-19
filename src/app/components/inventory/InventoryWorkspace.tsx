@@ -126,6 +126,12 @@ export default function InventoryWorkspace({
   const [statusFilter, setStatusFilter] = useState<'all' | 'normal' | 'warning' | 'danger'>('all')
   const [activeView, setActiveView] = useState<ViewMode>('list')
   const [overlayMode, setOverlayMode] = useState<'inbound' | 'manual-outbound' | 'count-adjustment' | 'transfer' | null>(null)
+  const [rowQuickAction, setRowQuickAction] = useState<{
+    modelId: number
+    sizeId: number
+    colorId: number
+    warehouseId: number
+  } | null>(null)
   const [historyFilters, setHistoryFilters] = useState<HistoryFilterState>({
     warehouseId: '',
     type: '',
@@ -230,6 +236,10 @@ export default function InventoryWorkspace({
                   variant: status.tone,
                 },
                 rawStatus: status.raw,
+                onAdjust: () => {
+                  setRowQuickAction({ modelId: model.id, sizeId: size.id, colorId: color.id, warehouseId: warehouse.id })
+                  setOverlayMode('count-adjustment')
+                },
               }
             })
         }),
@@ -258,6 +268,15 @@ export default function InventoryWorkspace({
     })
   }
 
+  // A row quick action locks the sheet to that row's own warehouse (it opened
+  // the sheet for that specific row), overriding the toolbar warehouse filter.
+  const activeWarehouseId = rowQuickAction?.warehouseId ?? (typeof selectedWarehouseId === 'number' ? selectedWarehouseId : undefined)
+
+  const closeOverlay = () => {
+    setOverlayMode(null)
+    setRowQuickAction(null)
+  }
+
   return (
     <div className={ui.shell}>
       <PageHeader title="재고 운영" description="재고를 조회하고 바로 입고/출고 처리합니다." />
@@ -282,10 +301,22 @@ export default function InventoryWorkspace({
                 columns={ALL_COLUMNS}
                 visibleColumns={visibleColumns}
                 onToggleColumn={toggleColumn}
-                onInbound={() => setOverlayMode('inbound')}
-                onOutbound={() => setOverlayMode('manual-outbound')}
-                onAdjustment={() => setOverlayMode('count-adjustment')}
-                onTransfer={() => setOverlayMode('transfer')}
+                onInbound={() => {
+                  setRowQuickAction(null)
+                  setOverlayMode('inbound')
+                }}
+                onOutbound={() => {
+                  setRowQuickAction(null)
+                  setOverlayMode('manual-outbound')
+                }}
+                onAdjustment={() => {
+                  setRowQuickAction(null)
+                  setOverlayMode('count-adjustment')
+                }}
+                onTransfer={() => {
+                  setRowQuickAction(null)
+                  setOverlayMode('transfer')
+                }}
               />
             }
           >
@@ -315,20 +346,22 @@ export default function InventoryWorkspace({
               ? '주문 발송과 별도로 현재 보유 재고를 차감합니다. 사유는 이력에 기록됩니다.'
               : overlayMode === 'transfer' ? '출발 재고를 차감하고 도착 창고에 같은 수량을 원자적으로 반영합니다.' : '실사 수량을 기준으로 현재 재고와의 차이를 이력에 기록합니다.'
         }
-        onClose={() => setOverlayMode(null)}
+        onClose={closeOverlay}
       >
         {overlayMode === 'transfer' ? <WarehouseTransferForm
           models={normalizedModels}
           warehouses={warehouses}
-          initialWarehouseId={typeof selectedWarehouseId === 'number' ? selectedWarehouseId : undefined}
-          onSubmitted={() => setOverlayMode(null)}
+          initialWarehouseId={activeWarehouseId}
+          initialVariant={rowQuickAction ?? undefined}
+          onSubmitted={closeOverlay}
         /> : <InOutForm
           models={normalizedModels}
           warehouses={warehouses}
           operation={overlayMode ?? 'inbound'}
-          initialWarehouseId={typeof selectedWarehouseId === 'number' ? selectedWarehouseId : warehouses[0]?.id}
-          lockedWarehouseId={typeof selectedWarehouseId === 'number' ? selectedWarehouseId : null}
-          onSubmitted={() => setOverlayMode(null)}
+          initialWarehouseId={activeWarehouseId ?? warehouses[0]?.id}
+          lockedWarehouseId={activeWarehouseId ?? null}
+          initialVariant={rowQuickAction ?? undefined}
+          onSubmitted={closeOverlay}
         />}
       </FixedSheet>
     </div>

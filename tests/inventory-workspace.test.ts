@@ -26,20 +26,35 @@ vi.mock('@/app/(protected)/inout/InOutForm', () => ({
     initialType,
     operation,
     lockedWarehouseId,
+    initialVariant,
   }: {
     initialType?: string
     operation?: string
     lockedWarehouseId?: number | null
+    initialVariant?: { modelId: number; sizeId: number; colorId: number }
   }) =>
     React.createElement(
       'div',
       {},
-      `InOutForm:${operation ?? initialType ?? '입고'}:${lockedWarehouseId ?? 'all'}`,
+      `InOutForm:${operation ?? initialType ?? '입고'}:${lockedWarehouseId ?? 'all'}:${
+        initialVariant ? `${initialVariant.modelId}-${initialVariant.sizeId}-${initialVariant.colorId}` : 'none'
+      }`,
     ),
 }))
 
 vi.mock('@/app/components/inventory/WarehouseTransferForm', () => ({
-  default: () => React.createElement('div', {}, 'WarehouseTransferForm'),
+  default: ({
+    initialVariant,
+  }: {
+    initialVariant?: { modelId: number; sizeId: number; colorId: number }
+  }) =>
+    React.createElement(
+      'div',
+      {},
+      `WarehouseTransferForm:${
+        initialVariant ? `${initialVariant.modelId}-${initialVariant.sizeId}-${initialVariant.colorId}` : 'none'
+      }`,
+    ),
 }))
 
 vi.mock('@/app/(protected)/history/HistoryView', () => ({
@@ -149,9 +164,10 @@ describe('InventoryWorkspace', () => {
     expect(screen.getByLabelText('상태 필터')).toBeTruthy()
     expect(screen.getByRole('button', { name: '컬럼' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '수동 입고' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '수동 출고' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '실사 조정' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '창고 이동' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '수동 출고' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '실사 조정' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '창고 이동' })).toBeNull()
+    expect(screen.getByRole('button', { name: '다른 재고 운영 action 더보기' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '재고 추가' })).toBeNull()
     expect(within(screen.getByRole('table')).getByText('현재 재고')).toBeTruthy()
     expect(within(screen.getByRole('table')).getByText('예약 재고')).toBeTruthy()
@@ -175,19 +191,54 @@ describe('InventoryWorkspace', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '수동 입고' }))
     expect(screen.getByRole('dialog', { name: '수동 입고' })).toBeTruthy()
-    expect(screen.getByText('InOutForm:inbound:2')).toBeTruthy()
+    expect(screen.getByText('InOutForm:inbound:2:none')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: '수동 출고' }))
+    fireEvent.pointerDown(screen.getByRole('button', { name: '다른 재고 운영 action 더보기' }))
+    let operationsMenu = screen.getByRole('menu')
+    fireEvent.click(within(operationsMenu).getByText('수동 출고'))
     expect(screen.getByRole('dialog', { name: '수동 출고' })).toBeTruthy()
-    expect(screen.getByText('InOutForm:manual-outbound:2')).toBeTruthy()
+    expect(screen.getByText('InOutForm:manual-outbound:2:none')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: '실사 조정' }))
+    fireEvent.pointerDown(screen.getByRole('button', { name: '다른 재고 운영 action 더보기' }))
+    operationsMenu = screen.getByRole('menu')
+    fireEvent.click(within(operationsMenu).getByText('실사 조정'))
     expect(screen.getByRole('dialog', { name: '실사 수량 조정' })).toBeTruthy()
-    expect(screen.getByText('InOutForm:count-adjustment:2')).toBeTruthy()
+    expect(screen.getByText('InOutForm:count-adjustment:2:none')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: '창고 이동' }))
+    fireEvent.pointerDown(screen.getByRole('button', { name: '다른 재고 운영 action 더보기' }))
+    operationsMenu = screen.getByRole('menu')
+    fireEvent.click(within(operationsMenu).getByText('창고 이동'))
     expect(screen.getByRole('dialog', { name: '창고 이동' })).toBeTruthy()
-    expect(screen.getByText('WarehouseTransferForm')).toBeTruthy()
+    expect(screen.getByText('WarehouseTransferForm:none')).toBeTruthy()
+  })
+
+  it('opens a mode-locked count-adjustment sheet pre-filled with the row variant and warehouse, and clears the prefill for toolbar-triggered actions', () => {
+    render(
+      React.createElement(InventoryWorkspace, {
+        warehouses: [
+          { id: 1, name: '오금동' },
+          { id: 2, name: '대자동' },
+        ],
+        models: [
+          {
+            id: 1,
+            name: 'LP01',
+            sizes: [{ id: 11, name: 'S', sortOrder: 1, modelId: 1 }],
+            colors: [{ id: 21, name: '네이비', rgbCode: '#111111', textWhite: true, sortOrder: 1, modelId: 1 }],
+            inventory: [{ id: 101, modelId: 1, sizeId: 11, colorId: 21, warehouseId: 1, warehouseName: '오금동', quantity: 2 }],
+          },
+        ],
+        transactions: [],
+      }),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '조정' }))
+    expect(screen.getByRole('dialog', { name: '실사 수량 조정' })).toBeTruthy()
+    expect(screen.getByText('InOutForm:count-adjustment:1:1-11-21')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '수동 입고' }))
+    expect(screen.getByRole('dialog', { name: '수동 입고' })).toBeTruthy()
+    expect(screen.getByText('InOutForm:inbound:all:none')).toBeTruthy()
   })
 
   it('does not render oversized summary chrome when the table is empty', () => {

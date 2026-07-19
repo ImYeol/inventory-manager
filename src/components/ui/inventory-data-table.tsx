@@ -6,6 +6,7 @@ import { motion, type Variants } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { ui } from '@/app/components/ui'
 import { StatusBadge } from './badge-1'
+import { Button } from './button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './table'
 
 export type InventoryStatusVariant = 'success' | 'warning' | 'danger'
@@ -33,6 +34,12 @@ export type InventoryDataRow = {
     label: string
     variant: InventoryStatusVariant
   }
+  /**
+   * Opens the mode-locked count-adjustment sheet pre-filled with this row's
+   * ProductVariant (model/size/color) and warehouse (ADR-004; docs GitHub issue #17
+   * Topic 1). Omitted when the row has no addressable variant to adjust.
+   */
+  onAdjust?: () => void
 }
 
 const rowVariants: Variants = {
@@ -66,6 +73,8 @@ export function InventoryDataTable({
   rows: InventoryDataRow[]
   visibleColumns: Set<InventoryColumnKey>
 }) {
+  const hasRowActions = rows.some((row) => row.onAdjust)
+
   return (
     <Table>
           <TableHeader>
@@ -77,6 +86,11 @@ export function InventoryDataTable({
                     {header.label}
                   </TableHead>
                 ))}
+              {hasRowActions && (
+                <TableHead key="actions" className={cn(ui.tableHeadCell, 'text-right')}>
+                  <span className="sr-only">행 작업</span>
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -88,7 +102,7 @@ export function InventoryDataTable({
                   initial="hidden"
                   animate="visible"
                   variants={rowVariants}
-                  className="border-b border-[color:var(--border)] transition-colors hover:bg-[color:var(--surface-muted)] data-[state=selected]:bg-[color:var(--surface-muted)]"
+                  className="group border-b border-[color:var(--border)] transition-colors hover:bg-[color:var(--surface-muted)] data-[state=selected]:bg-[color:var(--surface-muted)]"
                 >
                   {visibleColumns.has('modelName') && (
                     <TableCell className={cn(ui.tableCell, 'font-medium text-[color:var(--foreground)]')}>
@@ -112,11 +126,29 @@ export function InventoryDataTable({
                       </StatusBadge>
                     </TableCell>
                   )}
+                  {hasRowActions && (
+                    <TableCell className="text-right">
+                      {row.onAdjust ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={row.onAdjust}
+                          className="opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                        >
+                          조정
+                        </Button>
+                      ) : null}
+                    </TableCell>
+                  )}
                 </motion.tr>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={visibleColumns.size} className="px-4 py-10 text-center text-sm text-[color:var(--muted-foreground)]">
+                <TableCell
+                  colSpan={visibleColumns.size + (hasRowActions ? 1 : 0)}
+                  className="px-4 py-10 text-center text-sm text-[color:var(--muted-foreground)]"
+                >
                   조회 조건에 맞는 재고가 없습니다.
                 </TableCell>
               </TableRow>

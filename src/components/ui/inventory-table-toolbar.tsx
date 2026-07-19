@@ -1,9 +1,10 @@
 "use client"
 
 import { ColumnVisibilityMenu, type ColumnOption } from './column-visibility-menu'
+import { DropdownMenuItem } from './dropdown-menu'
 import { FilterToolbar } from './filter-toolbar'
 import { Input } from './input'
-import { Button } from './button'
+import { SplitButton } from './split-button'
 import { ui } from '@/app/components/ui'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select'
 
@@ -107,18 +108,11 @@ export function InventoryTableToolbar<T extends string>({
 
       <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
         <ColumnVisibilityMenu columns={columns} visibleColumns={visibleColumns} onToggle={onToggleColumn} />
-        <Button type="button" onClick={onInbound} variant="success" size="sm">
-          수동 입고
-        </Button>
-        <Button type="button" variant="outline" onClick={onOutbound} size="sm">
-          수동 출고
-        </Button>
-        <Button type="button" variant="outline" onClick={onAdjustment} size="sm">
-          실사 조정
-        </Button>
-        <Button type="button" variant="outline" onClick={onTransfer} size="sm">
-          창고 이동
-        </Button>
+        <SplitButton label="수동 입고" onClick={onInbound} menuLabel="다른 재고 운영 action 더보기" variant="success">
+          <DropdownMenuItem onSelect={onOutbound}>수동 출고</DropdownMenuItem>
+          <DropdownMenuItem onSelect={onAdjustment}>실사 조정</DropdownMenuItem>
+          <DropdownMenuItem onSelect={onTransfer}>창고 이동</DropdownMenuItem>
+        </SplitButton>
       </div>
     </FilterToolbar>
   )

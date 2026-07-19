@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createManualInventoryOperations, getCurrentStock } from '@/lib/actions'
 import { EditableTable } from '@/components/ui/editable-table'
@@ -123,6 +123,12 @@ function SelectControl({
   )
 }
 
+type InitialVariant = {
+  modelId: number
+  sizeId: number
+  colorId: number
+}
+
 type InOutFormProps = {
   models: ModelType[]
   warehouses: WarehouseLookup[]
@@ -130,7 +136,26 @@ type InOutFormProps = {
   operation?: 'inbound' | 'manual-outbound' | 'count-adjustment'
   initialWarehouseId?: number
   lockedWarehouseId?: number | null
+  /**
+   * Pre-fills the first row with a specific ProductVariant (model/size/color) —
+   * used by the inventory table's row-level quick action (GitHub issue #17 Topic 1)
+   * so the operator does not re-pick the product/size/color already visible in the
+   * row. Does not change operation mode-lock (ADR-004).
+   */
+  initialVariant?: InitialVariant
   onSubmitted?: () => void
+}
+
+function prefilledRow(initialVariant: InitialVariant): RowData {
+  return {
+    key: createRowKey(),
+    modelId: initialVariant.modelId,
+    sizeId: initialVariant.sizeId,
+    colorId: initialVariant.colorId,
+    quantity: '',
+    currentStock: null,
+    stockLoading: false,
+  }
 }
 
 export default function InOutForm({
@@ -140,13 +165,18 @@ export default function InOutForm({
   operation,
   initialWarehouseId,
   lockedWarehouseId,
+  initialVariant,
   onSubmitted,
 }: InOutFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [date, setDate] = useState(todayString())
   const [warehouseId, setWarehouseId] = useState<number>(initialWarehouseId ?? warehouses[0]?.id ?? -1)
-  const [rows, setRows] = useState<RowData[]>(() => Array.from({ length: INITIAL_ROW_COUNT }, emptyRow))
+  const [rows, setRows] = useState<RowData[]>(() =>
+    initialVariant
+      ? [prefilledRow(initialVariant), ...Array.from({ length: INITIAL_ROW_COUNT - 1 }, emptyRow)]
+      : Array.from({ length: INITIAL_ROW_COUNT }, emptyRow),
+  )
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null)
   const [reason, setReason] = useState('')
   const resolvedOperation = operation ?? (initialType === '출고' ? 'manual-outbound' : 'inbound')
@@ -200,6 +230,16 @@ export default function InOutForm({
     },
     [fetchStock, selectedWarehouseId, updateRow],
   )
+
+  // Seeds the current-stock lookup for a row-quick-action prefilled variant once,
+  // on mount, instead of waiting for the user to re-touch the size/color selects.
+  useEffect(() => {
+    if (!initialVariant || !selectedWarehouseId) return
+    const key = rows[0]?.key
+    if (!key) return
+    void fetchStock(key, initialVariant.modelId, initialVariant.sizeId, initialVariant.colorId, selectedWarehouseId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleModelChange = (key: string, value: string) => {
     const modelId = value ? Number(value) : ('' as const)
