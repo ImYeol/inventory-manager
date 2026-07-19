@@ -93,6 +93,11 @@
       "step": 11,
       "name": "completion-integrity-and-ui-ownership-correction",
       "status": "blocked",
+      "supersedes_steps": [
+        0,
+        9,
+        10
+      ],
       "acceptance_commands": [
         [
           "python3",
@@ -118,9 +123,9 @@
           "build"
         ]
       ],
-      "started_at": "2026-07-19T10:48:59+0900",
-      "blocked_reason": "Acceptance blocked: npm run build cannot fetch Geist and Geist Mono from Google Fonts in this network-restricted sandbox. Harness/review runtime tests, npm run test (255), and npm run lint passed.",
-      "blocked_at": "2026-07-19T10:52:00+0900"
+      "started_at": "2026-07-19T10:55:49+0900",
+      "blocked_reason": "Harness acceptance ran directly: runtime tests, 256 application tests, and lint passed, but the declared `npm run build` failed because this sandbox prohibits Turbopack from binding its internal port (`Operation not permitted`). The successful local-font change removed the prior Google Fonts network dependency, but the exact acceptance command is still non-zero and cannot support completion.",
+      "blocked_at": "2026-07-19T10:58:49+0900"
     },
     {
       "step": 12,
