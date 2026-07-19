@@ -9,3 +9,4 @@ Correct the false completion evidence and the highest-impact UI ownership regres
 - Persist the agreed inbound terminology and decisions in committed docs and provide a pointer-only Claude entry point. Do not put product contracts in personal memory.
 
 The Harness must execute the `acceptance_commands` declared in the phase index. Do not mark this step complete from conversation output.
+The child session must not mark the step blocked only because its own restricted sandbox cannot run an acceptance command. Record the implementation outcome; the outer Harness-owned acceptance runner is the authoritative command gate.

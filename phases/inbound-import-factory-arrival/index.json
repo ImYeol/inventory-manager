@@ -2,7 +2,7 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "blocked",
+  "status": "pending",
   "steps": [
     {
       "step": 0,
@@ -92,7 +92,7 @@
     {
       "step": 11,
       "name": "completion-integrity-and-ui-ownership-correction",
-      "status": "blocked",
+      "status": "completed",
       "supersedes_steps": [
         0,
         9,
@@ -123,9 +123,9 @@
           "build"
         ]
       ],
-      "started_at": "2026-07-19T10:55:49+0900",
-      "blocked_reason": "Harness acceptance ran directly: runtime tests, 256 application tests, and lint passed, but the declared `npm run build` failed because this sandbox prohibits Turbopack from binding its internal port (`Operation not permitted`). The successful local-font change removed the prior Google Fonts network dependency, but the exact acceptance command is still non-zero and cannot support completion.",
-      "blocked_at": "2026-07-19T10:58:49+0900"
+      "started_at": "2026-07-19T11:00:41+0900",
+      "summary": "Corrected Harness completion integrity by preserving per-attempt evidence, rejecting non-zero child exits despite claimed completion, running declared argv acceptance outside the child, and requiring successful current evidence for corrective supersession. Review context now resolves the current feature branch and validates phase evidence without a nonexistent command. Sourcing navigation exposes factories and arrivals, /sourcing redirects to arrivals, supplier Excel review remains arrival-owned, inventory keeps direct manual inbound, legacy manual arrival creation is secondary disclosure, and supplier import now requires file review instead of editable/paste-style rows. Inbound terminology is committed in product/ADR docs and CLAUDE.md remains pointer-only. Harness-owned acceptance passed: harness tests, review tests, 256 application tests, lint (four existing warnings), and production build.",
+      "completed_at": "2026-07-19T11:09:20+0900"
     },
     {
       "step": 12,
