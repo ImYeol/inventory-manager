@@ -133,6 +133,10 @@
     {
       "dir": "inbound-import-factory-arrival",
       "status": "blocked"
+    },
+    {
+      "dir": "settings-parse-template-operations",
+      "status": "pending"
     }
   ]
 }
