@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { getSupabaseWithUser } from '../db'
+import { toSellerSkuToken } from '../seller-sku'
 
 const MAX_VARIANTS = 100
 
@@ -9,9 +10,7 @@ function values(value: string[]) {
   return value.map((item) => item.trim()).filter(Boolean)
 }
 
-function skuPart(value: string) {
-  return value.trim().toUpperCase().replace(/[^A-Z0-9가-힣]+/g, '-').replace(/^-|-$/g, '')
-}
+const skuPart = toSellerSkuToken
 
 /** Creates the local catalog hierarchy and its sellable variants without calling a channel API. */
 export async function createInternalProduct(input: {

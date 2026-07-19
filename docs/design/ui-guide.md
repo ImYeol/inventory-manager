@@ -136,6 +136,7 @@ src/components/ui/
 ├── table.tsx
 ├── table-surface.tsx
 ├── tabs.tsx
+├── tag-input.tsx
 └── toolbar.tsx
 ```
 

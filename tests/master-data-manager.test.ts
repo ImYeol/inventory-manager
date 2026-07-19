@@ -85,7 +85,9 @@ describe('MasterDataManager', () => {
 
     expect(screen.getByRole('tab', { name: '상품' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: '창고' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: '공급자 SKU 감사' })).toBeTruthy()
     expect(screen.getByRole('tablist', { name: '상품 관리 보기 전환' })).toBeTruthy()
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['상품', '창고', '공급자 SKU 감사'])
     expect(screen.getByRole('button', { name: '내부 상품 등록' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '창고 등록' })).toBeNull()
     expect(screen.queryByText('2개 창고')).toBeNull()

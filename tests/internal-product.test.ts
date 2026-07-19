@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { isSellerSkuConvertible, toSellerSkuToken } from '@/lib/seller-sku'
 
 const mocks = vi.hoisted(() => ({ getSupabaseWithUser: vi.fn(), revalidatePath: vi.fn() }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
@@ -36,5 +37,17 @@ describe('createInternalProduct', () => {
     })
     expect(sizes.insert).toHaveBeenCalledWith([{ model_id: 1, name: '기본' }])
     expect(colors.insert).toHaveBeenCalledWith([{ model_id: 1, name: '기본', rgb_code: '#000000', text_white: false }])
+  })
+
+  it('rejects an option value that cannot convert into a seller SKU token before writing anything', async () => {
+    await expect(createInternalProduct({ name: '내부 상품', sizes: ['!!!'], colors: ['블랙'], skuPrefix: 'LP' })).rejects.toThrow('판매자 SKU로 변환할 수 없는 옵션 값이 있습니다.')
+    expect(mocks.getSupabaseWithUser).not.toHaveBeenCalled()
+  })
+
+  it('shares the same seller SKU token rule as the client-side chip input (src/lib/seller-sku.ts)', () => {
+    expect(toSellerSkuToken(' m ')).toBe('M')
+    expect(toSellerSkuToken('블랙')).toBe('블랙')
+    expect(isSellerSkuConvertible('!!!')).toBe(false)
+    expect(isSellerSkuConvertible('S')).toBe(true)
   })
 })
