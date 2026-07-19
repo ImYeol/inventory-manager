@@ -78,7 +78,7 @@ describe('factory arrival operation contracts', () => {
       expect(sql).toContain('normal_quantity,overage_quantity')
       expect(sql).toContain('q,0,null')
       expect(sql).toContain("'child_arrival_id',child_arrival_id")
-      expect(sql).toContain('coalesce(sum(l.received_quantity),0)')
+      expect(sql).toContain('coalesce(sum(linked_child.child_expected),0)')
       expect(sql).toContain('receipt_arrival.follow_up_parent_arrival_id is distinct from closure_allocation.factory_arrival_id')
     }
   })
@@ -111,6 +111,18 @@ describe('factory arrival operation contracts', () => {
       expect(sql).toContain("operation_error:allocation:%:Duplicate receipt allocation.")
       expect(sql).toContain("operation_error:closure:%:Follow-up exceeds closed shortage.")
       expect(sql).toContain("operation_error:closure:%:Shortage closure not found.")
+    }
+  })
+
+  it('keeps move-all retries identity-stable and prevents duplicate children while a corrected follow-up is open', () => {
+    const migration = readFileSync(resolve(process.cwd(), 'supabase/migrations/20260719120000_inbound_domain_contract_gap_closure.sql'), 'utf8')
+    const schema = readFileSync(resolve(process.cwd(), 'supabase/schema.sql'), 'utf8')
+    for (const sql of [migration, schema]) {
+      expect(sql).toContain("'changed_item_count',0,'unchanged',true")
+      expect(sql).toContain('has_open_child')
+      expect(sql).toContain("operation_error:closure:%:Follow-up child is still open.")
+      expect(sql).toContain('sum(child_item.ordered_quantity)')
+      expect(sql).not.toContain('not exists(select 1 from public.factory_receipt_line_corrections correction where correction.user_id=l.user_id and correction.factory_receipt_line_id=l.id)')
     }
   })
 })

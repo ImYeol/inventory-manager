@@ -153,6 +153,14 @@ begin
   if not exists(select 1 from public.warehouses where id=target and user_id=u) then raise exception 'Warehouse not found.'; end if;
   select * into a from public.factory_arrivals where id=(p_payload->>'arrival_id')::bigint and user_id=u for update;
   if not found or a.status in('RECEIVED','VARIANCE_CLOSED','CANCELLED') then raise exception 'Arrival cannot be reallocated.'; end if;
+  perform 1 from public.factory_arrival_items where factory_arrival_id=a.id and user_id=u order by id for update;
+  perform 1 from public.factory_arrival_allocations where factory_arrival_id=a.id and user_id=u order by id for update;
+  if exists(select 1 from public.factory_arrival_items where factory_arrival_id=a.id and user_id=u) and not exists(
+    select 1 from public.factory_arrival_items current_item where current_item.factory_arrival_id=a.id and current_item.user_id=u and (
+      exists(select 1 from public.factory_arrival_allocations current_allocation where current_allocation.factory_arrival_item_id=current_item.id and current_allocation.user_id=u and current_allocation.allocated_quantity<>(current_allocation.normally_received_quantity+current_allocation.shortage_closed_quantity+case when current_allocation.warehouse_id=target then current_item.ordered_quantity-coalesce((select sum(fixed_allocation.normally_received_quantity+fixed_allocation.shortage_closed_quantity) from public.factory_arrival_allocations fixed_allocation where fixed_allocation.factory_arrival_item_id=current_item.id and fixed_allocation.user_id=u),0) else 0 end))
+      or (current_item.ordered_quantity-coalesce((select sum(fixed_allocation.normally_received_quantity+fixed_allocation.shortage_closed_quantity) from public.factory_arrival_allocations fixed_allocation where fixed_allocation.factory_arrival_item_id=current_item.id and fixed_allocation.user_id=u),0)>0 and not exists(select 1 from public.factory_arrival_allocations target_allocation where target_allocation.factory_arrival_item_id=current_item.id and target_allocation.user_id=u and target_allocation.warehouse_id=target))
+    )
+  ) then return jsonb_build_object('arrival_id',a.id,'changed_item_count',0,'unchanged',true); end if;
   for i in select * from public.factory_arrival_items where factory_arrival_id=a.id and user_id=u order by id for update loop
     if i.product_variant_id is null or i.ordered_quantity is null then raise exception 'Arrival item not found.'; end if;
     perform 1 from public.factory_arrival_allocations where factory_arrival_item_id=i.id and user_id=u order by id for update;
@@ -234,7 +242,7 @@ declare
   u uuid:=auth.uid(); request_id text:=btrim(p_payload->>'receipt_request_id'); business_date date:=nullif(p_payload->>'receipt_business_date','')::date;
   canonical jsonb; hash text; existing public.factory_receipt_requests%rowtype; c public.factory_arrival_shortage_closures%rowtype;
   parent_x public.factory_arrival_allocations%rowtype; parent_i public.factory_arrival_items%rowtype; parent_a public.factory_arrivals%rowtype;
-  w public.warehouses%rowtype; v public.product_variants%rowtype; q integer:=(p_payload->>'quantity')::integer; followed integer;
+  w public.warehouses%rowtype; v public.product_variants%rowtype; q integer:=(p_payload->>'quantity')::integer; followed bigint; has_open_child boolean;
   child_arrival_id bigint; child_item_id bigint; child_allocation_id bigint; event_id bigint; line_id bigint; tx bigint;
 begin
   if u is null or coalesce(request_id,'')='' or business_date is null or q is null or q<=0 or btrim(coalesce(p_payload->>'reason',''))='' then raise exception 'operation_error:closure:%:Invalid follow-up receipt.',coalesce(p_payload->>'closure_id','unknown'); end if;
@@ -254,10 +262,15 @@ begin
   select * into w from public.warehouses where id=(p_payload->>'warehouse_id')::bigint and user_id=u;
   if not found then raise exception 'operation_error:closure:%:Warehouse not found.',coalesce(p_payload->>'closure_id','unknown'); end if;
   select * into v from public.product_variants where id=parent_x.product_variant_id and user_id=u;
-  select coalesce(sum(l.received_quantity),0) into followed
-    from public.factory_receipt_lines l
-    where l.user_id=u and l.factory_arrival_shortage_closure_id=c.id
-      and not exists(select 1 from public.factory_receipt_line_corrections correction where correction.user_id=l.user_id and correction.factory_receipt_line_id=l.id);
+  select coalesce(sum(linked_child.child_expected),0),coalesce(bool_or(linked_child.status in('DRAFT','READY','PARTIAL')),false) into followed,has_open_child
+    from (
+      select child.id,child.status,sum(child_item.ordered_quantity) as child_expected
+      from (select distinct event.factory_arrival_id from public.factory_receipt_lines line join public.factory_receipt_events event on event.id=line.factory_receipt_event_id and event.user_id=line.user_id where line.user_id=u and line.factory_arrival_shortage_closure_id=c.id) closure_child
+      join public.factory_arrivals child on child.id=closure_child.factory_arrival_id and child.user_id=u and child.follow_up_parent_arrival_id=parent_a.id
+      join public.factory_arrival_items child_item on child_item.factory_arrival_id=child.id and child_item.user_id=child.user_id
+      group by child.id,child.status
+    ) linked_child;
+  if has_open_child then raise exception 'operation_error:closure:%:Follow-up child is still open.',c.id; end if;
   if q>c.quantity-followed then raise exception 'operation_error:closure:%:Follow-up exceeds closed shortage.',c.id; end if;
 
   insert into public.factory_arrivals(user_id,factory_id,reference_code,expected_date,status,source_channel,memo,follow_up_parent_arrival_id,source_type,external_shipment_reference,supplier_name_snapshot)

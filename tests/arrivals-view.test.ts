@@ -248,6 +248,20 @@ describe('ArrivalsView', () => {
     await waitFor(() => expect(mocks.reverseFactoryReceiptLine).toHaveBeenCalledWith(expect.objectContaining({ receiptLineId: 501, reason: '다른 상품' })))
   })
 
+  it('keeps allocation editing open when the server returns an item-scoped failure', async () => {
+    mocks.replaceFactoryArrivalAllocations.mockResolvedValue({ success: false, error: { key: 'item-201', message: '배정 합계를 다시 확인해주세요.' } })
+    render(React.createElement(ArrivalsView, {
+      schemaState: { status: 'ready', message: null }, factories: [], warehouses: [{ id: 11, name: '오금동' }], models: [],
+      arrivals: [{ id: 101, factoryName: '광주 협력사', expectedDate: '2026-04-21', status: 'READY', sourceChannel: 'manual', memo: null, totalOrderedQuantity: 5, remainingQuantity: 5, shortageClosures: [], receiptLines: [], items: [{ id: 201, productVariantId: 901, modelName: 'LP01', sizeName: 'S', colorName: '네이비', colorRgb: '#111111', orderedQuantity: 5, receivedQuantity: 0, remainingQuantity: 5, allocations: [{ id: 301, warehouseId: 11, warehouseName: '오금동', allocatedQuantity: 5, normallyReceivedQuantity: 0, shortageClosedQuantity: 0, remainingQuantity: 5 }] }] }],
+    }))
+    fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
+    fireEvent.click(screen.getByRole('button', { name: '배정 작업 열기' }))
+    fireEvent.change(screen.getByLabelText('LP01 배정 변경 사유'), { target: { value: '창고 변경' } })
+    fireEvent.click(screen.getByRole('button', { name: '배정 저장' }))
+    expect((await screen.findByTestId('operation-error-item-201')).textContent).toContain('배정 합계를 다시 확인해주세요.')
+    expect(screen.getByRole('button', { name: '배정 작업 열기' }).getAttribute('aria-pressed')).toBe('true')
+  })
+
   it('keeps the selected operation and its draft visible after a scoped second-line server error', async () => {
     mocks.receiveFactoryArrivalRequest.mockResolvedValue({ success: false, error: { key: 'allocation-302', message: '두 번째 행을 다시 확인해주세요.' } })
     render(React.createElement(ArrivalsView, {

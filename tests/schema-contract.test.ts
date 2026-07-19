@@ -101,7 +101,7 @@ describe('schema contract', () => {
     expect(runner).toContain('20260719070000_import_revision_proof_and_review_hardening.sql')
     expect(runner).toContain('20260719120000_inbound_domain_contract_gap_closure.sql')
     expect(assertions).toContain('step-5/6 rpc proof')
-    for (const step12Proof of ['move-all fixed quantity invariant', 'business-date idempotency conflict', 'closure-linked child follow-up', 'allocation audit immutability', 'cross-owner allocation audit', 'no-op allocation audit', 'second failing allocation scope']) {
+    for (const step12Proof of ['move-all fixed quantity invariant', 'move-all identity-stable retry', 'business-date idempotency conflict', 'closure-linked child follow-up', 'corrected follow-up child lifecycle', 'allocation audit immutability', 'cross-owner allocation audit', 'no-op allocation audit', 'second failing allocation scope']) {
       expect(assertions).toContain(step12Proof)
     }
     expect(hardening).toContain('mapping_blocker')
