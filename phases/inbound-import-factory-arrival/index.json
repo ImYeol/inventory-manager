@@ -2,7 +2,7 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "blocked",
+  "status": "pending",
   "steps": [
     {
       "step": 0,
@@ -130,13 +130,64 @@
     {
       "step": 12,
       "name": "inbound-domain-contract-gap-closure",
-      "status": "blocked",
-      "started_at": "2026-07-19T11:11:16+0900"
+      "status": "completed",
+      "acceptance_commands": [
+        [
+          "npm",
+          "run",
+          "test"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npx",
+          "prisma",
+          "validate"
+        ],
+        [
+          "npm",
+          "run",
+          "build"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "started_at": "2026-07-19T11:20:01+0900",
+      "completed_at": "2026-07-19T11:26:30+0900",
+      "summary": "Closed the persisted-review and receiving-contract gaps: incomplete/unmapped rows remain immutable evidence and promotion remains the trusted blocker; receipt and follow-up operations carry a Korea-local editable business date through canonical payloads, idempotency and transaction dates; allocation move-all is reachable with a required reason and audit evidence; the arrival workspace keeps receipt dates and drafts scoped to the selected arrival or closure. Loader output now exposes receipt business dates. Forward migrations and fresh schema were updated together for the receipt date, review persistence, audit table, and move-all RPC. Direct acceptance passed: 259 tests, lint (four existing warnings), Prisma validation, production build, and diff check. The outer Harness still owns disposable database/fresh-schema behavioral execution."
     },
     {
       "step": 13,
       "name": "arrival-progressive-disclosure-and-visual-quality",
-      "status": "pending"
+      "status": "pending",
+      "acceptance_commands": [
+        [
+          "npm",
+          "run",
+          "test"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "build"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ]
     }
   ]
 }
