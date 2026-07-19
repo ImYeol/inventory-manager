@@ -258,6 +258,12 @@ class ExecuteCodexTests(unittest.TestCase):
         self.assertTrue(attempt_path.exists())
         self.assertEqual(json.loads(attempt_path.read_text(encoding="utf-8"))["stderr"], "failed\n")
 
+    def test_next_attempt_number_never_overwrites_a_previous_run(self) -> None:
+        attempt_path = self.fixture.root / "phases" / "demo-phase" / "step0-attempt1-output.json"
+        write_json(attempt_path, {"attempt": 1, "status": "blocked"})
+
+        self.assertEqual(ex.next_attempt_number(attempt_path.parent, 0), 2)
+
     def test_completed_step_is_rejected_when_harness_acceptance_command_fails(self) -> None:
         phase = self.fixture.load_phase()
         phase["steps"][0]["acceptance_commands"] = [["python3", "-c", "raise SystemExit(7)"]]
@@ -306,6 +312,35 @@ class ExecuteCodexTests(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "step1-output.json"):
             runner.verify_completed_phase()
+
+    def test_completed_phase_accepts_failed_historical_output_only_when_corrective_step_supersedes_it(self) -> None:
+        phase = self.fixture.load_phase()
+        for step in phase["steps"]:
+            step["status"] = "completed"
+            step["summary"] = "Done"
+        phase["steps"][1]["supersedes_steps"] = [0]
+        phase["steps"][1]["acceptance_commands"] = [["python3", "-c", "raise SystemExit(0)"]]
+        phase["status"] = "completed"
+        write_json(self.fixture.phase_path(), phase)
+        write_json(self.fixture.root / "phases" / "demo-phase" / "step0-output.json", {"status": "blocked", "returncode": 0})
+        write_json(self.fixture.root / "phases" / "demo-phase" / "step1-output.json", {"status": "completed", "returncode": 0})
+        write_json(self.fixture.root / "phases" / "demo-phase" / "step1-verification.json", {"status": "completed"})
+
+        ex.HarnessExecutor(self.fixture.root, "demo-phase").verify_completed_phase()
+
+    def test_completed_phase_rejects_supersession_without_corrective_verification(self) -> None:
+        phase = self.fixture.load_phase()
+        for step in phase["steps"]:
+            step["status"] = "completed"
+            step["summary"] = "Done"
+        phase["steps"][1]["supersedes_steps"] = [0]
+        phase["status"] = "completed"
+        write_json(self.fixture.phase_path(), phase)
+        write_json(self.fixture.root / "phases" / "demo-phase" / "step0-output.json", {"status": "blocked", "returncode": 0})
+        write_json(self.fixture.root / "phases" / "demo-phase" / "step1-output.json", {"status": "completed", "returncode": 0})
+
+        with self.assertRaisesRegex(RuntimeError, "supersession"):
+            ex.HarnessExecutor(self.fixture.root, "demo-phase").verify_completed_phase()
 
     def test_main_respects_push_flag_and_root_override(self) -> None:
         seen: list[bool] = []

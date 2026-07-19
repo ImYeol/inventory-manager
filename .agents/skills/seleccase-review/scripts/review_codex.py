@@ -91,7 +91,36 @@ def phase_validation(root: Path, phase_dir: str) -> tuple[bool, str]:
     elif top_entry.get("status") != phase_index.get("status"):
         errors.append("top-level and phase status differ")
 
-    for step in phase_index.get("steps", []):
+    steps = phase_index.get("steps", [])
+    step_numbers = {step.get("step") for step in steps}
+    superseded_by: dict[int, int] = {}
+    for corrective in steps:
+        targets = corrective.get("supersedes_steps")
+        if targets is None:
+            continue
+        corrective_number = corrective.get("step")
+        output_path = root / "phases" / phase_dir / f"step{corrective_number}-output.json"
+        verification_path = root / "phases" / phase_dir / f"step{corrective_number}-verification.json"
+        output = load_json(output_path) if output_path.is_file() else {}
+        verification = load_json(verification_path) if verification_path.is_file() else {}
+        if (
+            not isinstance(targets, list)
+            or not targets
+            or any(not isinstance(target, int) or target not in step_numbers or target >= corrective_number for target in targets)
+            or corrective.get("status") != "completed"
+            or corrective.get("acceptance_commands") is None
+            or output.get("status") != "completed"
+            or output.get("returncode") != 0
+            or verification.get("status") != "completed"
+        ):
+            errors.append(f"step {corrective_number} supersession lacks successful corrective verification")
+            continue
+        for target in targets:
+            if target in superseded_by:
+                errors.append(f"step {target} is superseded more than once")
+            superseded_by[target] = corrective_number
+
+    for step in steps:
         step_number = step.get("step")
         step_path = root / "phases" / phase_dir / f"step{step_number}.md"
         if not step_path.is_file():
@@ -103,7 +132,7 @@ def phase_validation(root: Path, phase_dir: str) -> tuple[bool, str]:
             errors.append(f"step{step_number}-output.json is missing")
             continue
         output = load_json(output_path)
-        if output.get("status") != "completed" or output.get("returncode") != 0:
+        if (output.get("status") != "completed" or output.get("returncode") != 0) and step_number not in superseded_by:
             errors.append(f"step{step_number}-output.json does not prove successful completion")
 
     return (not errors, "OK" if not errors else "; ".join(errors))

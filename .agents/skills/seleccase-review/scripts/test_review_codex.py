@@ -111,6 +111,27 @@ class ReviewCodexTests(unittest.TestCase):
         self.assertFalse(valid)
         self.assertIn("step1-output.json", message)
 
+    def test_phase_validation_accepts_failed_output_superseded_by_verified_correction(self) -> None:
+        phase = json.loads((self.fixture.root / "phases" / "demo-phase" / "index.json").read_text(encoding="utf-8"))
+        phase["status"] = "completed"
+        phase["steps"][1].update({
+            "status": "completed",
+            "summary": "Corrected",
+            "supersedes_steps": [0],
+            "acceptance_commands": [["python3", "-c", "raise SystemExit(0)"]],
+        })
+        top = json.loads((self.fixture.root / "phases" / "index.json").read_text(encoding="utf-8"))
+        top["phases"][0]["status"] = "completed"
+        write_json(self.fixture.root / "phases" / "index.json", top)
+        write_json(self.fixture.root / "phases" / "demo-phase" / "index.json", phase)
+        write_json(self.fixture.root / "phases" / "demo-phase" / "step0-output.json", {"status": "blocked", "returncode": 0})
+        write_json(self.fixture.root / "phases" / "demo-phase" / "step1-output.json", {"status": "completed", "returncode": 0})
+        write_json(self.fixture.root / "phases" / "demo-phase" / "step1-verification.json", {"status": "completed"})
+
+        valid, message = rc.phase_validation(self.fixture.root, "demo-phase")
+
+        self.assertTrue(valid, message)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -101,6 +101,7 @@ Card의 구성과 token 참조는 [card.composition.json](../../design-system/co
 ## Typography
 
 body/control은 최소 14px(`--text-base`)이다.
+기본 sans/mono 글꼴은 `--font-sans-stack`과 `--font-mono-stack`의 로컬 시스템 스택을 사용한다. 프로덕션 빌드가 외부 폰트 다운로드에 의존하지 않도록 `next/font/google`을 사용하지 않는다.
 
 | 토큰 | 값 | 역할 |
 | --- | --- | --- |

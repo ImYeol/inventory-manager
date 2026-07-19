@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
+import re
 import subprocess
 import sys
 import threading
@@ -54,6 +55,16 @@ def phase_paths(root: Path, phase_dir: str) -> dict[str, Path]:
 
 def step_file_for(phase_dir: Path, step_number: int, suffix: str = ".md") -> Path:
     return phase_dir / f"step{step_number}{suffix}"
+
+
+def next_attempt_number(phase_dir: Path, step_number: int) -> int:
+    pattern = re.compile(rf"^step{step_number}-attempt(\d+)-output\.json$")
+    attempts = [
+        int(match.group(1))
+        for path in phase_dir.glob(f"step{step_number}-attempt*-output.json")
+        if (match := pattern.match(path.name))
+    ]
+    return max(attempts, default=0) + 1
 
 
 def run_git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -532,7 +543,37 @@ class HarnessExecutor:
 
     def verify_completed_phase(self) -> None:
         errors: list[str] = []
-        for step in self.phase_index.get("steps", []):
+        steps = self.phase_index.get("steps", [])
+        step_numbers = {step.get("step") for step in steps}
+        superseded_by: dict[int, int] = {}
+        for corrective in steps:
+            targets = corrective.get("supersedes_steps")
+            if targets is None:
+                continue
+            corrective_number = corrective.get("step")
+            output_path = step_file_for(self.paths["phase_dir"], corrective_number, suffix="-output.json")
+            verification_path = step_file_for(self.paths["phase_dir"], corrective_number, suffix="-verification.json")
+            output_ok = output_path.is_file() and load_json(output_path).get("status") == "completed" and load_json(output_path).get("returncode") == 0
+            verification_ok = (
+                corrective.get("acceptance_commands") is not None
+                and verification_path.is_file()
+                and load_json(verification_path).get("status") == "completed"
+            )
+            if (
+                not isinstance(targets, list)
+                or not targets
+                or any(not isinstance(target, int) or target not in step_numbers or target >= corrective_number for target in targets)
+                or corrective.get("status") != "completed"
+                or not output_ok
+                or not verification_ok
+            ):
+                errors.append(f"step {corrective_number} supersession is not backed by successful corrective verification")
+                continue
+            for target in targets:
+                if target in superseded_by:
+                    errors.append(f"step {target} is superseded more than once")
+                superseded_by[target] = corrective_number
+        for step in steps:
             if step.get("status") != "completed":
                 errors.append(f"step {step.get('step')} is not completed")
                 continue
@@ -542,7 +583,7 @@ class HarnessExecutor:
                 errors.append(f"step{step_number}-output.json is missing")
                 continue
             output = load_json(output_path)
-            if output.get("status") != "completed" or output.get("returncode") != 0:
+            if (output.get("status") != "completed" or output.get("returncode") != 0) and step_number not in superseded_by:
                 errors.append(f"step{step_number}-output.json is not a successful completion record")
             if step.get("acceptance_commands") is not None:
                 verification_path = step_file_for(self.paths["phase_dir"], step_number, suffix="-verification.json")
@@ -588,7 +629,9 @@ class HarnessExecutor:
             prompt_path = step_file_for(self.paths["phase_dir"], step_number, suffix="-prompt.md")
             prev_error: str | None = None
 
-            for attempt in range(1, MAX_RETRIES + 1):
+            first_attempt = next_attempt_number(self.paths["phase_dir"], step_number)
+            for retry_index in range(MAX_RETRIES):
+                attempt = first_attempt + retry_index
                 self.refresh_state(persist_normalized=False)
                 current = lookup_step(self.phase_index, step_number)
                 acceptance_commands = deepcopy(current.get("acceptance_commands"))
@@ -596,8 +639,8 @@ class HarnessExecutor:
                 prompt_path.write_text(prompt_text, encoding="utf-8")
 
                 tag = f"Step {step_number}: {step_name}"
-                if attempt > 1:
-                    tag += f" [retry {attempt}/{MAX_RETRIES}]"
+                if retry_index > 0:
+                    tag += f" [retry {retry_index + 1}/{MAX_RETRIES}]"
 
                 with progress_indicator(tag):
                     result = self.run_codex_for_step(prompt=prompt_text)
@@ -621,7 +664,7 @@ class HarnessExecutor:
                 if result.returncode != 0:
                     process_error = (result.stderr or result.stdout or "").strip()
                     error_message = process_error or f"codex exec failed with exit code {result.returncode}"
-                    if attempt < MAX_RETRIES:
+                    if retry_index < MAX_RETRIES - 1:
                         self.mark_step_pending_for_retry(self.paths, refreshed_phase, refreshed_top, step_number)
                         prev_error = error_message
                         print(f"Retrying step {step_number} after failed process: {error_message}")
@@ -640,7 +683,7 @@ class HarnessExecutor:
                 if refreshed_step.get("status") == "completed":
                     acceptance_ok, acceptance_error = self.run_acceptance_commands(step_number, acceptance_commands)
                     if not acceptance_ok:
-                        if attempt < MAX_RETRIES:
+                        if retry_index < MAX_RETRIES - 1:
                             self.mark_step_pending_for_retry(self.paths, refreshed_phase, refreshed_top, step_number)
                             prev_error = acceptance_error
                             print(f"Retrying step {step_number} after failed acceptance: {acceptance_error}")
@@ -666,7 +709,7 @@ class HarnessExecutor:
 
                 if refreshed_step.get("status") == "error":
                     error_message = str(helper_message or "Step failed.").strip()
-                    if attempt < MAX_RETRIES:
+                    if retry_index < MAX_RETRIES - 1:
                         self.mark_step_pending_for_retry(self.paths, refreshed_phase, refreshed_top, step_number)
                         prev_error = error_message
                         print(f"Retrying step {step_number} after recorded error: {error_message}")
@@ -684,7 +727,7 @@ class HarnessExecutor:
 
                 error_message = "Codex finished without recording a step outcome."
 
-                if attempt < MAX_RETRIES:
+                if retry_index < MAX_RETRIES - 1:
                     self.mark_step_pending_for_retry(self.paths, refreshed_phase, refreshed_top, step_number)
                     prev_error = error_message
                     print(f"Retrying step {step_number} after failed attempt: {error_message}")
