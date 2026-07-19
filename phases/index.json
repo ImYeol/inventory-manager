@@ -137,6 +137,10 @@
     {
       "dir": "settings-parse-template-operations",
       "status": "completed"
+    },
+    {
+      "dir": "modal-select-product-option-polish",
+      "status": "pending"
     }
   ]
 }
