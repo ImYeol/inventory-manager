@@ -12,8 +12,9 @@ export default async function SourcingArrivalsPage() {
     getProductWorkspaceData(),
   ])
 
-  const { factories, schemaState } = factoriesData
+  const { factories } = factoriesData
   const { arrivals } = arrivalsData
+  const schemaState = factoriesData.schemaState.status === 'missing' ? factoriesData.schemaState : arrivalsData.schemaState
 
   return (
     <ArrivalsView

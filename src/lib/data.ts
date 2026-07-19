@@ -514,7 +514,10 @@ export async function getProductWorkspaceData(): Promise<{
   if ([variantsRes, reservationsRes, refsRes].some((response) => isMissingSchemaError(response.error))) {
     return { variants: [], channelProductRefs: [] }
   }
-  const responses = [variantsRes, modelsRes, sizesRes, colorsRes, inventoryRes, reservationsRes, refsRes, arrivalsRes, allocationsRes]
+  const canonicalArrivalSchemaMissing = [arrivalsRes, allocationsRes].some((response) => isMissingSchemaError(response.error))
+  const responses = canonicalArrivalSchemaMissing
+    ? [variantsRes, modelsRes, sizesRes, colorsRes, inventoryRes, reservationsRes, refsRes]
+    : [variantsRes, modelsRes, sizesRes, colorsRes, inventoryRes, reservationsRes, refsRes, arrivalsRes, allocationsRes]
   if (responses.some((response) => response.error)) throw new Error('상품 작업공간 데이터를 불러오지 못했습니다.')
 
   const models = new Map((modelsRes.data ?? []).map((row) => [Number(row.id), row.name]))
@@ -534,14 +537,14 @@ export async function getProductWorkspaceData(): Promise<{
     committedByVariantWarehouse.set(warehouseKey, (committedByVariantWarehouse.get(warehouseKey) ?? 0) + row.quantity)
   }
   const openArrivalIds = new Set(
-    (arrivalsRes.data ?? [])
+    (canonicalArrivalSchemaMissing ? [] : arrivalsRes.data ?? [])
       .filter((arrival) => isCanonicalIncomingArrival(arrival.status))
       .map((arrival) => Number(arrival.id)),
   )
   const incoming = new Map<string, number>()
   const incomingByVariantWarehouse = new Map<string, number>()
   const variantKey = new Map((variantsRes.data ?? []).map((variant) => [Number(variant.id), `${variant.model_id}:${variant.size_id}:${variant.color_id}`]))
-  for (const item of allocationsRes.data ?? []) {
+  for (const item of canonicalArrivalSchemaMissing ? [] : allocationsRes.data ?? []) {
     if (!openArrivalIds.has(Number(item.factory_arrival_id))) continue
     const key = variantKey.get(Number(item.product_variant_id))
     if (!key) continue

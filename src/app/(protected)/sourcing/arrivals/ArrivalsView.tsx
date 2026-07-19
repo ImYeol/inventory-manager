@@ -606,7 +606,7 @@ export default function ArrivalsView({
         </section>
       </div>
       <FixedSheet open={importOpen} title="입고 엑셀 가져오기" description="파일 검토와 SKU 연결을 저장한 뒤 두 번째 단계에서 기본 창고를 선택합니다." onOpenChange={setImportOpen}>
-        <InboundRegistrationSheet suppliers={factories.map((factory) => ({ id: factory.id, name: factory.name }))} warehouses={warehouses} templates={inboundTemplates} productVariants={productVariants} onSaved={() => { setImportOpen(false); router.refresh() }} />
+        <InboundRegistrationSheet suppliers={factories.map((factory) => ({ id: factory.id, name: factory.name }))} warehouses={warehouses} templates={inboundTemplates} productVariants={productVariants} returnTo="/sourcing/arrivals" onSaved={() => { setImportOpen(false); router.refresh() }} />
       </FixedSheet>
     </div>
   )

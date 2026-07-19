@@ -109,4 +109,13 @@ describe('InboundRegistrationSheet', () => {
     fireEvent.click(screen.getByRole('button', { name: '상품 목록 새로고침' }))
     expect(mocks.refresh).toHaveBeenCalledTimes(1)
   })
+
+  it('preserves the sourcing return path when launched from arrivals', () => {
+    render(React.createElement(InboundRegistrationSheet, {
+      suppliers: [], warehouses: [], templates: [], returnTo: '/sourcing/arrivals',
+    }))
+
+    expect(screen.getByRole('link', { name: '상품 관리에서 SKU 만들기' }).getAttribute('href'))
+      .toContain('returnTo=%2Fsourcing%2Farrivals')
+  })
 })

@@ -70,4 +70,27 @@ describe('SourcingArrivalsPage', () => {
       }),
     )
   })
+
+  it('uses the canonical arrival schema state when factory master data is already available', async () => {
+    mocks.getCatalogData.mockResolvedValue({ models: [], warehouses: [] })
+    mocks.getFactoriesData.mockResolvedValue({
+      schemaState: { status: 'ready', message: null },
+      factories: [],
+      factorySourcingItems: {},
+    })
+    mocks.getFactoryArrivalsData.mockResolvedValue({
+      schemaState: { status: 'missing', message: '입고 스키마 준비가 필요합니다.' },
+      arrivals: [],
+    })
+    mocks.getActiveInboundTemplates.mockResolvedValue([])
+    mocks.getProductWorkspaceData.mockResolvedValue({ variants: [], channelProductRefs: [] })
+
+    render(await SourcingArrivalsPage())
+
+    expect(mocks.arrivalsView).toHaveBeenCalledWith(
+      expect.objectContaining({
+        schemaState: { status: 'missing', message: '입고 스키마 준비가 필요합니다.' },
+      }),
+    )
+  })
 })

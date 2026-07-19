@@ -88,6 +88,26 @@ describe('Supabase data mappers', () => {
     expect(supabase.from).not.toHaveBeenCalledWith('inbound_import_source_rows')
   })
 
+  it('keeps product inventory available while canonical arrival tables are not deployed', async () => {
+    const missingTableError = { message: "relation 'public.factory_arrival_allocations' does not exist" }
+    const supabase = createSupabaseMock({
+      product_variants: { data: [{ id: 9, model_id: 1, size_id: 10, color_id: 20, seller_sku: 'SKU-1' }], error: null },
+      models: { data: [{ id: 1, name: 'LP01' }], error: null },
+      sizes: { data: [{ id: 10, name: 'S' }], error: null },
+      colors: { data: [{ id: 20, name: '네이비' }], error: null },
+      inventory: { data: [{ model_id: 1, size_id: 10, color_id: 20, quantity: 3 }], error: null },
+      inventory_reservations: { data: [{ product_variant_id: 9, warehouse_id: 3, quantity: 1 }], error: null },
+      channel_product_refs: { data: [], error: null },
+      factory_arrivals: { data: null, error: missingTableError },
+      factory_arrival_allocations: { data: null, error: missingTableError },
+    })
+    mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
+
+    await expect(getProductWorkspaceData()).resolves.toMatchObject({
+      variants: [{ id: 9, committed: 1, incoming: 0, incomingByWarehouse: {}, onHand: 3, available: 2 }],
+    })
+  })
+
   it('maps catalog rows into the model, size, color, inventory and warehouse shape used by the UI', async () => {
     const supabase = createSupabaseMock({
       models: {
