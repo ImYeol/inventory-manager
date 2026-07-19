@@ -24,8 +24,21 @@ const rows = [{
   quantity: 12, receivedQuantity: 0, warehouseName: '서울 창고', productVariantId: null, productName: null, sellerSku: null,
 }]
 
+const matchedRows = [...rows, {
+  id: 42, draftId: 7, supplierName: '한빛 공장', template: 'summer-26', externalSku: 'EXT-002',
+  quantity: 12, receivedQuantity: 4, warehouseName: '서울 창고', productVariantId: 101, productName: '린넨 셔츠', sellerSku: 'HB-001',
+}]
+
 describe('ManualInboundDraftRows', () => {
   beforeEach(() => Object.values(mocks).forEach((mock) => mock.mockReset()))
+
+  it('keeps SKU creation and receipt reachable without the obsolete file import control', () => {
+    render(React.createElement(ManualInboundDraftRows, { rows: matchedRows }))
+
+    expect(screen.queryByRole('button', { name: '파일 가져오기' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'SKU 생성' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '입고 반영' })).toBeTruthy()
+  })
 
   it('opens inline SKU creation for an unmatched row without navigating away', () => {
     render(React.createElement(ManualInboundDraftRows, { rows }))
