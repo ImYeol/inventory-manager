@@ -166,7 +166,7 @@ describe('ArrivalsView', () => {
       }),
     )
 
-    expect(screen.getByText('예정 목록').closest('section')?.className).not.toContain('ui-card')
+    expect(screen.getByRole('table', { name: '입고 예정 목록' })).toBeTruthy()
     expect(screen.getAllByText('입고 예정').length).toBeGreaterThan(1)
     expect(screen.queryByRole('dialog')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
@@ -188,6 +188,23 @@ describe('ArrivalsView', () => {
       }),
     )
     expect(mocks.refresh).toHaveBeenCalled()
+  })
+
+  it('keeps the list as the primary table and opens the selected arrival with the keyboard', () => {
+    render(React.createElement(ArrivalsView, {
+      schemaState: { status: 'ready', message: null }, factories: [], warehouses: [], models: [],
+      arrivals: [
+        { id: 101, factoryName: '광주 협력사', expectedDate: '2026-04-21', status: 'READY', sourceChannel: 'manual', memo: null, totalOrderedQuantity: 5, remainingQuantity: 5, shortageClosures: [], receiptLines: [], items: [] },
+        { id: 102, factoryName: '대전 공장', expectedDate: '2026-04-22', status: 'RECEIVED', sourceChannel: 'manual', memo: null, totalOrderedQuantity: 3, remainingQuantity: 0, shortageClosures: [], receiptLines: [], items: [] },
+      ],
+    }))
+
+    expect(screen.getByRole('table', { name: '입고 예정 목록' })).toBeTruthy()
+    fireEvent.change(screen.getByRole('searchbox', { name: '입고 예정 검색' }), { target: { value: '대전' } })
+    expect(screen.queryByText('광주 협력사')).toBeNull()
+    const row = screen.getByRole('row', { name: '대전 공장 입고 예정 상세 보기' })
+    fireEvent.keyDown(row, { key: 'Enter' })
+    expect(screen.getByRole('dialog', { name: '대전 공장 입고 예정' })).toBeTruthy()
   })
 
   it('keeps split allocation, shortage follow-up, and full-line correction reachable', async () => {

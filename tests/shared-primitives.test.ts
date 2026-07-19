@@ -384,6 +384,23 @@ describe('shared action and status primitives', () => {
     expect(document.activeElement).toBe(screen.getByLabelText('입고 수량'))
   })
 
+  it('returns focus to the opening control after the fixed sheet closes', async () => {
+    function Example() {
+      const [open, setOpen] = React.useState(false)
+      return React.createElement('div', null,
+        React.createElement('button', { onClick: () => setOpen(true) }, '입고 열기'),
+        React.createElement(FixedSheet, { open, title: '입고 작업', onClose: () => setOpen(false) }, '입고 편집 표'),
+      )
+    }
+
+    render(React.createElement(Example))
+    const trigger = screen.getByRole('button', { name: '입고 열기' })
+    trigger.focus()
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+    await waitFor(() => expect(document.activeElement).toBe(trigger))
+  })
+
   it('renders status badges with visible text for each semantic tone', () => {
     const tones = ['neutral', 'info', 'success', 'warning', 'danger'] as const
 

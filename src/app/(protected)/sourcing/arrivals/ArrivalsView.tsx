@@ -10,6 +10,9 @@ import { FixedSheet } from '@/components/ui/fixed-sheet'
 import { Input } from '@/components/ui/input'
 import { ProductVariantCombobox, type ProductVariantOption } from '@/components/ui/product-variant-combobox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { BasicDataTable } from '@/components/ui/basic-data-table'
+import { FilterToolbar } from '@/components/ui/filter-toolbar'
+import { TableSurface } from '@/components/ui/table-surface'
 import InboundRegistrationSheet, { type InboundTemplateOption } from '@/app/components/inventory/InboundRegistrationSheet'
 import { PageHeader, ui } from '@/app/components/ui'
 
@@ -39,6 +42,8 @@ export default function ArrivalsView({ schemaState, factories, warehouses, model
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [sheet, setSheet] = useState<Sheet>(null)
+  const [arrivalQuery, setArrivalQuery] = useState('')
+  const [arrivalStatus, setArrivalStatus] = useState<string | null>(null)
   const [pageMessage, setPageMessage] = useState<string | null>(null)
   const [sheetError, setSheetError] = useState<string | null>(null)
   const [operationErrors, setOperationErrors] = useState<Record<string, string>>({})
@@ -55,6 +60,13 @@ export default function ArrivalsView({ schemaState, factories, warehouses, model
   const [corrections, setCorrections] = useState<Record<number, string>>({})
   const receiptIds = useRef<Record<number, string>>({}); const followUpIds = useRef<Record<number, string>>({}); const correctionIds = useRef<Record<number, string>>({})
   const selected = sheet?.kind === 'arrival' ? arrivals.find((arrival) => arrival.id === sheet.arrivalId) ?? null : null
+  const visibleArrivals = useMemo(() => {
+    const query = arrivalQuery.trim().toLocaleLowerCase('ko-KR')
+    return arrivals.filter((arrival) =>
+      (!arrivalStatus || arrival.status === arrivalStatus) &&
+      (!query || `${arrival.factoryName} ${arrival.expectedDate} ${arrival.status}`.toLocaleLowerCase('ko-KR').includes(query)),
+    )
+  }, [arrivalQuery, arrivalStatus, arrivals])
   const activeFactories = factories.filter((factory) => factory.isActive); const factoryOptions = activeFactories.length ? activeFactories : factories
   const variants = useMemo<ProductVariantOption[]>(
     () => models.flatMap((model) => model.colors.flatMap((color) => model.sizes.map((size) => ({
@@ -146,7 +158,27 @@ export default function ArrivalsView({ schemaState, factories, warehouses, model
   const description = sheet?.kind === 'arrival' ? '한 작업씩 열어 배정, 입고, 부족과 정정을 처리합니다.' : sheet?.kind === 'manual' ? '엑셀 없이 확인된 예정 수량을 직접 등록합니다.' : '파일 검토와 SKU 연결을 저장한 뒤 두 번째 단계에서 기본 창고를 선택합니다.'
   return <div className={ui.shell}><PageHeader title="입고 예정" description="공장 엑셀을 검토·연결하고 창고 배정과 실제 입고를 관리합니다." actions={<><Button type="button" variant="outline" size="sm" onClick={() => { setSheet({ kind: 'manual' }); setSheetError(null) }}>수동 추가</Button><Button type="button" size="sm" onClick={() => { setSheet({ kind: 'import' }); setSheetError(null) }}>엑셀 가져오기</Button></>} />
     {schemaState.status === 'missing' && schemaState.message ? <p role="status" className="mb-4 text-sm font-medium text-[color:var(--warning-foreground)]">{schemaState.message}</p> : null}{pageMessage ? <p role="status" aria-live="polite" className="mb-4 text-sm text-[color:var(--muted)]">{pageMessage}</p> : null}
-    <section aria-labelledby="arrival-list-title"><div className="mb-3 flex items-center justify-between gap-3"><h2 id="arrival-list-title" className="text-base font-semibold tracking-tight text-[color:var(--foreground)]">예정 목록</h2><span className={ui.pill}>총 {arrivals.length}건</span></div><div className={ui.tableShell}>{arrivals.length === 0 ? <div className={ui.emptyState}>등록된 예정 입고가 없습니다.</div> : <div className="divide-y divide-[color:var(--border)]">{arrivals.map((arrival) => <div key={arrival.id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex items-center gap-2"><h3 className="font-semibold text-[color:var(--foreground)]">{arrival.factoryName}</h3><StatusBadge tone={(status[arrival.status] ?? status.DRAFT).tone}>{(status[arrival.status] ?? { label: arrival.status }).label}</StatusBadge></div><p className="mt-1 text-sm text-[color:var(--muted)]">{arrival.expectedDate} · 예정 {arrival.totalOrderedQuantity}개 · 잔여 {arrival.remainingQuantity}개</p></div><Button type="button" variant="outline" size="sm" aria-label={`입고 #${arrival.id} 상세 보기`} onClick={() => { setSheet({ kind: 'arrival', arrivalId: arrival.id, operation: 'overview' }); setSheetError(null) }}>상세 보기</Button></div>)}</div>}</div></section>
+    <TableSurface
+      toolbar={<FilterToolbar><div className={ui.toolbarDense}><Input type="search" aria-label="입고 예정 검색" value={arrivalQuery} onChange={(event) => setArrivalQuery(event.target.value)} placeholder="공장 또는 예정일 검색" className="w-52 shrink-0" /><Select value={arrivalStatus ?? 'all'} onValueChange={(value) => setArrivalStatus(value === 'all' ? null : value)}><SelectTrigger aria-label="입고 예정 상태" className={ui.controlSm}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">전체 상태</SelectItem>{Object.entries(status).map(([value, item]) => <SelectItem key={value} value={value}>{item.label}</SelectItem>)}</SelectContent></Select></div><span className={ui.statusPillDense}>총 {visibleArrivals.length}건</span></FilterToolbar>}
+    >
+      <BasicDataTable
+        bare
+        tableAriaLabel="입고 예정 목록"
+        columns={[{ key: 'factory', label: '공장' }, { key: 'expectedDate', label: '예정일' }, { key: 'quantity', label: '수량', align: 'right' }, { key: 'status', label: '상태' }, { key: 'action', label: <span className="sr-only">작업</span>, align: 'right' }]}
+        rows={visibleArrivals}
+        rowKey={(arrival) => arrival.id}
+        rowAriaLabel={(arrival) => `${arrival.factoryName} 입고 예정 상세 보기`}
+        onRowClick={(arrival) => { setSheet({ kind: 'arrival', arrivalId: arrival.id, operation: 'overview' }); setSheetError(null) }}
+        emptyState={arrivals.length === 0 ? '등록된 예정 입고가 없습니다.' : '검색 조건에 맞는 예정 입고가 없습니다.'}
+        renderCell={(arrival, column) => {
+          if (column === 'factory') return <span className="font-medium text-[color:var(--foreground)]">{arrival.factoryName}</span>
+          if (column === 'expectedDate') return <span className="text-[color:var(--muted)]">{arrival.expectedDate}</span>
+          if (column === 'quantity') return <span className="font-mono tabular-nums text-[color:var(--muted)]">{arrival.remainingQuantity} / {arrival.totalOrderedQuantity}</span>
+          if (column === 'status') return <StatusBadge tone={(status[arrival.status] ?? status.DRAFT).tone}>{(status[arrival.status] ?? { label: arrival.status }).label}</StatusBadge>
+          return <Button type="button" variant="outline" size="sm" aria-label={`입고 #${arrival.id} 상세 보기`} onClick={(event) => { event.stopPropagation(); setSheet({ kind: 'arrival', arrivalId: arrival.id, operation: 'overview' }); setSheetError(null) }}>상세 보기</Button>
+        }}
+      />
+    </TableSurface>
     <FixedSheet open={sheet !== null} title={title} description={description} onClose={closeSheet}>{sheet?.kind === 'arrival' ? renderOperation() : sheet?.kind === 'manual' ? renderManual() : sheet?.kind === 'import' ? <InboundRegistrationSheet suppliers={factories.map((factory) => ({ id: factory.id, name: factory.name }))} warehouses={warehouses} templates={inboundTemplates} productVariants={productVariants} returnTo="/sourcing/arrivals" onSaved={() => succeed('엑셀 검토를 저장했습니다.')} /> : null}</FixedSheet>
   </div>
 }

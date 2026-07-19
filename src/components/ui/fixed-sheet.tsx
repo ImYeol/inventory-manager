@@ -22,16 +22,29 @@ export function FixedSheet({ open, title, description, onClose, children, classN
   const descriptionId = useId()
   const dialogRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLElement | null>(null)
+  const wasOpenRef = useRef(false)
   const onCloseRef = useRef(onClose)
+
+  if (open && !wasOpenRef.current && typeof document !== 'undefined') {
+    triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    wasOpenRef.current = true
+  } else if (!open) {
+    wasOpenRef.current = false
+  }
 
   useEffect(() => {
     onCloseRef.current = onClose
   }, [onClose])
 
+  const requestClose = () => {
+    triggerRef.current?.focus()
+    onCloseRef.current()
+  }
+
   useEffect(() => {
     if (!open) return
 
-    triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    triggerRef.current ??= document.activeElement instanceof HTMLElement ? document.activeElement : null
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const focusableSelector = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
@@ -42,7 +55,7 @@ export function FixedSheet({ open, title, description, onClose, children, classN
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onCloseRef.current()
+        requestClose()
         return
       }
       if (event.key !== 'Tab' || !dialogRef.current) return
@@ -78,7 +91,7 @@ export function FixedSheet({ open, title, description, onClose, children, classN
 
   return createPortal(
     <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-[60] outline-none" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined}>
-      <div aria-hidden="true" onClick={onClose} className={cn(ui.modalOverlay, '!z-0 cursor-default')} />
+      <div aria-hidden="true" onClick={requestClose} className={cn(ui.modalOverlay, '!z-0 cursor-default')} />
       <div
         className={cn(
           ui.surfaceStrong,
@@ -95,7 +108,7 @@ export function FixedSheet({ open, title, description, onClose, children, classN
                 </h2>
                 {description ? <p id={descriptionId} className="mt-1 text-sm leading-6 text-[color:var(--muted-foreground)]">{description}</p> : null}
               </div>
-              <Button type="button" variant="ghost" size="icon" className="shrink-0" onClick={onClose} aria-label="닫기">
+              <Button type="button" variant="ghost" size="icon" className="shrink-0" onClick={requestClose} aria-label="닫기">
                 <X className="h-4 w-4" />
               </Button>
             </div>
