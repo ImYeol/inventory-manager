@@ -1138,12 +1138,14 @@ export async function getInboundTemplateVersion(templateVersionId: number): Prom
   return { id: Number(data.id), templateId: Number(data.template_id), versionNumber: Number(data.version_number), sheetName: data.sheet_name, headerRowNumber: Number(data.header_row_number), headers: data.headers as string[], mappings, active: Boolean((data.inbound_templates as { is_active?: boolean } | null)?.is_active) }
 }
 
-/** Active templates only: inactive versions remain reachable from their audited drafts. */
-export async function getActiveInboundTemplates(): Promise<Array<{ id: number; name: string; versionId: number; versionNumber: number }>> {
+/** Active templates only, scoped to one 입고처(supplier): inactive versions remain reachable from their audited drafts. */
+export async function getActiveInboundTemplates(supplierId: number): Promise<Array<{ id: number; name: string; versionId: number; versionNumber: number }>> {
+  if (!supplierId) return []
   const { supabase } = await getSupabaseWithUser()
   const { data, error } = await supabase
     .from('inbound_templates')
     .select('id, name, inbound_template_versions(id, version_number)')
+    .eq('supplier_id', supplierId)
     .eq('is_active', true)
     .order('name')
   if (error) throw new Error(error.message)
@@ -1154,12 +1156,14 @@ export async function getActiveInboundTemplates(): Promise<Array<{ id: number; n
   })
 }
 
-/** Settings history includes inactive templates; inbound registration uses the active-only query above. */
-export async function getInboundTemplates(): Promise<Array<{ id: number; name: string; versionId: number; versionNumber: number; active: boolean }>> {
+/** 입고처 상세 modal의 템플릿 이력에는 비활성 템플릿도 남는다; 입고 등록은 위 active-only 쿼리를 쓴다. */
+export async function getInboundTemplates(supplierId: number): Promise<Array<{ id: number; name: string; versionId: number; versionNumber: number; active: boolean }>> {
+  if (!supplierId) return []
   const { supabase } = await getSupabaseWithUser()
   const { data, error } = await supabase
     .from('inbound_templates')
     .select('id, name, is_active, inbound_template_versions(id, version_number)')
+    .eq('supplier_id', supplierId)
     .order('name')
   if (error) throw new Error(error.message)
   return (data ?? []).flatMap((template) => {

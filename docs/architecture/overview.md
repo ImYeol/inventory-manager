@@ -96,7 +96,7 @@ src/
 └── 창고
 재고 운영 (/inventory)
 소싱
-├── 외부 공장 (/sourcing/factories)
+├── 입고처 (/sourcing/factories)
 └── 입고 예정 (/sourcing/arrivals)
 주문 (/orders)
 └── 송장 업로드 (/orders/tracking-import)
@@ -362,7 +362,7 @@ src/components/ui/
 
 ### Arrivals
 - `/sourcing/arrivals`는 immutable import evidence → mapping review → warehouse promotion → allocation/receipt flow의 단일 owner다. 상세 불변식과 acceptance는 `docs/product/inbound-receiving.md`, ADR-032, ADR-033을 따른다.
-- `/sourcing`은 `/sourcing/arrivals`로 이동하고 navigation은 외부 공장과 입고 예정 child link를 모두 노출한다.
+- `/sourcing`은 `/sourcing/arrivals`로 이동하고 navigation은 입고처와 입고 예정 child link를 모두 노출한다.
 - `/inventory`의 수동 입고는 공급자 import가 아닌 직접 재고 transaction이며, `incoming` deep link만 arrivals로 연결한다.
 - 공장/모델/사이즈/색상/창고 선택은 shared select primitive를 사용한다.
 

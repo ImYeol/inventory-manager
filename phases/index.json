@@ -145,6 +145,15 @@
     {
       "dir": "api-settings-template-menu-separation",
       "status": "completed"
+    },
+    {
+      "dir": "inbound-supplier-template-binding",
+      "status": "completed",
+      "completed_at": "2026-07-19T23:46:00+0900",
+      "supersedes": [
+        { "dir": "api-settings-template-menu-separation", "step": 0 },
+        { "dir": "settings-parse-template-operations" }
+      ]
     }
   ]
 }

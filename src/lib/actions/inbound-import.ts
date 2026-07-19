@@ -3,13 +3,23 @@
 import * as XLSX from 'xlsx'
 import { revalidatePath } from 'next/cache'
 import { getSupabaseWithUser } from '../db'
-import { getInboundTemplateVersion } from '../data'
+import { getActiveInboundTemplates, getInboundTemplateVersion, getInboundTemplates } from '../data'
 import { parseInboundTemplateWorksheet } from '../inbound-import'
 import { suggestExactSupplierSkuLinks } from '../supplier-sku'
 import { normalizeExternalShipmentNumber, sha256OriginalBytes } from '../inbound-import-review'
 import { classifyInboundReviewRows } from '../inbound-import-review'
 
 export type InboundTemplateSample = { sheets: Array<{ name: string; rows: string[][] }> }
+
+/** Client-callable boundary for the supplier → template ordering rule: templates are scoped to the selected 입고처. */
+export async function getActiveInboundTemplatesForSupplier(supplierId: number) {
+  return getActiveInboundTemplates(supplierId)
+}
+
+/** Client-callable boundary for the 입고처 상세 modal's template history (includes inactive templates). */
+export async function getInboundTemplatesForSupplier(supplierId: number) {
+  return getInboundTemplates(supplierId)
+}
 
 /** Reads only enough sample structure for an operator to map a new template version. */
 export async function inspectInboundTemplateSample(file: File): Promise<InboundTemplateSample> {
@@ -23,10 +33,11 @@ export async function inspectInboundTemplateSample(file: File): Promise<InboundT
   }
 }
 
-/** A changed mapping always becomes a new immutable version. */
+/** A changed mapping always becomes a new immutable version. A new template is always owned by exactly one 입고처(supplier). */
 export async function createInboundTemplateVersion(input: {
   name: string
   templateId?: number
+  supplierId?: number
   sheetName: string
   headerRowNumber: number
   headers: string[]
@@ -38,7 +49,8 @@ export async function createInboundTemplateVersion(input: {
   const { supabase, user } = await getSupabaseWithUser()
   let templateId = input.templateId
   if (!templateId) {
-    const { data, error } = await supabase.from('inbound_templates').insert({ user_id: user.id, name: input.name.trim() }).select('id, name').single()
+    if (!input.supplierId) throw new Error('입고처를 먼저 선택해주세요.')
+    const { data, error } = await supabase.from('inbound_templates').insert({ user_id: user.id, supplier_id: input.supplierId, name: input.name.trim() }).select('id, name').single()
     if (error || !data) throw new Error(error?.message ?? '입고 템플릿을 만들지 못했습니다.')
     templateId = Number(data.id)
   }
@@ -51,6 +63,7 @@ export async function createInboundTemplateVersion(input: {
   }).select('id').single()
   if (versionError || !version) throw new Error(versionError?.message ?? '템플릿 버전을 저장하지 못했습니다.')
   revalidatePath('/inventory')
+  revalidatePath('/sourcing/factories')
   return { id: templateId, name: input.name.trim(), versionId: Number(version.id), versionNumber }
 }
 
@@ -64,7 +77,7 @@ export async function setInboundTemplateActive(input: { templateId: number; acti
     .select('id, is_active')
     .single()
   if (error || !data) throw new Error(error?.message ?? '입고 템플릿 사용 상태를 변경하지 못했습니다.')
-  revalidatePath('/settings/parse-templates')
+  revalidatePath('/sourcing/factories')
   revalidatePath('/inventory')
   revalidatePath('/sourcing/arrivals')
   return { id: Number(data.id), active: Boolean(data.is_active) }

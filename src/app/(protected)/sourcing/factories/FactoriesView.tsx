@@ -1,18 +1,26 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createFactory, setFactoryActive } from '@/lib/actions'
+import { createInboundTemplateVersion, getInboundTemplatesForSupplier, inspectInboundTemplateSample, setInboundTemplateActive, type InboundTemplateSample } from '@/lib/actions/inbound-import'
 import { StatusBadge } from '@/components/ui/badge-1'
+import { BasicDataTable } from '@/components/ui/basic-data-table'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { FileDropInput } from '@/components/ui/file-drop-input'
 import { FilterToolbar } from '@/components/ui/filter-toolbar'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
+import { ParseTemplateBuilder } from '@/components/ui/parse-template-builder'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { TableSurface } from '@/components/ui/table-surface'
 import { PageHeader, cx, ui } from '@/app/components/ui'
+
+type InboundParseTemplateRow = { id: number; name: string; versionId: number; versionNumber: number; active: boolean }
+
+const inboundRoles = [{ key: 'externalSku' as const, label: '외부 SKU', required: true }, { key: 'quantity' as const, label: '수량', required: true }]
 
 type FactoryData = {
   id: number
@@ -124,6 +132,87 @@ export default function FactoriesView({
     notes: '',
   })
 
+  const [templates, setTemplates] = useState<InboundParseTemplateRow[]>([])
+  const [templateLoadError, setTemplateLoadError] = useState<string | null>(null)
+  const [versionModal, setVersionModal] = useState<InboundParseTemplateRow | 'new' | null>(null)
+  const [versionName, setVersionName] = useState('')
+  const [versionSample, setVersionSample] = useState<InboundTemplateSample | null>(null)
+  const [versionSheetName, setVersionSheetName] = useState('')
+  const [versionHeaderRow, setVersionHeaderRow] = useState(1)
+  const [versionMapping, setVersionMapping] = useState<{ externalSku: string; quantity: string }>({ externalSku: '', quantity: '' })
+
+  useEffect(() => {
+    let active = true
+    const request = selectedFactoryId === null ? Promise.resolve([]) : getInboundTemplatesForSupplier(selectedFactoryId)
+    request
+      .then((rows) => { if (active) { setTemplates(rows); setTemplateLoadError(null) } })
+      .catch((error) => { if (active) { setTemplates([]); setTemplateLoadError(error instanceof Error ? error.message : '파싱 템플릿을 불러오지 못했습니다.') } })
+    return () => { active = false }
+  }, [selectedFactoryId])
+
+  const openNewVersion = (template: InboundParseTemplateRow | 'new') => {
+    setVersionModal(template)
+    setVersionName(template === 'new' ? '' : template.name)
+    setVersionSample(null)
+    setVersionSheetName('')
+    setVersionHeaderRow(1)
+    setVersionMapping({ externalSku: '', quantity: '' })
+    setMessage(null)
+  }
+
+  const inspectVersionSample = (file: File) => startTransition(async () => {
+    try {
+      const result = await inspectInboundTemplateSample(file)
+      setVersionSample(result)
+      setVersionSheetName(result.sheets[0]?.name ?? '')
+      setVersionHeaderRow(1)
+      setVersionMapping({ externalSku: '', quantity: '' })
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '샘플 파일을 읽지 못했습니다.')
+    }
+  })
+
+  const saveVersion = () => {
+    const sheet = versionSample?.sheets.find((candidate) => candidate.name === versionSheetName)
+    if (!sheet || !versionName.trim() || !versionMapping.externalSku || !versionMapping.quantity || selectedFactoryId === null) return
+    const templateId = versionModal !== 'new' && versionModal ? versionModal.id : undefined
+    startTransition(async () => {
+      try {
+        await createInboundTemplateVersion({
+          templateId,
+          supplierId: selectedFactoryId,
+          name: versionName,
+          sheetName: sheet.name,
+          headerRowNumber: versionHeaderRow,
+          headers: sheet.rows[versionHeaderRow - 1] ?? [],
+          mappings: versionMapping,
+        })
+        setVersionModal(null)
+        setMessage('입고 파싱 템플릿 버전을 저장했습니다.')
+        const rows = await getInboundTemplatesForSupplier(selectedFactoryId)
+        setTemplates(rows)
+        router.refresh()
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : '파싱 템플릿을 저장하지 못했습니다.')
+      }
+    })
+  }
+
+  const toggleInboundTemplate = (template: InboundParseTemplateRow) => {
+    if (selectedFactoryId === null) return
+    startTransition(async () => {
+      try {
+        await setInboundTemplateActive({ templateId: template.id, active: !template.active })
+        setMessage(template.active ? '입고 파싱 템플릿 사용을 중지했습니다.' : '입고 파싱 템플릿을 사용합니다.')
+        const rows = await getInboundTemplatesForSupplier(selectedFactoryId)
+        setTemplates(rows)
+        router.refresh()
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : '입고 템플릿 사용 상태를 변경하지 못했습니다.')
+      }
+    })
+  }
+
   const filteredFactories = useMemo(() => {
     const query = search.toLowerCase().trim()
 
@@ -160,13 +249,16 @@ export default function FactoriesView({
   const submitFactory = () => {
     startTransition(async () => {
       try {
-        await createFactory(draft)
+        const created = await createFactory(draft)
         setDraft({ name: '', contactName: '', phone: '', email: '', notes: '' })
         setIsRegisterOpen(false)
-        setMessage('공장을 등록했습니다.')
+        setMessage('입고처를 등록했습니다. 이어서 파싱 템플릿을 등록하세요.')
+        // 등록 폼에는 템플릿을 넣지 않는다(샘플 파일이 없을 수 있다). 대신 상세를 바로 열어
+        // 파싱 템플릿 섹션으로 이어지게 한다.
+        setSelectedFactoryId(created.id)
         router.refresh()
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : '공장 등록에 실패했습니다.')
+        setMessage(error instanceof Error ? error.message : '입고처 등록에 실패했습니다.')
       }
     })
   }
@@ -175,10 +267,10 @@ export default function FactoriesView({
     startTransition(async () => {
       try {
         await setFactoryActive(factoryId, nextActive)
-        setMessage(nextActive ? '공장을 다시 활성화했습니다.' : '공장을 비활성화했습니다.')
+        setMessage(nextActive ? '입고처를 다시 활성화했습니다.' : '입고처를 비활성화했습니다.')
         router.refresh()
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : '공장 상태 변경에 실패했습니다.')
+        setMessage(error instanceof Error ? error.message : '입고처 상태 변경에 실패했습니다.')
       }
     })
   }
@@ -186,8 +278,8 @@ export default function FactoriesView({
   return (
     <div className={ui.shell}>
       <PageHeader
-        title="외부 공장"
-        description="공장 목록을 검색하고 상태를 걸러서 상세 정보와 등록 작업을 빠르게 처리합니다."
+        title="입고처"
+        description="입고처 목록을 검색하고 상태를 걸러서 상세 정보와 등록 작업을 빠르게 처리합니다."
         actions={
           <Button
             type="button"
@@ -200,7 +292,7 @@ export default function FactoriesView({
             className="h-10 px-3"
             disabled={schemaState.status === 'missing'}
           >
-            공장 등록
+            입고처 등록
           </Button>
         }
       />
@@ -223,12 +315,12 @@ export default function FactoriesView({
             <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <div className="w-full sm:w-[18rem] lg:max-w-[22rem] lg:flex-1">
                 <label htmlFor="factory-search" className="sr-only">
-                  공장 검색
+                  입고처 검색
                 </label>
                 <Input
                   id="factory-search"
                   type="search"
-                  placeholder="공장명, 연락처, 메모 검색"
+                  placeholder="입고처명, 연락처, 메모 검색"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   className="ui-control-sm"
@@ -257,10 +349,10 @@ export default function FactoriesView({
           </FilterToolbar>
         }
       >
-        <Table aria-label="공장 목록">
+        <Table aria-label="입고처 목록">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[18rem]">공장</TableHead>
+                  <TableHead className="w-[18rem]">입고처</TableHead>
                   <TableHead className="w-[18rem]">연락처</TableHead>
                   <TableHead className="w-[7rem] text-right">예정 입고</TableHead>
                   <TableHead className="w-[7rem] text-right">잔여</TableHead>
@@ -272,7 +364,7 @@ export default function FactoriesView({
                 {filteredFactories.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="py-10 text-center text-sm text-[color:var(--muted-foreground)]">
-                      조건에 맞는 공장이 없습니다.
+                      조건에 맞는 입고처가 없습니다.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -316,8 +408,8 @@ export default function FactoriesView({
 
       <Modal
         open={selectedFactory !== null}
-        title={selectedFactory?.name ?? '공장 상세'}
-        description={selectedFactory ? '공장 정보와 열려 있는 상품 소싱 내역을 확인합니다.' : undefined}
+        title={selectedFactory?.name ?? '입고처 상세'}
+        description={selectedFactory ? '입고처 정보와 열려 있는 상품 소싱 내역을 확인합니다.' : undefined}
         onOpenChange={(open) => {
           if (!open) {
             setSelectedFactoryId(null)
@@ -386,6 +478,29 @@ export default function FactoriesView({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-[color:var(--foreground)]">파싱 템플릿</h3>
+                <Button type="button" size="sm" onClick={() => openNewVersion('new')}>새 파싱 템플릿</Button>
+              </div>
+              {templateLoadError ? <p role="alert" className="text-sm font-medium text-[color:var(--warning-foreground)]">{templateLoadError}</p> : null}
+              <BasicDataTable
+                bare
+                tableAriaLabel="파싱 템플릿"
+                columns={[{ key: 'name', label: '이름' }, { key: 'version', label: '최신 버전' }, { key: 'status', label: '상태' }, { key: 'action', label: <span className="sr-only">작업</span>, align: 'right' }]}
+                rows={templates}
+                rowKey={(template) => template.id}
+                emptyState="등록된 입고 파싱 템플릿이 없습니다."
+                renderCell={(template, key) => key === 'name'
+                  ? <span className="font-medium text-[color:var(--foreground)]">{template.name}</span>
+                  : key === 'version'
+                    ? <span className="tabular-nums text-[color:var(--muted)]">v{template.versionNumber}</span>
+                    : key === 'status'
+                      ? <StatusBadge tone={template.active ? 'success' : 'neutral'}>{template.active ? '사용 중' : '사용 중지'}</StatusBadge>
+                      : <div className="flex justify-end gap-2"><Button type="button" variant="outline" size="sm" onClick={() => openNewVersion(template)}>새 버전 만들기</Button><Button type="button" variant="outline" size="sm" disabled={isPending} onClick={() => toggleInboundTemplate(template)}>{template.active ? '사용 중지' : '사용'}</Button></div>}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
                 <h3 className="text-sm font-semibold text-[color:var(--foreground)]">상품 소싱 내역</h3>
                 <span className={cx(ui.pillMuted, 'tabular-nums')}>열림 {selectedFactorySourcingItems.length}건</span>
               </div>
@@ -438,9 +553,32 @@ export default function FactoriesView({
       </Modal>
 
       <Modal
+        open={versionModal !== null}
+        title={versionModal === 'new' ? '새 입고 파싱 템플릿' : `${versionModal ? versionModal.name : ''} 새 버전`}
+        description="샘플 파일에서 시트·헤더 행과 외부 SKU, 수량 열을 선택해 새 버전으로 저장합니다."
+        onOpenChange={(open) => { if (!open) setVersionModal(null) }}
+        footer={<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setVersionModal(null)}>닫기</Button><Button type="button" disabled={isPending || !versionSample || !versionName.trim() || !versionMapping.externalSku || !versionMapping.quantity} onClick={saveVersion}>버전 저장</Button></div>}
+      >
+        <div className="space-y-4">
+          <label className="space-y-1"><span className={ui.label}>파싱 템플릿 이름</span><Input aria-label="파싱 템플릿 이름" value={versionName} onChange={(event) => setVersionName(event.target.value)} /></label>
+          <div className="space-y-1"><span className={ui.label}>샘플 파일</span><FileDropInput ariaLabel="샘플 파일" accept=".xlsx,.xls,.csv" onFile={inspectVersionSample} /></div>
+          {versionSample ? <ParseTemplateBuilder<'externalSku' | 'quantity'>
+            roles={inboundRoles}
+            sample={versionSample}
+            sheetName={versionSheetName}
+            headerRowNumber={versionHeaderRow}
+            mapping={versionMapping}
+            onSheetChange={setVersionSheetName}
+            onHeaderRowChange={setVersionHeaderRow}
+            onMappingChange={setVersionMapping}
+          /> : null}
+        </div>
+      </Modal>
+
+      <Modal
         open={isRegisterOpen}
-        title="공장 등록"
-        description="새 공장의 연락처와 메모를 등록합니다."
+        title="입고처 등록"
+        description="새 입고처의 연락처와 메모를 등록합니다."
         onOpenChange={setIsRegisterOpen}
         footer={
           <div className="flex items-center justify-end gap-2">
@@ -466,7 +604,7 @@ export default function FactoriesView({
 
           <div className="grid gap-3 md:grid-cols-2">
           <div className="md:col-span-2">
-            <label className={ui.label}>공장 이름</label>
+            <label className={ui.label}>입고처 이름</label>
             <Input
               value={draft.name}
               onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}

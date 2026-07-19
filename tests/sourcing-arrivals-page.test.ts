@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   getCatalogData: vi.fn(),
   getFactoriesData: vi.fn(),
   getFactoryArrivalsData: vi.fn(),
-  getActiveInboundTemplates: vi.fn(),
   getProductWorkspaceData: vi.fn(),
   arrivalsView: vi.fn(),
 }))
@@ -16,7 +15,6 @@ vi.mock('@/lib/data', () => ({
   getCatalogData: mocks.getCatalogData,
   getFactoriesData: mocks.getFactoriesData,
   getFactoryArrivalsData: mocks.getFactoryArrivalsData,
-  getActiveInboundTemplates: mocks.getActiveInboundTemplates,
   getProductWorkspaceData: mocks.getProductWorkspaceData,
 }))
 
@@ -55,7 +53,6 @@ describe('SourcingArrivalsPage', () => {
       schemaState: { status: 'ready', message: null },
       arrivals: [{ id: 100, factoryName: '광주 협력사' }],
     })
-    mocks.getActiveInboundTemplates.mockResolvedValue([])
     mocks.getProductWorkspaceData.mockResolvedValue({ variants: [], channelProductRefs: [] })
 
     render(await SourcingArrivalsPage())
@@ -82,7 +79,6 @@ describe('SourcingArrivalsPage', () => {
       schemaState: { status: 'missing', message: '입고 스키마 준비가 필요합니다.' },
       arrivals: [],
     })
-    mocks.getActiveInboundTemplates.mockResolvedValue([])
     mocks.getProductWorkspaceData.mockResolvedValue({ variants: [], channelProductRefs: [] })
 
     render(await SourcingArrivalsPage())

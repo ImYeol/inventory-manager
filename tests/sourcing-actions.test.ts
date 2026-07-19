@@ -47,7 +47,8 @@ beforeEach(() => {
 
 describe('sourcing actions', () => {
   it('creates and toggles factories via Supabase', async () => {
-    const insert = vi.fn(() => Promise.resolve({ error: null }))
+    // createFactory는 등록 직후 상세를 열기 위해 삽입된 행의 id를 되돌려받는다.
+    const insert = vi.fn(() => ({ select: vi.fn(() => ({ single: vi.fn(() => Promise.resolve({ data: { id: 7 }, error: null })) })) }))
     const update = vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) }))
     const supabase = {
       from: vi.fn((table: string) => {
@@ -60,7 +61,7 @@ describe('sourcing actions', () => {
 
     mocks.getSupabaseWithUser.mockResolvedValue({ supabase, user: { id: 'user-1' } })
 
-    await expect(createFactory({ name: '광주 협력사', phone: '010-1111-2222' })).resolves.toEqual({ success: true })
+    await expect(createFactory({ name: '광주 협력사', phone: '010-1111-2222' })).resolves.toEqual({ success: true, id: 7 })
     await expect(setFactoryActive(1, false)).resolves.toEqual({ success: true })
 
     expect(insert).toHaveBeenCalledWith({
@@ -217,7 +218,7 @@ describe('sourcing actions', () => {
 
   it('normalizes missing-schema errors across sourcing actions', async () => {
     const missingSchemaError = { message: "relation 'public.factory_arrivals' does not exist" }
-    const insert = vi.fn(() => Promise.resolve({ error: missingSchemaError }))
+    const insert = vi.fn(() => ({ select: vi.fn(() => ({ single: vi.fn(() => Promise.resolve({ data: null, error: missingSchemaError })) })) }))
     const update = vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: missingSchemaError })) }))
     const rpc = vi.fn(() => Promise.resolve({ error: missingSchemaError }))
 

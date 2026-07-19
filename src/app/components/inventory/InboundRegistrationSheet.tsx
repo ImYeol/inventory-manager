@@ -1,14 +1,14 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileUp } from 'lucide-react'
-import { createInboundTemplateVersion, inspectInboundTemplateSample, listResumableInboundReviews, loadInboundReviewRevision, previewInboundTemplateFile, promoteInboundImportRevision, saveInboundTemplateDraft, type InboundFilePreview, type InboundTemplateSample, type ResumableInboundReview } from '@/lib/actions/inbound-import'
+import { createInboundTemplateVersion, getActiveInboundTemplatesForSupplier, inspectInboundTemplateSample, listResumableInboundReviews, loadInboundReviewRevision, previewInboundTemplateFile, promoteInboundImportRevision, saveInboundTemplateDraft, type InboundFilePreview, type InboundTemplateSample, type ResumableInboundReview } from '@/lib/actions/inbound-import'
 import { confirmSupplierSkuMapping } from '@/lib/actions/supplier-sku-mapping'
 import { normalizeSupplierExternalSku } from '@/lib/supplier-sku'
 import { EditableTable } from '@/components/ui/editable-table'
 import { BasicDataTable } from '@/components/ui/basic-data-table'
 import { Button } from '@/components/ui/button'
+import { FileDropInput } from '@/components/ui/file-drop-input'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -32,7 +32,6 @@ function rowKey() {
 export default function InboundRegistrationSheet({
   suppliers,
   warehouses,
-  templates,
   initialWarehouseId,
   productVariants = [],
   returnTo = '/inventory',
@@ -40,7 +39,6 @@ export default function InboundRegistrationSheet({
 }: {
   suppliers: Lookup[]
   warehouses: Lookup[]
-  templates: InboundTemplateOption[]
   initialWarehouseId?: number
   productVariants?: ProductVariantOption[]
   returnTo?: string
@@ -48,12 +46,11 @@ export default function InboundRegistrationSheet({
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const inputRef = useRef<HTMLInputElement>(null)
   const [supplierId, setSupplierId] = useState('')
   const [warehouseId, setWarehouseId] = useState(initialWarehouseId ? String(initialWarehouseId) : '')
   const [templateVersionId, setTemplateVersionId] = useState('')
   const [shipmentNumber, setShipmentNumber] = useState('')
-  const [templateOptionsState, setTemplateOptionsState] = useState(templates)
+  const [templateOptionsState, setTemplateOptionsState] = useState<InboundTemplateOption[]>([])
   const [rows, setRows] = useState<DraftRow[]>([])
   const [preview, setPreview] = useState<InboundFilePreview | null>(null)
   const [sourceFile, setSourceFile] = useState<File | undefined>()
@@ -85,6 +82,24 @@ export default function InboundRegistrationSheet({
       .catch(() => { if (active) setResumableReviews([]) })
     return () => { active = false }
   }, [])
+
+  // 입고처 → 템플릿 → 파일 순서 규칙: 템플릿 select는 항상 렌더되지만 선택된 입고처의 템플릿으로만 채워진다.
+  useEffect(() => {
+    let active = true
+    const request = supplierId ? getActiveInboundTemplatesForSupplier(Number(supplierId)) : Promise.resolve([])
+    request
+      .then((options) => {
+        if (!active) return
+        setTemplateOptionsState(options)
+        setTemplateVersionId((current) => {
+          if (!supplierId) return ''
+          if (current && options.some((option) => String(option.versionId) === current)) return current
+          return options.length === 1 ? String(options[0].versionId) : ''
+        })
+      })
+      .catch(() => { if (active) { setTemplateOptionsState([]); setTemplateVersionId('') } })
+    return () => { active = false }
+  }, [supplierId])
 
   const resumeReview = (revisionId: number) => {
     startTransition(async () => {
@@ -122,10 +137,10 @@ export default function InboundRegistrationSheet({
   }
 
   const saveTemplate = () => {
-    if (!sampleSheet || !templateName.trim() || !externalSkuColumn || !quantityColumn) return
+    if (!supplierId || !sampleSheet || !templateName.trim() || !externalSkuColumn || !quantityColumn) return
     startTransition(async () => {
       try {
-        const result = await createInboundTemplateVersion({ templateId: editingTemplateId, name: templateName, sheetName: sampleSheet.name, headerRowNumber: Number(headerRowNumber), headers: sampleHeaders, mappings: { externalSku: externalSkuColumn, quantity: quantityColumn } })
+        const result = await createInboundTemplateVersion({ templateId: editingTemplateId, supplierId: Number(supplierId), name: templateName, sheetName: sampleSheet.name, headerRowNumber: Number(headerRowNumber), headers: sampleHeaders, mappings: { externalSku: externalSkuColumn, quantity: quantityColumn } })
         setTemplateOptionsState((current) => [...current.filter((template) => template.id !== result.id), result])
         setTemplateVersionId(String(result.versionId))
         setTemplateModalOpen(false)
@@ -144,7 +159,7 @@ export default function InboundRegistrationSheet({
 
   const previewFile = (file: File) => {
     if (!supplierId || !templateVersionId) {
-      setMessage('공급자와 파싱 템플릿을 먼저 선택해주세요.')
+      setMessage('입고처와 파싱 템플릿을 먼저 선택해주세요.')
       return
     }
     setMessage(null)
@@ -163,7 +178,7 @@ export default function InboundRegistrationSheet({
 
   const saveDraft = () => {
     if (!supplierId || !selectedTemplate || rows.length === 0 || !sourceFile || !shipmentNumber.trim()) {
-      setMessage('공급자, 파싱 템플릿, 외부 출고 번호와 입고 파일을 입력해주세요.')
+      setMessage('입고처, 파싱 템플릿, 외부 출고 번호와 입고 파일을 입력해주세요.')
       return
     }
     const draftPreview: InboundFilePreview = preview ?? {
@@ -239,27 +254,22 @@ export default function InboundRegistrationSheet({
         </li>
       </ol>
       {resumableReviews.length && !preview ? <div className="space-y-[var(--space-2)]"><p className={ui.label}>저장된 검토</p><BasicDataTable<ResumableInboundReview>
-        columns={[{ key: 'source', label: '증빙' }, { key: 'supplier', label: '공급자 / 출고 번호' }, { key: 'state', label: '행 / 보정', align: 'right' }, { key: 'action', label: '작업', align: 'right' }]}
+        columns={[{ key: 'source', label: '증빙' }, { key: 'supplier', label: '입고처 / 출고 번호' }, { key: 'state', label: '행 / 보정', align: 'right' }, { key: 'action', label: '작업', align: 'right' }]}
         rows={resumableReviews} rowKey={(review) => review.id} emptyState="이어서 검토할 증빙이 없습니다."
         renderCell={(review, key) => key === 'source' ? <span>{review.filename ?? '수동 증빙'}</span> : key === 'supplier' ? <span>{review.supplierName} · {review.shipmentNumber}</span> : key === 'state' ? <span className="tabular-nums">{review.rowCount} / {review.blockerCount}</span> : <Button type="button" variant="ghost" size="sm" disabled={isPending} onClick={() => resumeReview(review.id)}>이어서 검토</Button>}
       /></div> : null}
       <div className="grid gap-[var(--space-3)] md:grid-cols-3">
-        <label className="space-y-1"><span className={ui.label}>공급자</span><Select value={supplierId || EMPTY_VALUE} onValueChange={(value) => setSupplierId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="공급자"><SelectValue placeholder="공급자 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>공급자 선택</SelectItem>{suppliers.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></label>
-        <div className="space-y-1"><span className={ui.label}>입고 파싱 템플릿</span><div className="flex gap-2"><Select value={templateVersionId || EMPTY_VALUE} onValueChange={(value) => setTemplateVersionId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="입고 파싱 템플릿"><SelectValue placeholder="파싱 템플릿 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>파싱 템플릿 선택</SelectItem>{templateOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Button type="button" variant="secondary" size="sm" onClick={() => { setEditingTemplateId(undefined); setTemplateName(''); setTemplateModalOpen(true) }}>파싱 템플릿 만들기</Button>{selectedTemplate ? <Button type="button" variant="secondary" size="sm" onClick={() => { setEditingTemplateId(selectedTemplate.id); setTemplateName(selectedTemplate.name); setTemplateModalOpen(true) }}>파싱 템플릿 수정</Button> : null}</div></div>
+        <label className="space-y-1"><span className={ui.label}>입고처</span><Select value={supplierId || EMPTY_VALUE} onValueChange={(value) => setSupplierId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="입고처"><SelectValue placeholder="입고처 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>입고처 선택</SelectItem>{suppliers.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></label>
+        <div className="space-y-1"><span className={ui.label}>입고 파싱 템플릿</span><div className="flex gap-2"><Select value={templateVersionId || EMPTY_VALUE} onValueChange={(value) => setTemplateVersionId(value === EMPTY_VALUE ? '' : value)} disabled={!supplierId}><SelectTrigger aria-label="입고 파싱 템플릿"><SelectValue placeholder="파싱 템플릿 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>파싱 템플릿 선택</SelectItem>{templateOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Button type="button" variant="secondary" size="sm" disabled={!supplierId} onClick={() => { setEditingTemplateId(undefined); setTemplateName(''); setTemplateModalOpen(true) }}>파싱 템플릿 만들기</Button>{selectedTemplate ? <Button type="button" variant="secondary" size="sm" onClick={() => { setEditingTemplateId(selectedTemplate.id); setTemplateName(selectedTemplate.name); setTemplateModalOpen(true) }}>파싱 템플릿 수정</Button> : null}</div></div>
         <label className="space-y-1"><span className={ui.label}>외부 출고 번호</span><Input aria-label="외부 출고 번호" value={shipmentNumber} onChange={(event) => setShipmentNumber(event.target.value)} /></label>
       </div>
 
-      <div
-        className="flex min-h-40 flex-col items-center justify-center gap-[var(--space-2)] rounded-[var(--radius-lg)] border border-dashed border-[color:var(--border-strong)] bg-[color:var(--surface-muted)] p-[var(--space-6)] text-center"
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => { event.preventDefault(); const file = event.dataTransfer.files[0]; if (file) previewFile(file) }}
-      >
-        <FileUp aria-hidden="true" className="size-5 text-[color:var(--muted)]" />
-        <p className="font-medium text-[color:var(--foreground)]">파일을 놓거나 선택하세요</p>
-        <p className="text-sm text-[color:var(--muted-foreground)]">선택한 파싱 템플릿의 시트와 필수 열로만 미리보기합니다.</p>
-        <Input ref={inputRef} className="sr-only" aria-label="입고 파일 업로드" type="file" accept=".xlsx,.xls,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) previewFile(file) }} />
-        <Button type="button" variant="secondary" size="sm" onClick={() => inputRef.current?.click()}>파일 선택</Button>
-      </div>
+      <FileDropInput
+        ariaLabel="입고 파일 업로드"
+        accept=".xlsx,.xls,.csv"
+        onFile={previewFile}
+        description="선택한 파싱 템플릿의 시트와 필수 열로만 미리보기합니다."
+      />
 
       {preview ? <EditableTable
         columns={[{ key: 'externalSku', header: '외부 SKU' }, { key: 'quantity', header: '수량', align: 'right' }, { key: 'evidence', header: '원본 셀' }, { key: 'mapping', header: '내부 SKU 상태' }]}
@@ -283,7 +293,7 @@ export default function InboundRegistrationSheet({
       <Modal open={templateModalOpen} title="입고 파싱 템플릿 만들기" description="샘플 파일에서 시트·헤더 행과 외부 SKU, 수량 열을 선택하고 실제 데이터 미리보기를 확인해 저장합니다." onOpenChange={setTemplateModalOpen} footer={<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setTemplateModalOpen(false)}>닫기</Button><Button type="button" disabled={isPending || !sampleSheet || !templateName.trim() || !externalSkuColumn || !quantityColumn} onClick={saveTemplate}>파싱 템플릿 저장</Button></div>}>
         <div className="space-y-4">
           <label className="space-y-1"><span className={ui.label}>파싱 템플릿 이름</span><Input aria-label="파싱 템플릿 이름" value={templateName} onChange={(event) => setTemplateName(event.target.value)} /></label>
-          <label className="space-y-1"><span className={ui.label}>샘플 파일</span><Input aria-label="샘플 파일" type="file" accept=".xlsx,.xls,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) inspectSample(file) }} /></label>
+          <div className="space-y-1"><span className={ui.label}>샘플 파일</span><FileDropInput ariaLabel="샘플 파일" accept=".xlsx,.xls,.csv" onFile={inspectSample} /></div>
           {templateSample ? <ParseTemplateBuilder<InboundRole>
             roles={inboundRoles}
             sample={templateSample}

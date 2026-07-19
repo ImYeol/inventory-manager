@@ -21,7 +21,6 @@ export const arrivalsPreviewProps = {
       colors: [{ id: 301, name: '네이비', rgbCode: '#1f2937' }],
     },
   ],
-  inboundTemplates: [],
   productVariants: [
     { id: 901, label: 'LP01-NV-S · LP01 린넨 파우치 / 네이비 / S' },
   ],

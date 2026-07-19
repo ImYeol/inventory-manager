@@ -51,7 +51,7 @@ describe('Nav', () => {
     expect(screen.getByRole('link', { name: '재고 운영' }).getAttribute('href')).toBe('/inventory')
     expect(screen.getByRole('link', { name: '상품 관리' }).getAttribute('href')).toBe('/products')
     expect(screen.getByRole('button', { name: '소싱' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: '외부 공장' }).getAttribute('href')).toBe('/sourcing/factories')
+    expect(screen.getByRole('link', { name: '입고처' }).getAttribute('href')).toBe('/sourcing/factories')
     expect(screen.getByRole('link', { name: '입고 예정' }).getAttribute('href')).toBe('/sourcing/arrivals')
     expect(screen.queryByRole('link', { name: '운송장' })).toBeNull()
     expect(screen.queryByRole('link', { name: '분석' })).toBeNull()
@@ -77,7 +77,7 @@ describe('Nav', () => {
       expect(mobileMenu.getByRole('link', { name: label }).getAttribute('href')).toBe(href)
     })
     expect(mobileMenu.getByRole('button', { name: '소싱' })).toBeTruthy()
-    expect(mobileMenu.getByRole('link', { name: '외부 공장' }).getAttribute('href')).toBe('/sourcing/factories')
+    expect(mobileMenu.getByRole('link', { name: '입고처' }).getAttribute('href')).toBe('/sourcing/factories')
     expect(mobileMenu.getByRole('link', { name: '입고 예정' }).getAttribute('href')).toBe('/sourcing/arrivals')
     expect(screen.queryAllByRole('link', { name: '분석' })).toHaveLength(0)
     expect(mobileMenu.queryByRole('link', { name: '설정' })).toBeNull()
@@ -103,12 +103,12 @@ describe('Nav', () => {
     expect(screen.getAllByText('hong@example.com')).toHaveLength(2)
   })
 
-  it('keeps settings and parse-template management deep links in the account menu on desktop and mobile', () => {
+  it('keeps the API settings deep link in the account menu on desktop and mobile without a separate parse-template entry', () => {
     render(React.createElement(Nav, { user: { name: '홍길동', email: 'hong@example.com' } }))
 
     fireEvent.pointerDown(screen.getAllByRole('button', { name: /홍길동/ })[0], { button: 0, ctrlKey: false })
     expect(screen.getByRole('menuitem', { name: 'API 설정' }).getAttribute('href')).toBe('/settings?section=store-connections')
-    expect(screen.getByRole('menuitem', { name: '파싱 템플릿' }).getAttribute('href')).toBe('/settings/parse-templates')
+    expect(screen.queryByRole('menuitem', { name: '파싱 템플릿' })).toBeNull()
     expect(screen.getByText('로그아웃')).toBeTruthy()
 
     cleanup()
@@ -117,6 +117,6 @@ describe('Nav', () => {
     const mobileMenu = within(screen.getByRole('dialog', { name: '모바일 메뉴' }))
     fireEvent.pointerDown(mobileMenu.getByRole('button', { name: /홍길동/ }), { button: 0, ctrlKey: false })
     expect(screen.getAllByRole('menuitem', { name: 'API 설정' }).some((item) => item.getAttribute('href') === '/settings?section=store-connections')).toBe(true)
-    expect(screen.getAllByRole('menuitem', { name: '파싱 템플릿' }).some((item) => item.getAttribute('href') === '/settings/parse-templates')).toBe(true)
+    expect(screen.queryAllByRole('menuitem', { name: '파싱 템플릿' })).toHaveLength(0)
   })
 })

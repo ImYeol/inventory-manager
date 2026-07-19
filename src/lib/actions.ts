@@ -504,37 +504,38 @@ export async function createFactory(input: {
 }) {
   const name = input.name.trim()
   if (!name) {
-    throw new Error('공장 이름을 입력해주세요.')
+    throw new Error('입고처 이름을 입력해주세요.')
   }
 
   const { supabase } = await getSupabaseWithUser()
-  const { error } = await supabase.from('factories').insert({
+  // 등록 직후 해당 입고처 상세를 바로 열어 파싱 템플릿을 붙일 수 있도록 id를 돌려준다.
+  const { data, error } = await supabase.from('factories').insert({
     name,
     contact_name: input.contactName?.trim() || null,
     phone: input.phone?.trim() || null,
     email: input.email?.trim() || null,
     notes: input.notes?.trim() || null,
-  })
+  }).select('id').single()
 
-  if (error) {
-    throw new Error(normalizeSourcingErrorMessage(error, '공장 등록에 실패했습니다.'))
+  if (error || !data) {
+    throw new Error(normalizeSourcingErrorMessage(error, '입고처 등록에 실패했습니다.'))
   }
 
   revalidatePath('/sourcing/factories')
   revalidatePath('/sourcing/arrivals')
-  return { success: true }
+  return { success: true, id: Number(data.id) }
 }
 
 export async function setFactoryActive(factoryId: number, isActive: boolean) {
   if (!factoryId) {
-    throw new Error('공장을 찾을 수 없습니다.')
+    throw new Error('입고처를 찾을 수 없습니다.')
   }
 
   const { supabase } = await getSupabaseWithUser()
   const { error } = await supabase.from('factories').update({ is_active: isActive }).eq('id', factoryId)
 
   if (error) {
-    throw new Error(normalizeSourcingErrorMessage(error, '공장 상태 변경에 실패했습니다.'))
+    throw new Error(normalizeSourcingErrorMessage(error, '입고처 상태 변경에 실패했습니다.'))
   }
 
   revalidatePath('/sourcing/factories')
@@ -556,7 +557,7 @@ export async function createFactoryArrivalBatch(input: {
   }>
 }) {
   if (!input.factoryId) {
-    throw new Error('공장을 선택해주세요.')
+    throw new Error('입고처를 선택해주세요.')
   }
 
   if (!input.expectedDate) {

@@ -30,7 +30,7 @@ describe('versioned inbound template contract', () => {
     const data = readFileSync(resolve(process.cwd(), 'src/lib/data.ts'), 'utf8')
     const actions = readFileSync(resolve(process.cwd(), 'src/lib/actions/inbound-import.ts'), 'utf8')
 
-    expect(data).toContain('export async function getInboundTemplates()')
+    expect(data).toContain('export async function getInboundTemplates(supplierId: number)')
     expect(data).toContain(".eq('is_active', true)")
     expect(actions).toContain('export async function setInboundTemplateActive')
     expect(actions).toContain(".from('inbound_templates').update({ is_active: input.active })")

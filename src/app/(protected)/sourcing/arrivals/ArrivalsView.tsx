@@ -16,7 +16,7 @@ import { BasicDataTable } from '@/components/ui/basic-data-table'
 import { FilterToolbar } from '@/components/ui/filter-toolbar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TableSurface } from '@/components/ui/table-surface'
-import InboundRegistrationSheet, { type InboundTemplateOption } from '@/app/components/inventory/InboundRegistrationSheet'
+import InboundRegistrationSheet from '@/app/components/inventory/InboundRegistrationSheet'
 import { PageHeader, ui } from '@/app/components/ui'
 
 type FactoryLookup = { id: number; name: string; isActive: boolean }
@@ -42,7 +42,7 @@ function FieldSelect({ label, value, options, onValueChange, disabled }: { label
   return <label className="block"><span className={ui.label}>{label}</span><Select value={value ? String(value) : undefined} onValueChange={(next) => onValueChange(next ? Number(next) : null)} disabled={disabled}><SelectTrigger aria-label={label} className={ui.controlSm}><SelectValue placeholder={`${label} 선택`} /></SelectTrigger><SelectContent>{options.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></label>
 }
 
-export default function ArrivalsView({ schemaState, factories, warehouses, models, arrivals, inboundTemplates = [], productVariants = [] }: { schemaState: SourcingSchemaState; factories: FactoryLookup[]; warehouses: WarehouseLookup[]; models: ModelLookup[]; arrivals: ArrivalRecord[]; inboundTemplates?: InboundTemplateOption[]; productVariants?: Array<{ id: number; label: string }> }) {
+export default function ArrivalsView({ schemaState, factories, warehouses, models, arrivals, productVariants = [] }: { schemaState: SourcingSchemaState; factories: FactoryLookup[]; warehouses: WarehouseLookup[]; models: ModelLookup[]; arrivals: ArrivalRecord[]; productVariants?: Array<{ id: number; label: string }> }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [sheet, setSheet] = useState<Sheet>(null)
@@ -195,7 +195,7 @@ export default function ArrivalsView({ schemaState, factories, warehouses, model
         <TabsTrigger value="import">엑셀에서</TabsTrigger>
       </TabsList>
       <TabsContent value="manual">{renderManual()}</TabsContent>
-      <TabsContent value="import"><InboundRegistrationSheet suppliers={factories.map((factory) => ({ id: factory.id, name: factory.name }))} warehouses={warehouses} templates={inboundTemplates} productVariants={productVariants} returnTo="/sourcing/arrivals" onSaved={() => succeed('엑셀 검토를 저장했습니다.')} /></TabsContent>
+      <TabsContent value="import"><InboundRegistrationSheet suppliers={factories.map((factory) => ({ id: factory.id, name: factory.name }))} warehouses={warehouses} productVariants={productVariants} returnTo="/sourcing/arrivals" onSaved={() => succeed('엑셀 검토를 저장했습니다.')} /></TabsContent>
     </Tabs>
   }
   const title = sheet?.kind === 'arrival' ? `${selected?.factoryName ?? ''} 입고 예정` : sheet?.kind === 'add' ? '입고 예정 추가' : ''

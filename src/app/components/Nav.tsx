@@ -13,7 +13,6 @@ import {
   PackageSearch,
   KeyRound,
   ClipboardList,
-  FileCode2,
 } from 'lucide-react'
 import { logout } from '@/app/login/actions'
 import { MenuLink, MenuSection } from '@/components/ui/menu'
@@ -47,7 +46,7 @@ const directItems: NavItem[] = [
 ]
 
 const sourcingItems: NavItem[] = [
-  { href: '/sourcing/factories', label: '외부 공장', icon: <span className="h-1.5 w-1.5 rounded-full bg-current" /> },
+  { href: '/sourcing/factories', label: '입고처', icon: <span className="h-1.5 w-1.5 rounded-full bg-current" /> },
   { href: '/sourcing/arrivals', label: '입고 예정', icon: <span className="h-1.5 w-1.5 rounded-full bg-current" /> },
 ]
 
@@ -146,12 +145,6 @@ function NavigationContent({
               <Link href="/settings?section=store-connections" onClick={onNavigate}>
                 <KeyRound className="h-4 w-4" />
                 API 설정
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild className="gap-2">
-              <Link href="/settings/parse-templates" onClick={onNavigate}>
-                <FileCode2 className="h-4 w-4" />
-                파싱 템플릿
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />

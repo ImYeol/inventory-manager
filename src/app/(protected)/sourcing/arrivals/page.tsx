@@ -1,14 +1,13 @@
-import { getActiveInboundTemplates, getCatalogData, getFactoriesData, getFactoryArrivalsData, getProductWorkspaceData } from '@/lib/data'
+import { getCatalogData, getFactoriesData, getFactoryArrivalsData, getProductWorkspaceData } from '@/lib/data'
 import ArrivalsView from './ArrivalsView'
 
 export const dynamic = 'force-dynamic'
 
 export default async function SourcingArrivalsPage() {
-  const [{ models, warehouses = [] }, factoriesData, arrivalsData, inboundTemplates, workspace] = await Promise.all([
+  const [{ models, warehouses = [] }, factoriesData, arrivalsData, workspace] = await Promise.all([
     getCatalogData(),
     getFactoriesData(),
     getFactoryArrivalsData(),
-    getActiveInboundTemplates(),
     getProductWorkspaceData(),
   ])
 
@@ -28,7 +27,6 @@ export default async function SourcingArrivalsPage() {
           colors: model.colors.map((color) => ({ id: color.id, name: color.name, rgbCode: color.rgbCode })),
         }))}
         arrivals={arrivals}
-        inboundTemplates={inboundTemplates}
         productVariants={workspace.variants.map((variant) => ({ id: variant.id, label: `${variant.sellerSku} · ${variant.modelName} / ${variant.colorName} / ${variant.sizeName}` }))}
     />
   )

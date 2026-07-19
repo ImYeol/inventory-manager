@@ -1,4 +1,7 @@
 # ADR-034: 파싱 템플릿은 공유 primitive이며 관리는 설정이 소유한다
+
+> **Superseded (부분)**: 입고 파싱 템플릿의 관리 위치는 [ADR-035](./0035-inbound-supplier-is-shipping-list-issuer.md)가 대체한다 — `inbound_templates.supplier_id`가 NOT NULL이 되면서 템플릿은 입고처에 종속되므로, 관리 UI도 설정이 아니라 입고처 상세 modal(`소싱 > 입고처`)로 옮긴다. 공유 primitive(`ParseTemplateBuilder`)와 도메인별 저장 계층 분리 결정은 그대로 유효하다.
+
 **결정**: 파일 → 시트/헤더 행 선택 → 컬럼-역할 매핑 → 미리보기로 이어지는 파싱 흐름은 `src/components/ui/parse-template-builder.tsx`의 `ParseTemplateBuilder` 공유 primitive 하나로 수렴한다. 역할 스키마(`ParseTemplateRole[]`)를 파라미터로 받아 입고(`외부 SKU`·`수량`, `InboundRegistrationSheet`)와 주문 송장(`운송장번호`·`주문번호`·`수취인` 등, `tracking-import-workspace`)이 이 컴포넌트 하나를 소비한다. 헤더 지문 자동 매칭(`headerFingerprint`/`matchPresetByHeaders`)은 primitive가 소유하며, 두 도메인 모두 이를 통해 저장된 프리셋/템플릿을 자동 선택받는다.
 
 파싱 템플릿의 **관리**(전체 목록·수정·새 버전·프리셋 복제)는 `/settings/parse-templates`에서 이뤄진다(ADR-006이 확립한 "설정은 cross-cutting 설정을 소유한다" 원칙의 연장이며, ADR-002가 경계하는 top-level 메뉴 과밀은 기존 `/settings` 아래 sub-route로 만들어 피한다). 각 가져오기 화면(입고 예정의 엑셀 가져오기, 주문 송장 가져오기)은 인라인 파싱 템플릿 선택과 급조(quick-create)만 유지하고, 목록·버전 이력·프리셋 관리 UI를 자체로 다시 만들지 않는다.
