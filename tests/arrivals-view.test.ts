@@ -44,7 +44,7 @@ async function openSelectAndChoose(label: string, optionName: string) {
 }
 
 describe('ArrivalsView', () => {
-  it('keeps manual arrival creation in a secondary sheet', async () => {
+  it('unifies manual and Excel entry behind a single add entry point with a source toggle', async () => {
     mocks.createFactoryArrivalBatch.mockResolvedValue({ success: true, count: 1 })
 
     render(
@@ -68,7 +68,11 @@ describe('ArrivalsView', () => {
     )
 
     expect(screen.queryByRole('button', { name: 'CSV 등록' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '수동 추가' }))
+    expect(screen.queryByRole('button', { name: '수동 추가' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '엑셀 가져오기' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '입고 예정 추가' }))
+    expect(await screen.findByRole('dialog', { name: '입고 예정 추가' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: '직접 입력' }).getAttribute('aria-selected')).toBe('true')
 
     await openSelectAndChoose('공장', '광주 협력사')
     await openSelectAndChoose('입고 예정 창고', '대자동')
@@ -90,6 +94,43 @@ describe('ArrivalsView', () => {
         }),
       ),
     )
+  })
+
+  it('switches the add sheet to the Excel review path via the source toggle, producing the same FactoryArrival aggregate entry', () => {
+    render(
+      React.createElement(ArrivalsView, {
+        schemaState: { status: 'ready', message: null },
+        factories: [{ id: 1, name: '광주 협력사', isActive: true }],
+        warehouses: [{ id: 11, name: '오금동' }],
+        models: [],
+        arrivals: [],
+      }),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '입고 예정 추가' }))
+    expect(screen.queryByRole('button', { name: '행 추가' })).toBeTruthy()
+    const excelTab = screen.getByRole('tab', { name: '엑셀에서' })
+    fireEvent.mouseDown(excelTab)
+    fireEvent.click(excelTab)
+    expect(screen.getByText('파일을 놓거나 선택하세요')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '예정 입고 등록' })).toBeNull()
+  })
+
+  it('lets an operator delete a registration row from the manual entry form', () => {
+    render(
+      React.createElement(ArrivalsView, {
+        schemaState: { status: 'ready', message: null },
+        factories: [{ id: 1, name: '광주 협력사', isActive: true }],
+        warehouses: [{ id: 11, name: '오금동' }],
+        models: [],
+        arrivals: [],
+      }),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '입고 예정 추가' }))
+    expect(screen.getAllByPlaceholderText('수량')).toHaveLength(2)
+    fireEvent.click(screen.getAllByRole('button', { name: '행 삭제' })[0])
+    expect(screen.getAllByPlaceholderText('수량')).toHaveLength(1)
   })
 
   it('receives multiple canonical allocation quantities with overage evidence', async () => {
@@ -328,7 +369,7 @@ describe('ArrivalsView', () => {
     )
 
     expect(screen.getByText('소싱 스키마가 아직 배포되지 않았습니다. supabase/schema.sql 적용 후 다시 시도하세요.')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '수동 추가' }))
+    fireEvent.click(screen.getByRole('button', { name: '입고 예정 추가' }))
     expect(screen.getByRole('button', { name: '예정 입고 등록' }).getAttribute('disabled')).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '닫기' }))
     fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))

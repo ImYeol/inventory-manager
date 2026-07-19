@@ -12,12 +12,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { StatusBadge } from '@/components/ui/badge-1'
+import { ParseTemplateBuilder, extractHeaders as extractSampleHeaders, type ParseTemplateMapping } from '@/components/ui/parse-template-builder'
 import { ui } from '@/app/components/ui'
 
 type Lookup = { id: number; name: string }
 type ProductVariantOption = { id: number; label: string }
 export type InboundTemplateOption = { id: number; name: string; versionId: number; versionNumber: number }
 type DraftRow = InboundFilePreview['rows'][number] & { key: string; sourceRowId?: number }
+type InboundRole = 'externalSku' | 'quantity'
+const inboundRoles = [{ key: 'externalSku' as const, label: '외부 SKU', required: true }, { key: 'quantity' as const, label: '수량', required: true }]
 
 const EMPTY_VALUE = '__empty__'
 
@@ -69,8 +73,10 @@ export default function InboundRegistrationSheet({
   const selectedTemplate = useMemo(() => templateOptionsState.find((template) => template.versionId === Number(templateVersionId)) ?? null, [templateVersionId, templateOptionsState])
   const templateOptions = templateOptionsState.map((template) => ({ value: String(template.versionId), label: `${template.name} v${template.versionNumber}` }))
   const sampleSheet = templateSample?.sheets.find((sheet) => sheet.name === sampleSheetName)
-  const sampleHeaders = sampleSheet?.rows[Number(headerRowNumber) - 1] ?? []
+  const sampleHeaders = templateSample ? extractSampleHeaders(templateSample, sampleSheetName, Number(headerRowNumber) || 1) : []
   const reviewBlockers = rows.filter((row) => Boolean(row.validationError) || !row.productVariantId || !Number.isInteger(row.quantity) || Number(row.quantity) <= 0)
+  const templateMapping: ParseTemplateMapping<InboundRole> = { externalSku: externalSkuColumn, quantity: quantityColumn }
+  const promotionStage: 1 | 2 = savedRevisionId ? 2 : 1
 
   useEffect(() => {
     let active = true
@@ -124,7 +130,7 @@ export default function InboundRegistrationSheet({
         setTemplateVersionId(String(result.versionId))
         setTemplateModalOpen(false)
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : '템플릿을 저장하지 못했습니다.')
+        setMessage(error instanceof Error ? error.message : '파싱 템플릿을 저장하지 못했습니다.')
       }
     })
   }
@@ -138,7 +144,7 @@ export default function InboundRegistrationSheet({
 
   const previewFile = (file: File) => {
     if (!supplierId || !templateVersionId) {
-      setMessage('공급자와 템플릿을 먼저 선택해주세요.')
+      setMessage('공급자와 파싱 템플릿을 먼저 선택해주세요.')
       return
     }
     setMessage(null)
@@ -157,7 +163,7 @@ export default function InboundRegistrationSheet({
 
   const saveDraft = () => {
     if (!supplierId || !selectedTemplate || rows.length === 0 || !sourceFile || !shipmentNumber.trim()) {
-      setMessage('공급자, 템플릿, 외부 출고 번호와 입고 파일을 입력해주세요.')
+      setMessage('공급자, 파싱 템플릿, 외부 출고 번호와 입고 파일을 입력해주세요.')
       return
     }
     const draftPreview: InboundFilePreview = preview ?? {
@@ -221,6 +227,17 @@ export default function InboundRegistrationSheet({
 
   return (
     <div className="space-y-[var(--space-5)]">
+      <ol aria-label="입고 처리 단계" className="flex flex-wrap items-center gap-2 text-sm">
+        <li className="flex items-center gap-2">
+          <StatusBadge tone={promotionStage === 1 ? 'info' : 'success'}>1</StatusBadge>
+          <span className={promotionStage === 1 ? 'font-semibold text-[color:var(--foreground)]' : 'text-[color:var(--muted-foreground)]'}>증빙 검토 · InboundImport</span>
+        </li>
+        <span aria-hidden="true" className="text-[color:var(--muted-foreground)]">→</span>
+        <li className="flex items-center gap-2">
+          <StatusBadge tone={promotionStage === 2 ? 'info' : 'neutral'}>2</StatusBadge>
+          <span className={promotionStage === 2 ? 'font-semibold text-[color:var(--foreground)]' : 'text-[color:var(--muted-foreground)]'}>창고 배정·전환 · FactoryArrival</span>
+        </li>
+      </ol>
       {resumableReviews.length && !preview ? <div className="space-y-[var(--space-2)]"><p className={ui.label}>저장된 검토</p><BasicDataTable<ResumableInboundReview>
         columns={[{ key: 'source', label: '증빙' }, { key: 'supplier', label: '공급자 / 출고 번호' }, { key: 'state', label: '행 / 보정', align: 'right' }, { key: 'action', label: '작업', align: 'right' }]}
         rows={resumableReviews} rowKey={(review) => review.id} emptyState="이어서 검토할 증빙이 없습니다."
@@ -228,7 +245,7 @@ export default function InboundRegistrationSheet({
       /></div> : null}
       <div className="grid gap-[var(--space-3)] md:grid-cols-3">
         <label className="space-y-1"><span className={ui.label}>공급자</span><Select value={supplierId || EMPTY_VALUE} onValueChange={(value) => setSupplierId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="공급자"><SelectValue placeholder="공급자 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>공급자 선택</SelectItem>{suppliers.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></label>
-        <div className="space-y-1"><span className={ui.label}>입고 템플릿</span><div className="flex gap-2"><Select value={templateVersionId || EMPTY_VALUE} onValueChange={(value) => setTemplateVersionId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="입고 템플릿"><SelectValue placeholder="템플릿 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>템플릿 선택</SelectItem>{templateOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Button type="button" variant="secondary" size="sm" onClick={() => { setEditingTemplateId(undefined); setTemplateName(''); setTemplateModalOpen(true) }}>템플릿 만들기</Button>{selectedTemplate ? <Button type="button" variant="secondary" size="sm" onClick={() => { setEditingTemplateId(selectedTemplate.id); setTemplateName(selectedTemplate.name); setTemplateModalOpen(true) }}>템플릿 수정</Button> : null}</div></div>
+        <div className="space-y-1"><span className={ui.label}>입고 파싱 템플릿</span><div className="flex gap-2"><Select value={templateVersionId || EMPTY_VALUE} onValueChange={(value) => setTemplateVersionId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="입고 파싱 템플릿"><SelectValue placeholder="파싱 템플릿 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>파싱 템플릿 선택</SelectItem>{templateOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Button type="button" variant="secondary" size="sm" onClick={() => { setEditingTemplateId(undefined); setTemplateName(''); setTemplateModalOpen(true) }}>파싱 템플릿 만들기</Button>{selectedTemplate ? <Button type="button" variant="secondary" size="sm" onClick={() => { setEditingTemplateId(selectedTemplate.id); setTemplateName(selectedTemplate.name); setTemplateModalOpen(true) }}>파싱 템플릿 수정</Button> : null}</div></div>
         <label className="space-y-1"><span className={ui.label}>외부 출고 번호</span><Input aria-label="외부 출고 번호" value={shipmentNumber} onChange={(event) => setShipmentNumber(event.target.value)} /></label>
       </div>
 
@@ -239,7 +256,7 @@ export default function InboundRegistrationSheet({
       >
         <FileUp aria-hidden="true" className="size-5 text-[color:var(--muted)]" />
         <p className="font-medium text-[color:var(--foreground)]">파일을 놓거나 선택하세요</p>
-        <p className="text-sm text-[color:var(--muted-foreground)]">선택한 템플릿의 시트와 필수 열로만 미리보기합니다.</p>
+        <p className="text-sm text-[color:var(--muted-foreground)]">선택한 파싱 템플릿의 시트와 필수 열로만 미리보기합니다.</p>
         <Input ref={inputRef} className="sr-only" aria-label="입고 파일 업로드" type="file" accept=".xlsx,.xls,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) previewFile(file) }} />
         <Button type="button" variant="secondary" size="sm" onClick={() => inputRef.current?.click()}>파일 선택</Button>
       </div>
@@ -263,11 +280,24 @@ export default function InboundRegistrationSheet({
       {message ? <p role="alert" className="text-sm text-[color:var(--muted)]">{message}</p> : null}
       {savedRevisionId ? <div className="flex items-end justify-between gap-3 border-t border-[color:var(--border)] pt-[var(--space-4)]"><div><p className="text-sm font-medium text-[color:var(--foreground)]">2단계 · 입고 예정 전환</p><p className="text-sm text-[color:var(--muted)]">{reviewBlockers.length ? `${reviewBlockers.map((row) => row.sourceRowNumber).join(', ')}행의 연결·수량 문제를 먼저 해결하세요.` : '기본 창고 하나로 입고 예정 수량을 만듭니다.'}</p></div><label className="space-y-1"><span className={ui.label}>입고 창고</span><Select value={warehouseId || EMPTY_VALUE} onValueChange={(value) => setWarehouseId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="입고 창고"><SelectValue placeholder="창고 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>창고 선택</SelectItem>{warehouses.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></label><Button type="button" disabled={isPending || !warehouseId || reviewBlockers.length > 0} onClick={promote}>입고 예정 전환</Button></div> : <div className="flex justify-end"><Button type="button" disabled={isPending || !sourceFile || rows.length === 0} onClick={saveDraft}>검토 저장</Button></div>}
 
-      <Modal open={templateModalOpen} title="입고 템플릿 만들기" description="샘플 파일에서 시트·헤더 행과 외부 SKU, 수량 열을 선택해 저장합니다." onOpenChange={setTemplateModalOpen} footer={<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setTemplateModalOpen(false)}>닫기</Button><Button type="button" disabled={isPending || !sampleSheet || !templateName.trim() || !externalSkuColumn || !quantityColumn} onClick={saveTemplate}>템플릿 저장</Button></div>}>
+      <Modal open={templateModalOpen} title="입고 파싱 템플릿 만들기" description="샘플 파일에서 시트·헤더 행과 외부 SKU, 수량 열을 선택하고 실제 데이터 미리보기를 확인해 저장합니다." onOpenChange={setTemplateModalOpen} footer={<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setTemplateModalOpen(false)}>닫기</Button><Button type="button" disabled={isPending || !sampleSheet || !templateName.trim() || !externalSkuColumn || !quantityColumn} onClick={saveTemplate}>파싱 템플릿 저장</Button></div>}>
         <div className="space-y-4">
-          <label className="space-y-1"><span className={ui.label}>템플릿 이름</span><Input aria-label="템플릿 이름" value={templateName} onChange={(event) => setTemplateName(event.target.value)} /></label>
+          <label className="space-y-1"><span className={ui.label}>파싱 템플릿 이름</span><Input aria-label="파싱 템플릿 이름" value={templateName} onChange={(event) => setTemplateName(event.target.value)} /></label>
           <label className="space-y-1"><span className={ui.label}>샘플 파일</span><Input aria-label="샘플 파일" type="file" accept=".xlsx,.xls,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) inspectSample(file) }} /></label>
-          {templateSample ? <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1"><span className={ui.label}>시트</span><Select value={sampleSheetName} onValueChange={setSampleSheetName}><SelectTrigger aria-label="템플릿 시트"><SelectValue /></SelectTrigger><SelectContent>{templateSample.sheets.map((sheet) => <SelectItem key={sheet.name} value={sheet.name}>{sheet.name}</SelectItem>)}</SelectContent></Select></label><label className="space-y-1"><span className={ui.label}>헤더 행</span><Input aria-label="헤더 행" type="number" min="1" max={String(sampleSheet?.rows.length ?? 1)} value={headerRowNumber} onChange={(event) => setHeaderRowNumber(event.target.value)} /></label><label className="space-y-1"><span className={ui.label}>외부 SKU 열</span><Select value={externalSkuColumn || EMPTY_VALUE} onValueChange={(value) => setExternalSkuColumn(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="외부 SKU 열"><SelectValue placeholder="열 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>열 선택</SelectItem>{sampleHeaders.map((header) => <SelectItem key={header} value={header}>{header}</SelectItem>)}</SelectContent></Select></label><label className="space-y-1"><span className={ui.label}>수량 열</span><Select value={quantityColumn || EMPTY_VALUE} onValueChange={(value) => setQuantityColumn(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="수량 열"><SelectValue placeholder="열 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>열 선택</SelectItem>{sampleHeaders.map((header) => <SelectItem key={header} value={header}>{header}</SelectItem>)}</SelectContent></Select></label></div> : null}
+          {templateSample ? <ParseTemplateBuilder<InboundRole>
+            roles={inboundRoles}
+            sample={templateSample}
+            sheetName={sampleSheetName}
+            headerRowNumber={Number(headerRowNumber) || 1}
+            mapping={templateMapping}
+            onSheetChange={setSampleSheetName}
+            onHeaderRowChange={(next) => setHeaderRowNumber(String(next))}
+            onMappingChange={(next) => { setExternalSkuColumn(next.externalSku); setQuantityColumn(next.quantity) }}
+            sheetLabel="파싱 템플릿 시트"
+            headerRowLabel="헤더 행"
+            previewLabel="샘플 데이터 미리보기"
+            emptyPreviewState="시트와 헤더 행을 선택하면 샘플 데이터가 표시됩니다."
+          /> : null}
         </div>
       </Modal>
     </div>

@@ -38,7 +38,7 @@ describe('InboundRegistrationSheet', () => {
       initialWarehouseId: 2,
     }))
 
-    expect(screen.getByRole('combobox', { name: '입고 템플릿' })).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: '입고 파싱 템플릿' })).toBeTruthy()
     expect(screen.getByLabelText('입고 파일 업로드')).toBeTruthy()
     expect(screen.getByText('파일을 놓거나 선택하세요')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '행 추가' })).toBeNull()
@@ -68,7 +68,7 @@ describe('InboundRegistrationSheet', () => {
 
     fireEvent.click(screen.getByRole('combobox', { name: '공급자' }))
     fireEvent.click(await screen.findByRole('option', { name: '한빛 공장' }))
-    fireEvent.click(screen.getByRole('combobox', { name: '입고 템플릿' }))
+    fireEvent.click(screen.getByRole('combobox', { name: '입고 파싱 템플릿' }))
     fireEvent.click(await screen.findByRole('option', { name: '중국 공장 기본 v1' }))
     const file = new File(['contents'], 'inbound.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     fireEvent.change(screen.getByLabelText('입고 파일 업로드'), { target: { files: [file] } })
@@ -101,8 +101,8 @@ describe('InboundRegistrationSheet', () => {
     render(React.createElement(InboundRegistrationSheet, {
       suppliers: [{ id: 4, name: '한빛 공장' }], warehouses: [{ id: 2, name: '대자동' }], templates,
     }))
-    fireEvent.click(screen.getByRole('button', { name: '템플릿 만들기' }))
-    expect(screen.getByRole('dialog', { name: '입고 템플릿 만들기' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '파싱 템플릿 만들기' }))
+    expect(screen.getByRole('dialog', { name: '입고 파싱 템플릿 만들기' })).toBeTruthy()
     expect(screen.getByLabelText('샘플 파일')).toBeTruthy()
   })
 
@@ -136,7 +136,7 @@ describe('InboundRegistrationSheet', () => {
 
     fireEvent.click(screen.getByRole('combobox', { name: '공급자' }))
     fireEvent.click(await screen.findByRole('option', { name: '한빛 공장' }))
-    fireEvent.click(screen.getByRole('combobox', { name: '입고 템플릿' }))
+    fireEvent.click(screen.getByRole('combobox', { name: '입고 파싱 템플릿' }))
     fireEvent.click(await screen.findByRole('option', { name: '중국 공장 기본 v1' }))
     const file = new File(['contents'], 'invalid.xlsx')
     fireEvent.change(screen.getByLabelText('입고 파일 업로드'), { target: { files: [file] } })
