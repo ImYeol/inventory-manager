@@ -9,6 +9,9 @@ const mocks = vi.hoisted(() => ({
   updateChannelProductMapping: vi.fn(),
   unlinkChannelProductMapping: vi.fn(),
   createInternalProduct: vi.fn(),
+  confirmSupplierSkuMapping: vi.fn(),
+  reassignSupplierSkuMapping: vi.fn(),
+  deactivateSupplierSkuMapping: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh }) }))
@@ -18,6 +21,11 @@ vi.mock('@/lib/actions/channel-product-link', () => ({
   unlinkChannelProductMapping: mocks.unlinkChannelProductMapping,
 }))
 vi.mock('@/lib/actions/internal-product', () => ({ createInternalProduct: mocks.createInternalProduct }))
+vi.mock('@/lib/actions/supplier-sku-mapping', () => ({
+  confirmSupplierSkuMapping: mocks.confirmSupplierSkuMapping,
+  reassignSupplierSkuMapping: mocks.reassignSupplierSkuMapping,
+  deactivateSupplierSkuMapping: mocks.deactivateSupplierSkuMapping,
+}))
 vi.mock('@/lib/actions', () => ({
   createWarehouse: vi.fn(), createModel: vi.fn(), createModelSize: vi.fn(), createModelColor: vi.fn(),
   deleteWarehouse: vi.fn(), deleteModel: vi.fn(),
@@ -28,11 +36,14 @@ import MasterDataManager from '@/app/(protected)/master-data/MasterDataManager'
 const props = {
   models: [{ id: 1, name: 'LP01', sizes: [{ id: 11, name: 'M' }], colors: [{ id: 21, name: '네이비', rgbCode: '#111111', textWhite: true }] }],
   warehouses: [],
-  variants: [{ id: 101, modelName: 'LP01', sizeName: 'M', colorName: '네이비', sellerSku: 'LP01-M-NV', onHand: 12, committed: 4, available: 8, incoming: 6 }],
+  variants: [{ id: 101, modelName: 'LP01', sizeName: 'M', colorName: '네이비', sellerSku: 'LP01-M-NV', onHand: 12, committed: 4, committedByWarehouse: {}, available: 8, incoming: 6, incomingByWarehouse: {} }],
   channelProductRefs: [
     { id: 501, variantId: 101, channel: 'coupang' as const, externalProductId: 'CP-1', externalVariantId: 'CPV-1', productName: 'LP01', optionName: 'M / 네이비', sellerSku: 'LP01-M-NV', listingStatus: 'active' as const, channelReported: 5, lastSyncedAt: '2026-07-15T03:00:00Z', lastSyncError: null, verificationStatus: 'verified' as const, imageUrl: 'https://example.test/coupang.jpg', price: 25000 },
     { id: 502, variantId: 101, channel: 'naver' as const, externalProductId: 'NV-1', externalVariantId: 'NVV-1', productName: 'LP01', optionName: 'M / 네이비', sellerSku: 'LP01-M-NV', listingStatus: 'paused' as const, channelReported: 8, lastSyncedAt: '2026-07-15T02:00:00Z', lastSyncError: '권한 확인 필요', verificationStatus: 'unverified' as const, imageUrl: null, price: 24000 },
   ],
+  suppliers: [{ id: 4, name: '한빛 공장' }],
+  supplierSkuMappings: [{ id: 701, supplierId: 4, supplierName: '한빛 공장', externalSku: 'FAC-RED-M', normalizedExternalSku: 'FAC-RED-M', productVariantId: 101, isActive: true, deactivatedAt: null, deactivationReason: null, createdAt: '2026-07-18T00:00:00Z' }],
+  supplierSkuMappingAudits: [{ id: 801, supplierId: 4, action: 'CONFIRMED', externalSku: 'FAC-RED-M', previousSellerSku: null, newSellerSku: 'LP01-M-NV', reason: null, createdAt: '2026-07-18T00:00:00Z' }],
 }
 
 beforeEach(() => Object.values(mocks).forEach((mock) => mock.mockReset()))
@@ -109,6 +120,31 @@ describe('Product management workspace', () => {
 
     expect(within(dialog).getByText(/판매 옵션 1개 · 예시 LP01/)).toBeTruthy()
     expect(within(dialog).getAllByText(/옵션이 없으면 비워두세요/)).toHaveLength(2)
+  })
+
+  it('maintains supplier SKU mappings with reassign, deactivate, and visible audit history', async () => {
+    mocks.reassignSupplierSkuMapping.mockResolvedValue({ id: 702 })
+    mocks.deactivateSupplierSkuMapping.mockResolvedValue(undefined)
+    render(React.createElement(MasterDataManager, props))
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: '공급자 SKU' }))
+    fireEvent.click(screen.getByRole('tab', { name: '공급자 SKU' }))
+    expect(screen.getByRole('columnheader', { name: '외부 SKU' })).toBeTruthy()
+    expect(screen.getByText('FAC-RED-M')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '관리' }))
+    const dialog = screen.getByRole('dialog', { name: '공급자 SKU 관리' })
+    expect(within(dialog).getByText('최근 변경 이력')).toBeTruthy()
+    expect(within(dialog).getByText('연결')).toBeTruthy()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '재지정' }))
+    fireEvent.change(within(dialog).getByLabelText('재지정 사유'), { target: { value: '잘못된 옵션 수정' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '재지정 확정' }))
+    await waitFor(() => expect(mocks.reassignSupplierSkuMapping).toHaveBeenCalledWith({ supplierId: 4, externalSku: 'FAC-RED-M', productVariantId: 101, reason: '잘못된 옵션 수정' }))
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '비활성화' }))
+    fireEvent.change(within(dialog).getByLabelText('비활성화 사유'), { target: { value: '공급 종료' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '비활성화 확정' }))
+    await waitFor(() => expect(mocks.deactivateSupplierSkuMapping).toHaveBeenCalledWith({ supplierId: 4, externalSku: 'FAC-RED-M', reason: '공급 종료' }))
   })
 
 })

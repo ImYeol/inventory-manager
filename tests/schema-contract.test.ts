@@ -99,7 +99,11 @@ describe('schema contract', () => {
     expect(runner).toContain('INBOUND_BEHAVIORAL_DOCKER_CONTAINER')
     expect(runner).toContain('supabase_db_seleccase-inventory-issue-11')
     expect(runner).toContain('20260719070000_import_revision_proof_and_review_hardening.sql')
+    expect(runner).toContain('20260719120000_inbound_domain_contract_gap_closure.sql')
     expect(assertions).toContain('step-5/6 rpc proof')
+    for (const step12Proof of ['move-all fixed quantity invariant', 'business-date idempotency conflict', 'closure-linked child follow-up', 'allocation audit immutability', 'cross-owner allocation audit', 'no-op allocation audit', 'second failing allocation scope']) {
+      expect(assertions).toContain(step12Proof)
+    }
     expect(hardening).toContain('mapping_blocker')
     expect(hardening).toContain('duplicate_file_hash')
     expect(hardening).toContain('logical_import_conflict')

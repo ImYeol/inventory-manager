@@ -23,6 +23,18 @@ import { assertAllocationSplit } from './factory-arrival'
 import type { InboundDraftRowInput } from './inbound'
 import { getSupabaseWithUser } from './db'
 
+export type FactoryArrivalActionResult<T = unknown> =
+  | { success: true; result?: T }
+  | { success: false; error: { key: string; message: string } }
+
+function factoryArrivalOperationFailure(error: unknown, fallbackKey: string, fallbackMessage: string): FactoryArrivalActionResult {
+  const message = error instanceof Error ? error.message : fallbackMessage
+  const scoped = message.match(/operation_error:(allocation|item|arrival|closure|receipt-line):(\d+):([^\n]+)/)
+  return scoped
+    ? { success: false, error: { key: `${scoped[1]}-${scoped[2]}`, message: scoped[3].trim() || fallbackMessage } }
+    : { success: false, error: { key: fallbackKey, message } }
+}
+
 export async function getModels() {
   const { models } = await getCatalogData()
   return models.map((model) => ({
@@ -633,7 +645,12 @@ export async function receiveFactoryArrivalRequest(input: { arrivalId: number; r
   if (!input.arrivalId || !input.receiptRequestId.trim() || !input.lines.length || input.lines.some((line) => !line.allocationId || !Number.isInteger(line.quantity) || line.quantity < 0 || !Number.isInteger(line.overageQuantity ?? 0) || (line.overageQuantity ?? 0) < 0)) throw new Error('입고 요청 정보가 올바르지 않습니다.')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.receiptBusinessDate)) throw new Error('입고 업무일을 입력해주세요.')
   const payload = { arrivalId: input.arrivalId, receiptRequestId: input.receiptRequestId.trim(), receiptBusinessDate: input.receiptBusinessDate, lines: input.lines.map((line) => ({ allocationId: line.allocationId, quantity: line.quantity, overageQuantity: line.overageQuantity ?? 0, overageReason: line.overageReason?.trim() ?? '' })) }
-  const result = await runFactoryArrivalOperation('receive_factory_arrival_request', { arrival_id: payload.arrivalId, receipt_request_id: payload.receiptRequestId, receipt_business_date: payload.receiptBusinessDate, lines: payload.lines.map((line) => ({ allocation_id: line.allocationId, quantity: line.quantity, overage_quantity: line.overageQuantity, overage_reason: line.overageReason })) })
+  let result: unknown
+  try {
+    result = await runFactoryArrivalOperation('receive_factory_arrival_request', { arrival_id: payload.arrivalId, receipt_request_id: payload.receiptRequestId, receipt_business_date: payload.receiptBusinessDate, lines: payload.lines.map((line) => ({ allocation_id: line.allocationId, quantity: line.quantity, overage_quantity: line.overageQuantity, overage_reason: line.overageReason })) })
+  } catch (error) {
+    return factoryArrivalOperationFailure(error, `allocation-${input.lines[0].allocationId}`, '입고 반영에 실패했습니다.')
+  }
   revalidateInventoryPaths(); revalidatePath('/sourcing/arrivals')
   return { success: true, result }
 }

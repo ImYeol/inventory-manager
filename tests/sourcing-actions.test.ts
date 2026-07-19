@@ -4,6 +4,7 @@ import { SOURCING_SCHEMA_MISSING_MESSAGE } from '@/lib/data'
 const mocks = vi.hoisted(() => ({
   getSupabaseWithUser: vi.fn(),
   runReceiveFactoryArrival: vi.fn(),
+  runFactoryArrivalOperation: vi.fn(),
   revalidatePath: vi.fn(),
 }))
 
@@ -16,6 +17,7 @@ vi.mock('@/lib/data', async (importOriginal) => {
   return {
     ...actual,
     runReceiveFactoryArrival: mocks.runReceiveFactoryArrival,
+    runFactoryArrivalOperation: mocks.runFactoryArrivalOperation,
   }
 })
 
@@ -27,12 +29,14 @@ import {
   createFactory,
   createFactoryArrivalBatch,
   receiveFactoryArrival,
+  receiveFactoryArrivalRequest,
   setFactoryActive,
 } from '@/lib/actions'
 
 beforeEach(() => {
   mocks.getSupabaseWithUser.mockReset()
   mocks.runReceiveFactoryArrival.mockReset()
+  mocks.runFactoryArrivalOperation.mockReset()
   mocks.revalidatePath.mockReset()
 })
 
@@ -114,6 +118,25 @@ describe('sourcing actions', () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/history')
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sourcing/arrivals')
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sourcing/factories')
+  })
+
+  it('returns a serializable allocation-scoped receipt error for the exact failing line', async () => {
+    mocks.runFactoryArrivalOperation.mockRejectedValue(new Error('operation_error:allocation:302:두 번째 입고 행의 수량이 올바르지 않습니다.'))
+
+    await expect(receiveFactoryArrivalRequest({
+      arrivalId: 55,
+      receiptRequestId: 'request-1',
+      receiptBusinessDate: '2026-07-19',
+      lines: [
+        { allocationId: 301, quantity: 2 },
+        { allocationId: 302, quantity: 7 },
+      ],
+    })).resolves.toEqual({
+      success: false,
+      error: { key: 'allocation-302', message: '두 번째 입고 행의 수량이 올바르지 않습니다.' },
+    })
+
+    expect(mocks.revalidatePath).not.toHaveBeenCalled()
   })
 
   it('normalizes missing-schema errors across sourcing actions', async () => {

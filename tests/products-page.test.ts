@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getTransactionsWithRelations: vi.fn(),
   getProductWorkspaceData: vi.fn(),
   getFactoriesData: vi.fn(),
+  getSupplierSkuMappingWorkspace: vi.fn(),
   masterDataManager: vi.fn(),
 }))
 
@@ -27,6 +28,10 @@ vi.mock('@/app/(protected)/master-data/MasterDataManager', () => ({
   },
 }))
 
+vi.mock('@/lib/actions/supplier-sku-mapping', () => ({
+  getSupplierSkuMappingWorkspace: mocks.getSupplierSkuMappingWorkspace,
+}))
+
 import ProductsPage from '@/app/(protected)/products/page'
 
 afterEach(() => {
@@ -35,6 +40,7 @@ afterEach(() => {
   mocks.getTransactionsWithRelations.mockReset()
   mocks.getProductWorkspaceData.mockReset()
   mocks.getFactoriesData.mockReset()
+  mocks.getSupplierSkuMappingWorkspace.mockReset()
   mocks.masterDataManager.mockReset()
 })
 
@@ -48,6 +54,7 @@ describe('ProductsPage', () => {
     mocks.getTransactionsWithRelations.mockResolvedValue({ transactions })
     mocks.getProductWorkspaceData.mockResolvedValue({ variants: [], channelProductRefs: [] })
     mocks.getFactoriesData.mockResolvedValue({ factories: [], schemaState: 'ready', factorySourcingItems: [] })
+    mocks.getSupplierSkuMappingWorkspace.mockResolvedValue({ mappings: [], audits: [] })
 
     render(await ProductsPage())
 
@@ -55,6 +62,7 @@ describe('ProductsPage', () => {
     expect(mocks.getTransactionsWithRelations).toHaveBeenCalledTimes(1)
     expect(mocks.getProductWorkspaceData).toHaveBeenCalledTimes(1)
     expect(mocks.getFactoriesData).toHaveBeenCalledTimes(1)
+    expect(mocks.getSupplierSkuMappingWorkspace).toHaveBeenCalledTimes(1)
     expect(mocks.masterDataManager).toHaveBeenCalledWith(
       expect.objectContaining({
         warehouses,

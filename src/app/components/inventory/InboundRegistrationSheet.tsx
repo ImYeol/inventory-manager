@@ -1,12 +1,13 @@
 'use client'
 
-import { useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { FileUp } from 'lucide-react'
-import { createInboundTemplateVersion, inspectInboundTemplateSample, previewInboundTemplateFile, promoteInboundImportRevision, saveInboundTemplateDraft, type InboundFilePreview, type InboundTemplateSample } from '@/lib/actions/inbound-import'
+import { createInboundTemplateVersion, inspectInboundTemplateSample, listResumableInboundReviews, loadInboundReviewRevision, previewInboundTemplateFile, promoteInboundImportRevision, saveInboundTemplateDraft, type InboundFilePreview, type InboundTemplateSample, type ResumableInboundReview } from '@/lib/actions/inbound-import'
 import { confirmSupplierSkuMapping } from '@/lib/actions/supplier-sku-mapping'
 import { normalizeSupplierExternalSku } from '@/lib/supplier-sku'
 import { EditableTable } from '@/components/ui/editable-table'
+import { BasicDataTable } from '@/components/ui/basic-data-table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
@@ -16,7 +17,7 @@ import { ui } from '@/app/components/ui'
 type Lookup = { id: number; name: string }
 type ProductVariantOption = { id: number; label: string }
 export type InboundTemplateOption = { id: number; name: string; versionId: number; versionNumber: number }
-type DraftRow = InboundFilePreview['rows'][number] & { key: string }
+type DraftRow = InboundFilePreview['rows'][number] & { key: string; sourceRowId?: number }
 
 const EMPTY_VALUE = '__empty__'
 
@@ -63,11 +64,40 @@ export default function InboundRegistrationSheet({
   const [editingTemplateId, setEditingTemplateId] = useState<number | undefined>()
   const [savedRevisionId, setSavedRevisionId] = useState<number | null>(null)
   const [confirmedSkus, setConfirmedSkus] = useState<Set<string>>(new Set())
+  const [resumableReviews, setResumableReviews] = useState<ResumableInboundReview[]>([])
 
   const selectedTemplate = useMemo(() => templateOptionsState.find((template) => template.versionId === Number(templateVersionId)) ?? null, [templateVersionId, templateOptionsState])
   const templateOptions = templateOptionsState.map((template) => ({ value: String(template.versionId), label: `${template.name} v${template.versionNumber}` }))
   const sampleSheet = templateSample?.sheets.find((sheet) => sheet.name === sampleSheetName)
   const sampleHeaders = sampleSheet?.rows[Number(headerRowNumber) - 1] ?? []
+  const reviewBlockers = rows.filter((row) => Boolean(row.validationError) || !row.productVariantId || !Number.isInteger(row.quantity) || Number(row.quantity) <= 0)
+
+  useEffect(() => {
+    let active = true
+    listResumableInboundReviews()
+      .then((reviews) => { if (active) setResumableReviews(reviews ?? []) })
+      .catch(() => { if (active) setResumableReviews([]) })
+    return () => { active = false }
+  }, [])
+
+  const resumeReview = (revisionId: number) => {
+    startTransition(async () => {
+      try {
+        const revision = await loadInboundReviewRevision(revisionId)
+        setSupplierId(String(revision.supplierId))
+        setTemplateVersionId(String(revision.templateVersionId))
+        setShipmentNumber(revision.shipmentNumber)
+        setPreview({ ...revision, rows: revision.rows })
+        setRows(revision.rows.map((row) => ({ ...row, key: rowKey() })))
+        setSourceFile(undefined)
+        setSavedRevisionId(revision.revisionId)
+        setConfirmedSkus(new Set(revision.rows.filter((row) => row.productVariantId).map((row) => normalizeSupplierExternalSku(row.externalSku))))
+        setMessage('저장된 원본 증빙을 행 순서대로 불러왔습니다.')
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : '저장된 검토를 불러오지 못했습니다.')
+      }
+    })
+  }
 
   const inspectSample = (file: File) => {
     startTransition(async () => {
@@ -151,7 +181,9 @@ export default function InboundRegistrationSheet({
           shipmentNumber,
         })
         setSavedRevisionId(result.id)
-        setMessage(result.proposedRevision ? '새 개정 증빙을 저장했습니다. 기본 창고를 확인한 뒤 입고 예정으로 전환하세요.' : '입고 증빙을 저장했습니다. 기본 창고를 확인한 뒤 입고 예정으로 전환하세요.')
+        setMessage(result.blockers?.length
+          ? `${result.blockers.join(', ')}행은 연결 또는 원본 수량 오류 보정 후에만 입고 예정으로 전환할 수 있습니다.`
+          : result.proposedRevision ? '새 개정 증빙을 저장했습니다. 기본 창고를 확인한 뒤 입고 예정으로 전환하세요.' : '입고 증빙을 저장했습니다. 기본 창고를 확인한 뒤 입고 예정으로 전환하세요.')
       } catch (error) {
         setMessage(error instanceof Error ? error.message : '입고 초안을 저장하지 못했습니다.')
       }
@@ -163,8 +195,9 @@ export default function InboundRegistrationSheet({
     const productVariantId = row.productVariantId
     startTransition(async () => {
       try {
-        await confirmSupplierSkuMapping({ supplierId: Number(supplierId), externalSku: row.externalSku, productVariantId })
         const exactSku = normalizeSupplierExternalSku(row.externalSku)
+        const sourceRowIds = rows.filter((candidate) => candidate.sourceRowId && normalizeSupplierExternalSku(candidate.externalSku) === exactSku).map((candidate) => candidate.sourceRowId as number)
+        await confirmSupplierSkuMapping({ supplierId: Number(supplierId), externalSku: row.externalSku, productVariantId, ...(sourceRowIds.length ? { sourceRowIds } : {}) })
         setRows((current) => current.map((candidate) => normalizeSupplierExternalSku(candidate.externalSku) === exactSku
           ? { ...candidate, productVariantId }
           : candidate))
@@ -188,6 +221,11 @@ export default function InboundRegistrationSheet({
 
   return (
     <div className="space-y-[var(--space-5)]">
+      {resumableReviews.length && !preview ? <div className="space-y-[var(--space-2)]"><p className={ui.label}>저장된 검토</p><BasicDataTable<ResumableInboundReview>
+        columns={[{ key: 'source', label: '증빙' }, { key: 'supplier', label: '공급자 / 출고 번호' }, { key: 'state', label: '행 / 보정', align: 'right' }, { key: 'action', label: '작업', align: 'right' }]}
+        rows={resumableReviews} rowKey={(review) => review.id} emptyState="이어서 검토할 증빙이 없습니다."
+        renderCell={(review, key) => key === 'source' ? <span>{review.filename ?? '수동 증빙'}</span> : key === 'supplier' ? <span>{review.supplierName} · {review.shipmentNumber}</span> : key === 'state' ? <span className="tabular-nums">{review.rowCount} / {review.blockerCount}</span> : <Button type="button" variant="ghost" size="sm" disabled={isPending} onClick={() => resumeReview(review.id)}>이어서 검토</Button>}
+      /></div> : null}
       <div className="grid gap-[var(--space-3)] md:grid-cols-3">
         <label className="space-y-1"><span className={ui.label}>공급자</span><Select value={supplierId || EMPTY_VALUE} onValueChange={(value) => setSupplierId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="공급자"><SelectValue placeholder="공급자 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>공급자 선택</SelectItem>{suppliers.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></label>
         <div className="space-y-1"><span className={ui.label}>입고 템플릿</span><div className="flex gap-2"><Select value={templateVersionId || EMPTY_VALUE} onValueChange={(value) => setTemplateVersionId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="입고 템플릿"><SelectValue placeholder="템플릿 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>템플릿 선택</SelectItem>{templateOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Button type="button" variant="secondary" size="sm" onClick={() => { setEditingTemplateId(undefined); setTemplateName(''); setTemplateModalOpen(true) }}>템플릿 만들기</Button>{selectedTemplate ? <Button type="button" variant="secondary" size="sm" onClick={() => { setEditingTemplateId(selectedTemplate.id); setTemplateName(selectedTemplate.name); setTemplateModalOpen(true) }}>템플릿 수정</Button> : null}</div></div>
@@ -207,13 +245,14 @@ export default function InboundRegistrationSheet({
       </div>
 
       {preview ? <EditableTable
-        columns={[{ key: 'externalSku', header: '외부 SKU' }, { key: 'quantity', header: '수량', align: 'right' }, { key: 'mapping', header: '내부 SKU 상태' }]}
+        columns={[{ key: 'externalSku', header: '외부 SKU' }, { key: 'quantity', header: '수량', align: 'right' }, { key: 'evidence', header: '원본 셀' }, { key: 'mapping', header: '내부 SKU 상태' }]}
         rows={rows}
         getRowKey={(row) => row.key}
         rowError={(row) => row.validationError ?? (row.productVariantId ? null : '내부 SKU 연결이 필요합니다.')}
         renderCell={(row, key) => {
           if (key === 'externalSku') return <span>{row.externalSku}</span>
           if (key === 'quantity') return <span className="tabular-nums">{row.rawQuantity}</span>
+          if (key === 'evidence') return <span className="text-sm text-[color:var(--muted)]">{Object.entries(row.sourceValues).map(([name, value]) => `${name}: ${value}`).join(' · ') || '—'}</span>
           if (row.productVariantId && confirmedSkus.has(normalizeSupplierExternalSku(row.externalSku))) return <span className="text-[color:var(--success-foreground)]">연결됨</span>
           return <div className="flex items-center gap-2"><Select value={row.productVariantId ? String(row.productVariantId) : EMPTY_VALUE} onValueChange={(value) => updateRow(row.key, { productVariantId: value === EMPTY_VALUE ? null : Number(value) })}><SelectTrigger aria-label="내부 SKU"><SelectValue placeholder="내부 SKU 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>내부 SKU 선택</SelectItem>{productVariants.map((variant) => <SelectItem key={variant.id} value={String(variant.id)}>{variant.label}</SelectItem>)}</SelectContent></Select><Button type="button" variant="secondary" size="sm" disabled={isPending || !row.productVariantId} onClick={() => confirmMapping(row)}>연결</Button></div>
         }}
@@ -222,7 +261,7 @@ export default function InboundRegistrationSheet({
       {rows.some((row) => !row.productVariantId) ? <div className="flex items-center gap-3"><a href={`/products?returnTo=${encodeURIComponent(returnTo)}`} target="_blank" rel="noreferrer" className="text-sm text-[color:var(--link)] underline underline-offset-4">상품 관리에서 SKU 만들기</a><Button type="button" variant="secondary" size="sm" onClick={() => router.refresh()}>상품 목록 새로고침</Button></div> : null}
 
       {message ? <p role="alert" className="text-sm text-[color:var(--muted)]">{message}</p> : null}
-      {savedRevisionId ? <div className="flex items-end justify-between gap-3 border-t border-[color:var(--border)] pt-[var(--space-4)]"><div><p className="text-sm font-medium text-[color:var(--foreground)]">2단계 · 입고 예정 전환</p><p className="text-sm text-[color:var(--muted)]">기본 창고 하나로 입고 예정 수량을 만듭니다.</p></div><label className="space-y-1"><span className={ui.label}>입고 창고</span><Select value={warehouseId || EMPTY_VALUE} onValueChange={(value) => setWarehouseId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="입고 창고"><SelectValue placeholder="창고 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>창고 선택</SelectItem>{warehouses.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></label><Button type="button" disabled={isPending || !warehouseId} onClick={promote}>입고 예정 전환</Button></div> : <div className="flex justify-end"><Button type="button" disabled={isPending || !sourceFile || rows.length === 0 || rows.some((row) => Boolean(row.validationError) || !row.productVariantId)} onClick={saveDraft}>검토 저장</Button></div>}
+      {savedRevisionId ? <div className="flex items-end justify-between gap-3 border-t border-[color:var(--border)] pt-[var(--space-4)]"><div><p className="text-sm font-medium text-[color:var(--foreground)]">2단계 · 입고 예정 전환</p><p className="text-sm text-[color:var(--muted)]">{reviewBlockers.length ? `${reviewBlockers.map((row) => row.sourceRowNumber).join(', ')}행의 연결·수량 문제를 먼저 해결하세요.` : '기본 창고 하나로 입고 예정 수량을 만듭니다.'}</p></div><label className="space-y-1"><span className={ui.label}>입고 창고</span><Select value={warehouseId || EMPTY_VALUE} onValueChange={(value) => setWarehouseId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="입고 창고"><SelectValue placeholder="창고 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>창고 선택</SelectItem>{warehouses.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></label><Button type="button" disabled={isPending || !warehouseId || reviewBlockers.length > 0} onClick={promote}>입고 예정 전환</Button></div> : <div className="flex justify-end"><Button type="button" disabled={isPending || !sourceFile || rows.length === 0} onClick={saveDraft}>검토 저장</Button></div>}
 
       <Modal open={templateModalOpen} title="입고 템플릿 만들기" description="샘플 파일에서 시트·헤더 행과 외부 SKU, 수량 열을 선택해 저장합니다." onOpenChange={setTemplateModalOpen} footer={<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setTemplateModalOpen(false)}>닫기</Button><Button type="button" disabled={isPending || !sampleSheet || !templateName.trim() || !externalSkuColumn || !quantityColumn} onClick={saveTemplate}>템플릿 저장</Button></div>}>
         <div className="space-y-4">

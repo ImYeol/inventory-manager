@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { BasicDataTable } from '@/components/ui/basic-data-table'
 import { Button } from '@/components/ui/button'
 import { ChannelBadge } from '@/components/ui/channel-badge'
+import { StatusBadge } from '@/components/ui/badge-1'
 import { FilterToolbar } from '@/components/ui/filter-toolbar'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
@@ -21,8 +22,9 @@ import {
   updateChannelProductMapping,
 } from '@/lib/actions/channel-product-link'
 import { createInternalProduct } from '@/lib/actions/internal-product'
-import { confirmSupplierSkuMapping } from '@/lib/actions/supplier-sku-mapping'
+import { confirmSupplierSkuMapping, type SupplierSkuMappingAuditRow, type SupplierSkuMappingRow } from '@/lib/actions/supplier-sku-mapping'
 import type { ProductWorkspaceChannelRef, ProductWorkspaceVariant } from '@/lib/data'
+import SupplierSkuMappingModal from './SupplierSkuMappingModal'
 
 type WarehouseLookup = { id: number; name: string }
 type WarehouseStat = WarehouseLookup & {
@@ -40,8 +42,10 @@ type MasterDataManagerProps = {
   variants?: ProductWorkspaceVariant[]
   channelProductRefs?: ProductWorkspaceChannelRef[]
   suppliers?: WarehouseLookup[]
+  supplierSkuMappings?: SupplierSkuMappingRow[]
+  supplierSkuMappingAudits?: SupplierSkuMappingAuditRow[]
 }
-type TabKey = 'product' | 'warehouse'
+type TabKey = 'product' | 'supplier-sku' | 'warehouse'
 type ProductChannelFilter = 'all' | 'naver' | 'coupang'
 type MappingStateFilter = 'all' | 'mapped' | 'mapping-required' | 'sync-error'
 type InternalProductDraft = { name: string; sizeText: string; colorText: string; skuPrefix: string }
@@ -78,6 +82,8 @@ export default function MasterDataManager({
   variants = [],
   channelProductRefs = [],
   suppliers = [],
+  supplierSkuMappings = [],
+  supplierSkuMappingAudits = [],
 }: MasterDataManagerProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -97,6 +103,9 @@ export default function MasterDataManager({
   const warehouseNameRef = useRef<HTMLInputElement>(null)
   const [deleteWarehouseTarget, setDeleteWarehouseTarget] = useState<WarehouseLookup | null>(null)
   const [supplierMappingDraft, setSupplierMappingDraft] = useState({ supplierId: '', externalSku: '' })
+  const [supplierSkuQuery, setSupplierSkuQuery] = useState('')
+  const [supplierSkuState, setSupplierSkuState] = useState<'all' | 'active' | 'inactive'>('active')
+  const [selectedSupplierMapping, setSelectedSupplierMapping] = useState<SupplierSkuMappingRow | null>(null)
 
   const showToast = (next: { type: 'success' | 'error'; text: string }) => {
     setMessage(next)
@@ -147,6 +156,14 @@ export default function MasterDataManager({
   const draftVariantCount = Math.max(draftSizes.length, 1) * Math.max(draftColors.length, 1)
   const draftSkuExample = [internalProductDraft.skuPrefix.trim(), draftSizes[0], draftColors[0]].filter(Boolean).join('-') || '—'
   const selectedRefs = selectedVariant ? refsForVariant(selectedVariant.id) : []
+  const filteredSupplierMappings = supplierSkuMappings.filter((mapping) => {
+    const query = supplierSkuQuery.trim().toLowerCase()
+    const variant = variants.find((item) => item.id === mapping.productVariantId)
+    if (query && ![mapping.supplierName, mapping.externalSku, variant?.sellerSku, variant?.modelName].join(' ').toLowerCase().includes(query)) return false
+    if (supplierSkuState === 'active') return mapping.isActive
+    if (supplierSkuState === 'inactive') return !mapping.isActive
+    return true
+  })
 
   const openSkuModal = (variant: ProductWorkspaceVariant) => {
     setSelectedVariant(variant)
@@ -180,7 +197,7 @@ export default function MasterDataManager({
     <div className="space-y-4">
       {message ? <div role="status" aria-live="polite" className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm font-medium', message.type === 'success' ? 'text-[color:var(--success-foreground)]' : 'text-[color:var(--danger-foreground)]')}>{message.text}</div> : null}
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)} className="mt-4 space-y-4">
-        <TabsList aria-label="상품 관리 보기 전환"><TabsTrigger value="product">상품</TabsTrigger><TabsTrigger value="warehouse">창고</TabsTrigger></TabsList>
+        <TabsList aria-label="상품 관리 보기 전환"><TabsTrigger value="product">상품</TabsTrigger><TabsTrigger value="supplier-sku">공급자 SKU</TabsTrigger><TabsTrigger value="warehouse">창고</TabsTrigger></TabsList>
         <TabsContent value="product" className="m-0">
           <TableSurface
             toolbar={<FilterToolbar>
@@ -209,6 +226,19 @@ export default function MasterDataManager({
             />
           </TableSurface>
         </TabsContent>
+        <TabsContent value="supplier-sku" className="m-0">
+          <TableSurface toolbar={<FilterToolbar><div className="flex min-w-0 items-center gap-2"><Input aria-label="공급자 SKU 검색" value={supplierSkuQuery} onChange={(event) => setSupplierSkuQuery(event.target.value)} placeholder="공급자, 외부 SKU, 내부 SKU 검색" className="w-64 ui-control-sm" /><Select value={supplierSkuState} onValueChange={(value) => setSupplierSkuState(value as typeof supplierSkuState)}><SelectTrigger aria-label="공급자 SKU 상태" className="w-28 ui-control-sm"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">활성</SelectItem><SelectItem value="inactive">비활성</SelectItem><SelectItem value="all">전체</SelectItem></SelectContent></Select></div><span className={ui.dataMeta}>{filteredSupplierMappings.length}개 매핑</span></FilterToolbar>}>
+            <BasicDataTable<SupplierSkuMappingRow> bare tableAriaLabel="공급자 SKU 매핑 목록" columns={[{ key: 'supplier', label: '공급자' }, { key: 'external', label: '외부 SKU' }, { key: 'internal', label: '내부 SKU' }, { key: 'state', label: '상태' }, { key: 'date', label: '변경일' }, { key: 'action', label: '작업', align: 'right' }]} rows={filteredSupplierMappings} rowKey={(mapping) => mapping.id} emptyState="조건에 맞는 공급자 SKU 매핑이 없습니다." renderCell={(mapping, key) => {
+              const variant = variants.find((item) => item.id === mapping.productVariantId)
+              if (key === 'supplier') return <span>{mapping.supplierName}</span>
+              if (key === 'external') return <span className="font-mono text-sm text-[color:var(--foreground)]">{mapping.externalSku}</span>
+              if (key === 'internal') return <div><p className="font-mono text-sm text-[color:var(--foreground)]">{variant?.sellerSku ?? `#${mapping.productVariantId}`}</p>{variant ? <p className="text-xs text-[color:var(--muted)]">{variant.modelName} · {variant.colorName} / {variant.sizeName}</p> : null}</div>
+              if (key === 'state') return <StatusBadge tone={mapping.isActive ? 'success' : 'neutral'}>{mapping.isActive ? '활성' : '비활성'}</StatusBadge>
+              if (key === 'date') return <span className="text-sm text-[color:var(--muted)]">{formatDate(mapping.deactivatedAt ?? mapping.createdAt)}</span>
+              return <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedSupplierMapping(mapping)}>관리</Button>
+            }} />
+          </TableSurface>
+        </TabsContent>
         <TabsContent value="warehouse" className="m-0">
           <TableSurface toolbar={<FilterToolbar><span className={ui.dataMeta}>{warehouseRows.length}개 창고</span><ActionToolbar><Button type="button" variant="secondary" size="sm" onClick={() => { setWarehouseName(''); setIsWarehouseModalOpen(true) }}>창고 등록</Button></ActionToolbar></FilterToolbar>}>
             <BasicDataTable<WarehouseRow> bare columns={[{ key: 'warehouse', label: '창고' }, { key: 'skuCount', label: 'SKU', align: 'right' }, { key: 'stockQty', label: '현재 재고', align: 'right' }, { key: 'movement', label: '최근 변동' }, { key: 'actions', label: '작업', align: 'right' }]} rows={warehouseRows} rowKey={(row) => row.warehouse.id} emptyState="등록된 창고가 없습니다." renderCell={(row, key) => {
@@ -222,6 +252,7 @@ export default function MasterDataManager({
           </TableSurface>
         </TabsContent>
       </Tabs>
+      <SupplierSkuMappingModal mapping={selectedSupplierMapping} variants={variants} audits={supplierSkuMappingAudits} onClose={() => setSelectedSupplierMapping(null)} />
 
       <Modal open={Boolean(selectedVariant)} title="SKU 매핑" description={selectedVariant ? `${selectedVariant.sellerSku} · ${selectedVariant.modelName}` : undefined} onOpenChange={(open) => { if (!open) { setSelectedVariant(null); setMappingDraft(null) } }} footer={<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setSelectedVariant(null)}>닫기</Button>{mappingDraft ? <Button type="button" onClick={saveMapping} disabled={isPending || !mappingDraft.sellerSku.trim() || !mappingDraft.externalProductId.trim() || !mappingDraft.externalVariantId.trim()}>저장</Button> : <Button type="button" onClick={startNewMapping}>매핑 추가</Button>}</div>}>
         <div className="space-y-3 text-sm">

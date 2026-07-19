@@ -595,6 +595,7 @@ describe('Supabase data mappers', () => {
           items: [
             {
               id: 100,
+              productVariantId: null,
               modelId: 1,
               modelName: 'LP01',
               sizeId: 10,

@@ -2,7 +2,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import React from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { PageHeader } from '@/app/components/ui'
@@ -341,6 +341,47 @@ describe('shared action and status primitives', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
 
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps focus inside the fixed sheet across rerenders', () => {
+    const { rerender } = render(
+      React.createElement(FixedSheet, { open: true, title: '입고 작업', onClose: vi.fn() },
+        React.createElement('div', null,
+          React.createElement('input', { 'aria-label': '입고 수량' }),
+          React.createElement('button', null, '저장'),
+        ),
+      ),
+    )
+    const quantity = screen.getByLabelText('입고 수량')
+    quantity.focus()
+
+    rerender(
+      React.createElement(FixedSheet, { open: true, title: '입고 작업', onClose: vi.fn() },
+        React.createElement('div', null,
+          React.createElement('input', { 'aria-label': '입고 수량' }),
+          React.createElement('button', null, '저장'),
+        ),
+      ),
+    )
+
+    expect(document.activeElement).toBe(screen.getByLabelText('입고 수량'))
+    screen.getByRole('button', { name: '저장' }).focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '닫기' }))
+  })
+
+  it('focuses an actionable sheet control and wraps backward from the dialog boundary', async () => {
+    render(
+      React.createElement(FixedSheet, { open: true, title: '입고 작업', onClose: vi.fn() },
+        React.createElement('input', { 'aria-label': '입고 수량' }),
+      ),
+    )
+
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: '닫기' })))
+    const dialog = screen.getByRole('dialog', { name: '입고 작업' })
+    dialog.focus()
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(screen.getByLabelText('입고 수량'))
   })
 
   it('renders status badges with visible text for each semantic tone', () => {

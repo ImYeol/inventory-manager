@@ -66,37 +66,57 @@ select set_config('inbound_fixture.step9_arrival_id', :'step9_arrival_id', false
 set role authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000011',false);
 do $$
-declare arrival_id bigint:=current_setting('inbound_fixture.step9_arrival_id')::bigint; item1 bigint:=current_setting('inbound_fixture.step9_item1_id')::bigint; item2 bigint:=current_setting('inbound_fixture.step9_item2_id')::bigint; alloc1 bigint:=current_setting('inbound_fixture.step9_alloc1_id')::bigint; alloc2 bigint:=current_setting('inbound_fixture.step9_alloc2_id')::bigint; alloc1_other bigint; receipt jsonb; before_tx bigint; before_stock bigint; after_first_tx bigint; after_first_stock bigint; closure_id bigint; line2 bigint; correction jsonb; failed boolean:=false;
+declare arrival_id bigint:=current_setting('inbound_fixture.step9_arrival_id')::bigint; item1 bigint:=current_setting('inbound_fixture.step9_item1_id')::bigint; item2 bigint:=current_setting('inbound_fixture.step9_item2_id')::bigint; alloc1 bigint:=current_setting('inbound_fixture.step9_alloc1_id')::bigint; alloc2 bigint:=current_setting('inbound_fixture.step9_alloc2_id')::bigint; alloc1_other bigint; receipt jsonb; no_op jsonb; before_tx bigint; before_stock bigint; after_first_tx bigint; after_first_stock bigint; audit_before bigint; closure_id bigint; line2 bigint; follow_line bigint; child_arrival bigint; correction jsonb; failed boolean:=false;
 begin
-  perform public.replace_factory_arrival_allocations(jsonb_build_object('arrival_id',arrival_id,'item_id',item1,'allocations',jsonb_build_array(jsonb_build_object('warehouse_id',130,'quantity',20),jsonb_build_object('warehouse_id',131,'quantity',10))));
+  begin perform public.replace_factory_arrival_allocations(jsonb_build_object('arrival_id',arrival_id,'item_id',item1,'allocations',jsonb_build_array(jsonb_build_object('warehouse_id',130,'quantity',30)))); exception when others then failed:=true; end;
+  if not failed then raise exception 'allocation replacement accepted a missing reason'; end if; failed:=false;
+  perform public.replace_factory_arrival_allocations(jsonb_build_object('arrival_id',arrival_id,'item_id',item1,'reason','initial 20+10 split','allocations',jsonb_build_array(jsonb_build_object('warehouse_id',130,'quantity',20),jsonb_build_object('warehouse_id',131,'quantity',10))));
   if (select sum(allocated_quantity) from public.factory_arrival_allocations where factory_arrival_item_id=item1)<>30 or (select count(*) from public.factory_arrival_allocations where factory_arrival_item_id=item1)<>2 then raise exception '30 to 20+10 split failed'; end if;
+  -- no-op allocation audit: identical plans do not mutate rows or add evidence.
+  select count(*) into audit_before from public.factory_arrival_allocation_audits where factory_arrival_item_id=item1;
+  no_op:=public.replace_factory_arrival_allocations(jsonb_build_object('arrival_id',arrival_id,'item_id',item1,'reason','identical retry','allocations',jsonb_build_array(jsonb_build_object('warehouse_id',130,'quantity',20),jsonb_build_object('warehouse_id',131,'quantity',10))));
+  if coalesce(no_op->>'unchanged','false')<>'true' or (select count(*) from public.factory_arrival_allocation_audits where factory_arrival_item_id=item1)<>audit_before then raise exception 'no-op allocation audit was written'; end if;
   select id into alloc1_other from public.factory_arrival_allocations where factory_arrival_item_id=item1 and warehouse_id=131;
   select count(*),coalesce(sum(quantity),0) into before_tx,before_stock from public.transactions cross join lateral (select 0) ignored where user_id=auth.uid();
   select coalesce(sum(quantity),0) into before_stock from public.inventory where user_id=auth.uid();
-  receipt:=jsonb_build_object('arrival_id',arrival_id,'receipt_request_id','step9-receipt-1','lines',jsonb_build_array(jsonb_build_object('allocation_id',alloc1,'quantity',5,'overage_quantity',2,'overage_reason','factory excess'),jsonb_build_object('allocation_id',alloc2,'quantity',2,'overage_quantity',0,'overage_reason','')));
+  receipt:=jsonb_build_object('arrival_id',arrival_id,'receipt_request_id','step9-receipt-1','receipt_business_date','2026-07-19','lines',jsonb_build_array(jsonb_build_object('allocation_id',alloc1,'quantity',5,'overage_quantity',2,'overage_reason','factory excess'),jsonb_build_object('allocation_id',alloc2,'quantity',2,'overage_quantity',0,'overage_reason','')));
   perform public.receive_factory_arrival_request(receipt);
   select count(*) into after_first_tx from public.transactions where user_id=auth.uid(); select coalesce(sum(quantity),0) into after_first_stock from public.inventory where user_id=auth.uid();
   if after_first_tx<>before_tx+2 or after_first_stock<>before_stock+9 then raise exception 'multi-row receipt did not post stock/transactions'; end if;
   if (select normally_received_quantity from public.factory_arrival_allocations where id=alloc1)<>5 or (select normally_received_quantity from public.factory_arrival_allocations where id=alloc2)<>2 then raise exception 'normal receipt counters failed'; end if;
+  if not exists(select 1 from public.factory_receipt_events where receipt_request_id='step9-receipt-1' and receipt_business_date='2026-07-19') or exists(select 1 from public.transactions where reference_type='factory_receipt_event' and reference_id=(select id from public.factory_receipt_events where receipt_request_id='step9-receipt-1') and date<>'2026-07-19') then raise exception 'receipt business date was not persisted to evidence and transactions'; end if;
   if (select sum(allocated_quantity-normally_received_quantity-shortage_closed_quantity) from public.factory_arrival_allocations where factory_arrival_id=arrival_id)<>28 then raise exception 'incoming remainder inflated by overage'; end if;
   perform public.receive_factory_arrival_request(receipt);
   if (select count(*) from public.transactions where user_id=auth.uid())<>after_first_tx or (select coalesce(sum(quantity),0) from public.inventory where user_id=auth.uid())<>after_first_stock then raise exception 'identical receipt retry duplicated stock'; end if;
   begin perform public.receive_factory_arrival_request(jsonb_set(receipt,'{lines,0,quantity}','6'::jsonb)); exception when others then failed:=sqlerrm='receipt_request_conflict'; end; if not failed then raise exception 'changed receipt retry did not conflict'; end if; failed:=false;
-  -- The received five stay in warehouse 130; only the other 25 can move.
-  perform public.replace_factory_arrival_allocations(jsonb_build_object('arrival_id',arrival_id,'item_id',item1,'allocations',jsonb_build_array(jsonb_build_object('warehouse_id',130,'quantity',7),jsonb_build_object('warehouse_id',131,'quantity',23))));
-  if (select normally_received_quantity from public.factory_arrival_allocations where id=alloc1)<>5 or (select allocated_quantity from public.factory_arrival_allocations where id=alloc1)<>7 then raise exception 'unreceived-only reallocation failed'; end if;
-  select (public.close_factory_arrival_shortage(jsonb_build_object('allocation_id',alloc1,'quantity',2,'reason','factory shortage'))->>'closure_id')::bigint into closure_id;
+  -- business-date idempotency conflict: the same request ID cannot change its business date.
+  begin perform public.receive_factory_arrival_request(jsonb_set(receipt,'{receipt_business_date}','"2026-07-20"'::jsonb)); exception when others then failed:=sqlerrm='receipt_request_conflict'; end; if not failed then raise exception 'business-date idempotency conflict missing'; end if; failed:=false;
+  -- move-all fixed quantity invariant: received quantities stay fixed and only all 30/5 remainders move.
+  perform public.move_factory_arrival_remainders_to_warehouse(jsonb_build_object('arrival_id',arrival_id,'warehouse_id',131,'reason','default warehouse correction'));
+  if (select allocated_quantity from public.factory_arrival_allocations where id=alloc1)<>5 or (select normally_received_quantity from public.factory_arrival_allocations where id=alloc1)<>5 then raise exception 'move-all changed fixed received quantity'; end if;
+  if (select allocated_quantity from public.factory_arrival_allocations where factory_arrival_item_id=item1 and warehouse_id=131)<>25 or (select sum(allocated_quantity) from public.factory_arrival_allocations where factory_arrival_item_id=item1)<>30 then raise exception 'move-all 30 invariant failed'; end if;
+  if (select allocated_quantity from public.factory_arrival_allocations where id=alloc2)<>2 or (select allocated_quantity from public.factory_arrival_allocations where factory_arrival_item_id=item2 and warehouse_id=131)<>3 then raise exception 'move-all repeated row invariant failed'; end if;
+  if not exists(select 1 from public.factory_arrival_allocation_audits where factory_arrival_id=arrival_id and reason='default warehouse correction') then raise exception 'move-all allocation audit missing'; end if;
+  begin update public.factory_arrival_allocation_audits set reason='forged' where factory_arrival_id=arrival_id; exception when others then failed:=true; end; if not failed then raise exception 'allocation audit immutability failed'; end if; failed:=false;
+  select id into alloc1_other from public.factory_arrival_allocations where factory_arrival_item_id=item1 and warehouse_id=131;
+  select (public.close_factory_arrival_shortage(jsonb_build_object('allocation_id',alloc1_other,'quantity',2,'reason','factory shortage'))->>'closure_id')::bigint into closure_id;
   if (select sum(allocated_quantity-normally_received_quantity-shortage_closed_quantity) from public.factory_arrival_allocations where factory_arrival_id=arrival_id)<>26 then raise exception 'shortage did not remove incoming'; end if;
-  perform public.record_factory_arrival_follow_up(jsonb_build_object('closure_id',closure_id,'warehouse_id',131,'quantity',1,'reason','late carton','receipt_request_id','step9-follow-up-1'));
+  select (public.record_factory_arrival_follow_up(jsonb_build_object('closure_id',closure_id,'warehouse_id',131,'quantity',1,'reason','late carton','receipt_request_id','step9-follow-up-1','receipt_business_date','2026-07-21'))->>'child_arrival_id')::bigint into child_arrival;
   if (select sum(allocated_quantity-normally_received_quantity-shortage_closed_quantity) from public.factory_arrival_allocations where factory_arrival_id=arrival_id)<>26 then raise exception 'follow-up inflated expected quantity'; end if;
-  if not exists(select 1 from public.factory_receipt_lines where factory_arrival_shortage_closure_id=closure_id and overage_quantity=1 and normal_quantity=0) then raise exception 'follow-up closure linkage missing'; end if;
+  -- closure-linked child follow-up is a normal receipt on a child aggregate, never parent overage.
+  if not exists(select 1 from public.factory_receipt_lines line join public.factory_receipt_events event on event.id=line.factory_receipt_event_id and event.user_id=line.user_id join public.factory_arrivals child on child.id=event.factory_arrival_id and child.user_id=event.user_id join public.factory_arrival_shortage_closures closure on closure.id=line.factory_arrival_shortage_closure_id and closure.user_id=line.user_id join public.factory_arrival_allocations parent_allocation on parent_allocation.id=closure.factory_arrival_allocation_id and parent_allocation.user_id=closure.user_id where child.id=child_arrival and child.follow_up_parent_arrival_id=parent_allocation.factory_arrival_id and child.follow_up_parent_arrival_id=arrival_id and child.status='RECEIVED') then raise exception 'closure-linked child follow-up consistency failed'; end if;
+  select id into follow_line from public.factory_receipt_lines where factory_arrival_shortage_closure_id=closure_id and factory_arrival_item_id in(select id from public.factory_arrival_items where factory_arrival_id=child_arrival) and normal_quantity=1 and overage_quantity=0;
+  if follow_line is null then raise exception 'follow-up normal receipt linkage missing'; end if;
+  perform public.reverse_factory_receipt_line(jsonb_build_object('receipt_line_id',follow_line,'correction_request_id','step9-follow-up-correction-1','reason','late carton rejected'));
+  if exists(select 1 from public.factory_arrival_items where factory_arrival_id=child_arrival and received_quantity<>0) or (select status from public.factory_arrivals where id=child_arrival)<>'READY' then raise exception 'follow-up correction parity failed'; end if;
   select l.id into line2 from public.factory_receipt_lines l join public.factory_receipt_events e on e.id=l.factory_receipt_event_id where e.receipt_request_id='step9-receipt-1' and l.factory_arrival_item_id=item2;
   correction:=public.reverse_factory_receipt_line(jsonb_build_object('receipt_line_id',line2,'correction_request_id','step9-correction-1','reason','wrong box'));
   if (select normally_received_quantity from public.factory_arrival_allocations where id=alloc2)<>0 or (select received_quantity from public.factory_arrival_items where id=item2)<>0 then raise exception 'correction did not restore counters'; end if;
   perform public.reverse_factory_receipt_line(jsonb_build_object('receipt_line_id',line2,'correction_request_id','step9-correction-1','reason','wrong box'));
   begin perform public.reverse_factory_receipt_line(jsonb_build_object('receipt_line_id',line2,'correction_request_id','step9-correction-1','reason','changed')); exception when others then failed:=sqlerrm='correction_request_conflict'; end; if not failed then raise exception 'changed correction retry did not conflict'; end if; failed:=false;
   before_tx:=(select count(*) from public.transactions where user_id=auth.uid()); before_stock:=(select coalesce(sum(quantity),0) from public.inventory where user_id=auth.uid());
-  begin perform public.receive_factory_arrival_request(jsonb_build_object('arrival_id',arrival_id,'receipt_request_id','step9-invalid-atomic','lines',jsonb_build_array(jsonb_build_object('allocation_id',alloc1_other,'quantity',1,'overage_quantity',0),jsonb_build_object('allocation_id',alloc2,'quantity',999,'overage_quantity',0)))); exception when others then failed:=true; end;
+  -- second failing allocation scope must identify the actual failing row.
+  begin perform public.receive_factory_arrival_request(jsonb_build_object('arrival_id',arrival_id,'receipt_request_id','step9-invalid-atomic','receipt_business_date','2026-07-22','lines',jsonb_build_array(jsonb_build_object('allocation_id',alloc1_other,'quantity',1,'overage_quantity',0),jsonb_build_object('allocation_id',alloc2,'quantity',999,'overage_quantity',0)))); exception when others then failed:=sqlerrm=format('operation_error:allocation:%s:Invalid receipt line.',alloc2); end;
   if not failed or (select count(*) from public.transactions where user_id=auth.uid())<>before_tx or (select coalesce(sum(quantity),0) from public.inventory where user_id=auth.uid())<>before_stock then raise exception 'invalid multi-row receipt was not atomic'; end if;
 end $$;
 reset role;
@@ -152,7 +172,7 @@ reset role;
 set role authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000011',false);
 do $$
-declare failed boolean:=false; v_template bigint:=current_setting('inbound_fixture.template_id')::bigint; v_version bigint:=current_setting('inbound_fixture.version_id')::bigint;
+declare failed boolean:=false; v_template bigint:=current_setting('inbound_fixture.template_id')::bigint; v_version bigint:=current_setting('inbound_fixture.version_id')::bigint; incomplete_revision bigint;
 begin
  begin update public.inbound_import_revisions set source_filename='forged' where id=(select min(r.id) from public.inbound_import_revisions r where r.user_id=auth.uid()); exception when others then failed:=true; end;
  if not failed then raise exception 'immutable revision update succeeded'; end if;
@@ -163,8 +183,10 @@ begin
  begin perform public.register_inbound_import_revision(140,'UNMAPPED','FILE','u.xlsx','owner/u.xlsx','eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',v_template,v_version,'Sheet1',1,'[]','[{"externalSku":"NO-MAP","rawQuantity":"1","quantity":1,"productVariantId":150}]'); exception when others then failed:=sqlerrm like 'mapping_blocker:%'; end;
  if not failed then raise exception 'unmapped/forged ProductVariant rejection failed'; end if;
  failed:=false;
- begin perform public.register_inbound_import_revision(140,'INVALID','FILE','i.xlsx','owner/i.xlsx','ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',v_template,v_version,'Sheet1',1,'[]','[{"externalSku":"IMP-001","rawQuantity":"0","quantity":0}]'); exception when others then failed:=sqlerrm like 'review_blocker:%'; end;
- if not failed then raise exception 'invalid quantity rejection failed'; end if;
+ select revision_id into incomplete_revision from public.register_inbound_import_revision(140,'INVALID','FILE','i.xlsx','owner/i.xlsx','ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',v_template,v_version,'Sheet1',1,'[]','[{"sourceRowNumber":7,"externalSku":"NO-MAP","rawQuantity":"0","quantity":0,"sourceValues":{"SKU":"NO-MAP","Qty":"0"},"validationError":"Quantity must be positive"}]');
+ if incomplete_revision is null or not exists(select 1 from public.inbound_import_source_rows where inbound_import_revision_id=incomplete_revision and source_row_ordinal=1 and raw_quantity='0' and validation_error='Quantity must be positive' and source_values->>'SKU'='NO-MAP' and product_variant_id is null) then raise exception 'incomplete review evidence was not persisted'; end if;
+ begin perform public.promote_inbound_import_revision(incomplete_revision,130); exception when others then failed:=sqlerrm='Import review blockers must be resolved before promotion.'; end;
+ if not failed or exists(select 1 from public.factory_arrivals where import_revision_id=incomplete_revision) then raise exception 'incomplete review promotion was not blocked'; end if;
 end $$;
 reset role;
 -- Receipt evidence is seeded by the fixture owner only through an admin setup
@@ -193,11 +215,15 @@ $$;
 -- RLS isolation plus immutable raw/evidence writes are tested as a second user.
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000022', false);
 do $$
-declare v_raw_failed boolean:=false; v_evidence_failed boolean:=false;
+declare v_raw_failed boolean:=false; v_evidence_failed boolean:=false; v_audit_failed boolean:=false;
 begin
   if exists (select 1 from public.factory_arrival_allocations where user_id='00000000-0000-0000-0000-000000000011') then raise exception 'RLS isolation failed'; end if;
+  -- cross-owner allocation audit rows are neither visible nor writable.
+  if exists (select 1 from public.factory_arrival_allocation_audits where user_id='00000000-0000-0000-0000-000000000011') then raise exception 'cross-owner allocation audit visibility failed'; end if;
+  begin insert into public.factory_arrival_allocation_audits(user_id,factory_arrival_id,factory_arrival_item_id,before_allocations,after_allocations,reason,actor_id) values('00000000-0000-0000-0000-000000000011',1,1,'[]','[]','forged',auth.uid()); exception when others then v_audit_failed:=true; end;
   begin update public.inbound_import_source_rows set external_sku='forbidden' where legacy_inbound_draft_row_id=210; exception when others then v_raw_failed:=true; end;
   begin delete from public.factory_receipt_lines where user_id='00000000-0000-0000-0000-000000000011'; exception when others then v_evidence_failed:=true; end;
+  if not v_audit_failed then raise exception 'cross-owner allocation audit insert succeeded'; end if;
   if not v_raw_failed then raise exception 'immutable raw source write succeeded'; end if;
   if not v_evidence_failed then raise exception 'immutable evidence write succeeded'; end if;
 end;

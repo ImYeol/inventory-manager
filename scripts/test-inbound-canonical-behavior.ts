@@ -33,7 +33,8 @@ const mappingMigration = path.join(root, 'supabase/migrations/20260719053000_sup
 const importPromotionMigration = path.join(root, 'supabase/migrations/20260719060000_import_deduplication_revisions_and_promotion.sql')
 const hardeningMigration = path.join(root, 'supabase/migrations/20260719070000_import_revision_proof_and_review_hardening.sql')
 const operationsMigration = path.join(root, 'supabase/migrations/20260719080000_allocation_partial_receipt_variance_correction.sql')
-for (const file of [fixture, assertions, migration, mappingMigration, importPromotionMigration, hardeningMigration, operationsMigration]) if (!existsSync(file)) throw new Error(`Missing fixture file: ${file}`)
+const correctiveMigration = path.join(root, 'supabase/migrations/20260719120000_inbound_domain_contract_gap_closure.sql')
+for (const file of [fixture, assertions, migration, mappingMigration, importPromotionMigration, hardeningMigration, operationsMigration, correctiveMigration]) if (!existsSync(file)) throw new Error(`Missing fixture file: ${file}`)
 
 function psql(file: string) {
   if (dockerContainer) {
@@ -55,6 +56,7 @@ psql(mappingMigration)
 psql(importPromotionMigration)
 psql(hardeningMigration)
 psql(operationsMigration)
+psql(correctiveMigration)
 psql(assertions)
 
 // The project-local Supabase container is intentionally supported by name;

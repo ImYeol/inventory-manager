@@ -22,6 +22,11 @@ export function FixedSheet({ open, title, description, onClose, children, classN
   const descriptionId = useId()
   const dialogRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLElement | null>(null)
+  const onCloseRef = useRef(onClose)
+
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   useEffect(() => {
     if (!open) return
@@ -29,10 +34,34 @@ export function FixedSheet({ open, title, description, onClose, children, classN
     triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    const focusSheet = window.requestAnimationFrame(() => dialogRef.current?.focus())
+    const focusableSelector = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+    const focusSheet = window.requestAnimationFrame(() => {
+      const firstAction = dialogRef.current?.querySelector<HTMLElement>(focusableSelector)
+      ;(firstAction ?? dialogRef.current)?.focus()
+    })
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') {
+        onCloseRef.current()
+        return
+      }
+      if (event.key !== 'Tab' || !dialogRef.current) return
+      const focusable = [...dialogRef.current.querySelectorAll<HTMLElement>(focusableSelector)]
+        .filter((element) => !element.hasAttribute('hidden') && element.getAttribute('aria-hidden') !== 'true')
+      if (!focusable.length) {
+        event.preventDefault()
+        dialogRef.current.focus()
+        return
+      }
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialogRef.current)) {
+        event.preventDefault()
+        first.focus()
+      }
     }
 
     document.addEventListener('keydown', handleKeyDown)
@@ -43,7 +72,7 @@ export function FixedSheet({ open, title, description, onClose, children, classN
       window.cancelAnimationFrame(focusSheet)
       triggerRef.current?.focus()
     }
-  }, [onClose, open])
+  }, [open])
 
   if (!open) return null
 
@@ -66,7 +95,7 @@ export function FixedSheet({ open, title, description, onClose, children, classN
                 </h2>
                 {description ? <p id={descriptionId} className="mt-1 text-sm leading-6 text-[color:var(--muted-foreground)]">{description}</p> : null}
               </div>
-              <Button type="button" variant="ghost" className="h-11 min-w-11 shrink-0 px-3" onClick={onClose} aria-label="닫기">
+              <Button type="button" variant="ghost" size="icon" className="shrink-0" onClick={onClose} aria-label="닫기">
                 <X className="h-4 w-4" />
               </Button>
             </div>

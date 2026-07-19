@@ -6,6 +6,30 @@ import { normalizeSupplierExternalSku } from '../supplier-sku'
 
 type MappingInput = { supplierId: number; externalSku: string; productVariantId: number }
 
+export type SupplierSkuMappingRow = {
+  id: number
+  supplierId: number
+  supplierName: string
+  externalSku: string
+  normalizedExternalSku: string
+  productVariantId: number
+  isActive: boolean
+  deactivatedAt: string | null
+  deactivationReason: string | null
+  createdAt: string
+}
+
+export type SupplierSkuMappingAuditRow = {
+  id: number
+  supplierId: number
+  action: string
+  externalSku: string
+  previousSellerSku: string | null
+  newSellerSku: string | null
+  reason: string | null
+  createdAt: string
+}
+
 function assertInput(input: MappingInput) {
   if (!input.supplierId || !input.productVariantId || !normalizeSupplierExternalSku(input.externalSku)) throw new Error('공급자, 외부 SKU, 내부 SKU를 입력해주세요.')
 }
@@ -51,4 +75,38 @@ export async function getSupplierSkuMappingAudit(supplierId: number) {
   const { data, error } = await supabase.from('supplier_sku_mapping_audits').select('id, action, raw_external_sku, normalized_external_sku, previous_seller_sku_snapshot, new_seller_sku_snapshot, reason, created_at').eq('supplier_id', supplierId).order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
   return data ?? []
+}
+
+/** Product-management read model for active mappings, inactive history, and immutable audits. */
+export async function getSupplierSkuMappingWorkspace(): Promise<{ mappings: SupplierSkuMappingRow[]; audits: SupplierSkuMappingAuditRow[] }> {
+  const { supabase } = await getSupabaseWithUser()
+  const [{ data: links, error: linksError }, { data: audits, error: auditsError }] = await Promise.all([
+    supabase.from('supplier_sku_links').select('id,supplier_id,external_sku,normalized_external_sku,product_variant_id,is_active,deactivated_at,deactivation_reason,received_at').order('received_at', { ascending: false }),
+    supabase.from('supplier_sku_mapping_audits').select('id,supplier_id,action,raw_external_sku,previous_seller_sku_snapshot,new_seller_sku_snapshot,reason,created_at').order('created_at', { ascending: false }).limit(200),
+  ])
+  const firstError = linksError ?? auditsError
+  if (firstError) {
+    if (firstError.message.includes('does not exist') || firstError.message.includes('schema cache')) return { mappings: [], audits: [] }
+    throw new Error(firstError.message)
+  }
+  const supplierIds = [...new Set((links ?? []).map((link) => Number(link.supplier_id)))]
+  const { data: suppliers, error: suppliersError } = supplierIds.length
+    ? await supabase.from('factories').select('id,name').in('id', supplierIds)
+    : { data: [], error: null }
+  if (suppliersError) throw new Error(suppliersError.message)
+  const names = new Map((suppliers ?? []).map((supplier) => [Number(supplier.id), String(supplier.name)]))
+  return {
+    mappings: (links ?? []).map((link) => ({
+      id: Number(link.id), supplierId: Number(link.supplier_id), supplierName: names.get(Number(link.supplier_id)) ?? '공급자',
+      externalSku: String(link.external_sku), normalizedExternalSku: String(link.normalized_external_sku), productVariantId: Number(link.product_variant_id),
+      isActive: Boolean(link.is_active), deactivatedAt: link.deactivated_at ? String(link.deactivated_at) : null,
+      deactivationReason: link.deactivation_reason ? String(link.deactivation_reason) : null, createdAt: String(link.received_at),
+    })),
+    audits: (audits ?? []).map((audit) => ({
+      id: Number(audit.id), supplierId: Number(audit.supplier_id), action: String(audit.action), externalSku: String(audit.raw_external_sku),
+      previousSellerSku: audit.previous_seller_sku_snapshot ? String(audit.previous_seller_sku_snapshot) : null,
+      newSellerSku: audit.new_seller_sku_snapshot ? String(audit.new_seller_sku_snapshot) : null,
+      reason: audit.reason ? String(audit.reason) : null, createdAt: String(audit.created_at),
+    })),
+  }
 }

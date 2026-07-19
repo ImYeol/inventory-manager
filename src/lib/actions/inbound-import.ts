@@ -66,6 +66,114 @@ export type InboundFilePreview = {
   rows: Array<{ sourceRowNumber: number; externalSku: string; rawQuantity: string; quantity: number | null; validationError: string | null; productVariantId: number | null; sourceValues: Record<string, string> }>
 }
 
+export type ResumableInboundReview = {
+  id: number
+  supplierName: string
+  shipmentNumber: string
+  filename: string | null
+  createdAt: string
+  rowCount: number
+  blockerCount: number
+}
+
+export type InboundReviewRevision = Omit<InboundFilePreview, 'rows'> & {
+  revisionId: number
+  shipmentNumber: string
+  rows: Array<InboundFilePreview['rows'][number] & { sourceRowId: number }>
+}
+
+function isMissingInboundSchema(message: string) {
+  return message.includes('does not exist') || message.includes('schema cache')
+}
+
+/** Lists the latest saved evidence revisions that have not been promoted yet. */
+export async function listResumableInboundReviews(): Promise<ResumableInboundReview[]> {
+  const { supabase } = await getSupabaseWithUser()
+  const { data: revisions, error: revisionError } = await supabase
+    .from('inbound_import_revisions')
+    .select('id,inbound_import_id,revision_number,source_filename,created_at')
+    .order('created_at', { ascending: false })
+  if (revisionError) {
+    if (isMissingInboundSchema(revisionError.message)) return []
+    throw new Error(revisionError.message)
+  }
+  const latest = new Map<number, (typeof revisions)[number]>()
+  for (const revision of revisions ?? []) {
+    const importId = Number(revision.inbound_import_id)
+    if (!latest.has(importId)) latest.set(importId, revision)
+  }
+  const latestRevisions = [...latest.values()]
+  if (!latestRevisions.length) return []
+  const revisionIds = latestRevisions.map((revision) => Number(revision.id))
+  const importIds = latestRevisions.map((revision) => Number(revision.inbound_import_id))
+  const [{ data: promoted, error: promotedError }, { data: imports, error: importError }, { data: rows, error: rowError }] = await Promise.all([
+    supabase.from('factory_arrivals').select('import_revision_id').in('import_revision_id', revisionIds),
+    supabase.from('inbound_imports').select('id,supplier_id,external_shipment_number').in('id', importIds),
+    supabase.from('inbound_import_source_rows').select('inbound_import_revision_id,validation_error,quantity,product_variant_id').in('inbound_import_revision_id', revisionIds),
+  ])
+  const firstError = promotedError ?? importError ?? rowError
+  if (firstError) throw new Error(firstError.message)
+  const supplierIds = [...new Set((imports ?? []).map((item) => Number(item.supplier_id)))]
+  const { data: suppliers, error: supplierError } = supplierIds.length
+    ? await supabase.from('factories').select('id,name').in('id', supplierIds)
+    : { data: [], error: null }
+  if (supplierError) throw new Error(supplierError.message)
+  const promotedIds = new Set((promoted ?? []).map((arrival) => Number(arrival.import_revision_id)))
+  const importById = new Map((imports ?? []).map((item) => [Number(item.id), item]))
+  const supplierById = new Map((suppliers ?? []).map((item) => [Number(item.id), String(item.name)]))
+  return latestRevisions.filter((revision) => !promotedIds.has(Number(revision.id))).map((revision) => {
+    const relatedRows = (rows ?? []).filter((row) => Number(row.inbound_import_revision_id) === Number(revision.id))
+    const inboundImport = importById.get(Number(revision.inbound_import_id))
+    return {
+      id: Number(revision.id),
+      supplierName: supplierById.get(Number(inboundImport?.supplier_id)) ?? '공급자',
+      shipmentNumber: String(inboundImport?.external_shipment_number ?? ''),
+      filename: revision.source_filename ? String(revision.source_filename) : null,
+      createdAt: String(revision.created_at),
+      rowCount: relatedRows.length,
+      blockerCount: relatedRows.filter((row) => row.validation_error || !row.product_variant_id || !Number.isInteger(Number(row.quantity)) || Number(row.quantity) <= 0).length,
+    }
+  })
+}
+
+/** Reloads immutable source evidence in its persisted ordinal order for review. */
+export async function loadInboundReviewRevision(revisionId: number): Promise<InboundReviewRevision> {
+  if (!revisionId) throw new Error('이어서 검토할 개정을 선택해주세요.')
+  const { supabase } = await getSupabaseWithUser()
+  const { data: revision, error: revisionError } = await supabase
+    .from('inbound_import_revisions')
+    .select('id,inbound_import_id,template_id,template_version_id,source_sheet_name,source_header_row_number,source_headers,source_file_hash')
+    .eq('id', revisionId)
+    .single()
+  if (revisionError || !revision) throw new Error(revisionError?.message ?? '입고 개정을 찾지 못했습니다.')
+  const [{ data: inboundImport, error: importError }, { data: rows, error: rowError }] = await Promise.all([
+    supabase.from('inbound_imports').select('supplier_id,external_shipment_number').eq('id', revision.inbound_import_id).single(),
+    supabase.from('inbound_import_source_rows').select('id,source_row_number,external_sku,raw_quantity,quantity,validation_error,product_variant_id,source_values').eq('inbound_import_revision_id', revisionId).order('source_row_ordinal', { ascending: true }).order('id', { ascending: true }),
+  ])
+  if (importError || !inboundImport || rowError) throw new Error(importError?.message ?? rowError?.message ?? '입고 검토 증빙을 불러오지 못했습니다.')
+  return {
+    revisionId: Number(revision.id),
+    supplierId: Number(inboundImport.supplier_id),
+    shipmentNumber: String(inboundImport.external_shipment_number),
+    templateId: Number(revision.template_id),
+    templateVersionId: Number(revision.template_version_id),
+    sheetName: String(revision.source_sheet_name ?? ''),
+    headerRowNumber: Number(revision.source_header_row_number ?? 0),
+    headers: Array.isArray(revision.source_headers) ? revision.source_headers.map(String) : [],
+    fileHash: String(revision.source_file_hash ?? ''),
+    rows: (rows ?? []).map((row) => ({
+      sourceRowId: Number(row.id),
+      sourceRowNumber: Number(row.source_row_number),
+      externalSku: String(row.external_sku ?? ''),
+      rawQuantity: String(row.raw_quantity ?? row.quantity ?? ''),
+      quantity: row.quantity === null ? null : Number(row.quantity),
+      validationError: row.validation_error ? String(row.validation_error) : null,
+      productVariantId: row.product_variant_id === null ? null : Number(row.product_variant_id),
+      sourceValues: (row.source_values && typeof row.source_values === 'object' ? row.source_values : {}) as Record<string, string>,
+    })),
+  }
+}
+
 /**
  * Server-only inspection boundary. This deliberately has no storage, draft,
  * inventory, or SKU-master mutation.
@@ -138,8 +246,8 @@ export async function saveInboundTemplateDraft(input: {
       // Evidence values are parser output. In particular, never rebuild the raw
       // cell from a parsed number (001, 1,000 and invalid cells are material).
       p_rows: input.rows.map((row) => {
-        const evidenceRow = { ...row }
-        delete evidenceRow.productVariantId
+        const { productVariantId, ...evidenceRow } = row
+        void productVariantId
         return evidenceRow
       }),
     })

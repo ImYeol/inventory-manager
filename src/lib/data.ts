@@ -106,6 +106,7 @@ type FactoryArrivalItemRow = {
   updated_at: string
   inbound_import_source_row_id?: number | null
   external_sku_snapshot?: string | null
+  product_variant_id?: number | null
 }
 
 export type CatalogModel = {
@@ -216,12 +217,13 @@ export type FactoryArrivalData = {
   remainingQuantity: number
   shortageClosures: Array<{ id: number; allocationId: number; quantity: number; reason: string; closedAt: string }>
   receiptLines: Array<{
-    id: number; eventId: number; itemId: number | null; allocationId: number | null; warehouseId: number | null
+    id: number; eventId: number; businessDate: string; itemId: number | null; allocationId: number | null; warehouseId: number | null
     receivedQuantity: number; normalQuantity: number; overageQuantity: number; overageReason: string | null
     shortageClosureId: number | null; createdAt: string; corrected: boolean
   }>
   items: Array<{
     id: number
+    productVariantId: number | null
     modelId: number
     modelName: string
     sizeId: number
@@ -805,7 +807,7 @@ export async function getFactoryArrivalsData(): Promise<FactoryArrivalsDataResul
       .order('created_at', { ascending: false }),
     supabase
       .from('factory_arrival_items')
-      .select('id, factory_arrival_id, model_id, size_id, color_id, ordered_quantity, received_quantity, inbound_import_source_row_id, external_sku_snapshot, created_at, updated_at'),
+      .select('id, factory_arrival_id, product_variant_id, model_id, size_id, color_id, ordered_quantity, received_quantity, inbound_import_source_row_id, external_sku_snapshot, created_at, updated_at'),
     supabase.from('inbound_import_source_rows').select('id, source_row_number, source_row_ordinal'),
     supabase.from('factory_arrival_allocations').select('id, factory_arrival_id, factory_arrival_item_id, warehouse_id, allocated_quantity, normally_received_quantity, shortage_closed_quantity, warehouse_name_snapshot'),
     supabase.from('factory_receipt_events').select('id, factory_arrival_id, receipt_request_id, event_kind, receipt_business_date'),
@@ -857,6 +859,7 @@ export async function getFactoryArrivalsData(): Promise<FactoryArrivalsDataResul
         }))
         return ({
         id: item.id,
+        productVariantId: item.product_variant_id == null ? null : Number(item.product_variant_id),
         modelId: item.model_id,
         modelName: modelMap.get(item.model_id) ?? '',
         sizeId: item.size_id,
