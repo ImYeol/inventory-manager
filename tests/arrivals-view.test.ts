@@ -73,7 +73,6 @@ describe('ArrivalsView', () => {
     fireEvent.click(screen.getByRole('combobox', { name: '항목 #1 상품 옵션' }))
     fireEvent.click(await screen.findByRole('option', { name: /LP01/ }))
     fireEvent.change(screen.getAllByPlaceholderText('수량')[0], { target: { value: '12' } })
-    expect(screen.getByText('항목 #1').closest('section')?.className).toContain('ui-card')
     expect(screen.getByRole('combobox', { name: '공장' }).className).toContain('ui-select-trigger')
     expect(screen.queryByRole('combobox', { name: '항목 #1 모델' })).toBeNull()
 
@@ -142,6 +141,10 @@ describe('ArrivalsView', () => {
 
     expect(screen.getByText('예정 목록').closest('section')?.className).not.toContain('ui-card')
     expect(screen.getAllByText('입고 예정').length).toBeGreaterThan(1)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
+    expect(await screen.findByRole('dialog', { name: '광주 협력사 입고 예정' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '입고 반영 작업 열기' }))
     fireEvent.change(screen.getByLabelText('오금동 정상 입고'), { target: { value: '2' } })
     fireEvent.change(screen.getByLabelText('오금동 초과 입고'), { target: { value: '1' } })
     fireEvent.change(screen.getByLabelText('오금동 초과 사유'), { target: { value: '공장 오발송' } })
@@ -172,14 +175,37 @@ describe('ArrivalsView', () => {
           allocations: [{ id: 301, warehouseId: 11, warehouseName: '오금동', allocatedQuantity: 20, normallyReceivedQuantity: 5, shortageClosedQuantity: 2, remainingQuantity: 13 }, { id: 302, warehouseId: 12, warehouseName: '대자동', allocatedQuantity: 10, normallyReceivedQuantity: 0, shortageClosedQuantity: 0, remainingQuantity: 10 }] }],
       }],
     }))
+    fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
+    fireEvent.click(screen.getByRole('button', { name: '배정 작업 열기' }))
     fireEvent.click(screen.getByRole('button', { name: '배정 저장' }))
     await waitFor(() => expect(mocks.replaceFactoryArrivalAllocations).toHaveBeenCalledWith({ arrivalId: 101, itemId: 201, reason: '', allocations: [{ warehouseId: 11, quantity: 20 }, { warehouseId: 12, quantity: 10 }] }))
+    fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
+    fireEvent.click(screen.getByRole('button', { name: '부족 작업 열기' }))
     fireEvent.change(screen.getByLabelText('오금동 부족 수량'), { target: { value: '1' } }); fireEvent.change(screen.getByLabelText('오금동 부족 사유'), { target: { value: '추가 미발송' } }); fireEvent.click(screen.getAllByRole('button', { name: '부족 종료' })[0])
     await waitFor(() => expect(mocks.closeFactoryArrivalShortage).toHaveBeenCalledWith({ allocationId: 301, quantity: 1, reason: '추가 미발송' }))
+    fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
+    fireEvent.click(screen.getByRole('button', { name: '후속 입고 작업 열기' }))
     fireEvent.change(screen.getByLabelText('부족 #401 후속 수량'), { target: { value: '1' } }); fireEvent.change(screen.getByLabelText('부족 #401 후속 사유'), { target: { value: '늦은 박스' } }); fireEvent.click(screen.getByRole('button', { name: '후속 입고' }))
     await waitFor(() => expect(mocks.recordFactoryArrivalFollowUp).toHaveBeenCalledWith(expect.objectContaining({ closureId: 401, warehouseId: 11, quantity: 1, reason: '늦은 박스' })))
+    fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
+    fireEvent.click(screen.getByRole('button', { name: '정정 작업 열기' }))
     fireEvent.change(screen.getByLabelText('입고 기록 #501 정정 사유'), { target: { value: '다른 상품' } }); fireEvent.click(screen.getByRole('button', { name: '전체 반전' }))
     await waitFor(() => expect(mocks.reverseFactoryReceiptLine).toHaveBeenCalledWith(expect.objectContaining({ receiptLineId: 501, reason: '다른 상품' })))
+  })
+
+  it('keeps the selected operation and its draft visible after a scoped server error', async () => {
+    mocks.receiveFactoryArrivalRequest.mockRejectedValue(new Error('다시 확인해주세요.'))
+    render(React.createElement(ArrivalsView, {
+      schemaState: { status: 'ready', message: null }, factories: [], warehouses: [{ id: 11, name: '오금동' }], models: [],
+      arrivals: [{ id: 101, factoryName: '광주 협력사', expectedDate: '2026-04-21', status: 'READY', sourceChannel: 'manual', memo: null, totalOrderedQuantity: 5, remainingQuantity: 5, shortageClosures: [], receiptLines: [], items: [{ id: 201, modelName: 'LP01', sizeName: 'S', colorName: '네이비', colorRgb: '#111111', orderedQuantity: 5, receivedQuantity: 0, remainingQuantity: 5, allocations: [{ id: 301, warehouseId: 11, warehouseName: '오금동', allocatedQuantity: 5, normallyReceivedQuantity: 0, shortageClosedQuantity: 0, remainingQuantity: 5 }] }] }],
+    }))
+    fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
+    fireEvent.click(screen.getByRole('button', { name: '입고 반영 작업 열기' }))
+    fireEvent.change(screen.getByLabelText('오금동 정상 입고'), { target: { value: '2' } })
+    fireEvent.click(screen.getByRole('button', { name: '입고 반영' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('다시 확인해주세요.')
+    expect(screen.getByRole('button', { name: '입고 반영 작업 열기' }).getAttribute('aria-pressed')).toBe('true')
+    expect((screen.getByLabelText('오금동 정상 입고') as HTMLInputElement).value).toBe('2')
   })
 
   it('shows the setup banner and blocks register/receive actions when sourcing schema is missing', async () => {
@@ -232,6 +258,9 @@ describe('ArrivalsView', () => {
     expect(screen.getByText('소싱 스키마가 아직 배포되지 않았습니다. supabase/schema.sql 적용 후 다시 시도하세요.')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '수동 추가' }))
     expect(screen.getByRole('button', { name: '예정 입고 등록' }).getAttribute('disabled')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+    fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
+    fireEvent.click(screen.getByRole('button', { name: '입고 반영 작업 열기' }))
     expect(screen.getByRole('button', { name: '입고 반영' }).getAttribute('disabled')).not.toBeNull()
   })
 })

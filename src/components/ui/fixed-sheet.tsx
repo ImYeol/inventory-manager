@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useId, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
@@ -20,12 +20,16 @@ type FixedSheetProps = {
 export function FixedSheet({ open, title, description, onClose, children, className }: FixedSheetProps) {
   const titleId = useId()
   const descriptionId = useId()
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     if (!open) return
 
+    triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    const focusSheet = window.requestAnimationFrame(() => dialogRef.current?.focus())
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
@@ -36,13 +40,15 @@ export function FixedSheet({ open, title, description, onClose, children, classN
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
       document.body.style.overflow = previousOverflow
+      window.cancelAnimationFrame(focusSheet)
+      triggerRef.current?.focus()
     }
   }, [onClose, open])
 
   if (!open) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined}>
+    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-[60] outline-none" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined}>
       <div aria-hidden="true" onClick={onClose} className={cn(ui.modalOverlay, '!z-0 cursor-default')} />
       <div
         className={cn(

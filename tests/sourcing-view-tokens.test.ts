@@ -15,8 +15,7 @@ describe('sourcing view token usage', () => {
     expect(arrivalsViewSource).not.toMatch(selfThemeUtilities)
   })
 
-  it('uses semantic warning tokens for invalid arrival rows', () => {
-    expect(arrivalsViewSource).toContain('border-[color:var(--hue-warning)]')
+  it('uses semantic warning tokens for scoped arrival errors', () => {
     expect(arrivalsViewSource).toContain('text-[color:var(--warning-foreground)]')
   })
 })
