@@ -35,6 +35,7 @@
 | `Table`, `TableHeader`, `TableBody`, `TableFooter`, `TableHead`, `TableRow`, `TableCell`, `TableCaption` | `table.tsx` | semantic table building blocks | 해당 native table element props와 `className` | `BasicDataTable`/`InventoryDataTable`로 표현할 수 없는 table 구성 | surface·empty state·row behavior를 화면별로 중복 조립하지 않는다. |
 | `TableSurface` | `table-surface.tsx` | filter toolbar + table을 하나로 묶는 통합 data surface | `toolbar`, `children`, `footer`, `className`, `scrollClassName` | 조회 화면의 canonical shell. toolbar strip → divider → table body → footer가 하나의 bordered surface로 읽힌다 | filter 박스와 table shell을 별도 카드 2개로 쌓지 않는다. child table은 자체 border(`ui-table-shell`)를 갖지 않는다. |
 | `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent` | `tabs.tsx` | Radix view switch | Radix tabs props와 `className` | 같은 page의 상위 view switch | filter chip 또는 action toggle로 쓰지 않는다. |
+| `TagInput` | `tag-input.tsx` | 값을 하나씩 입력해 removable chip으로 쌓는 다건 입력 | `value: string[]`, `onChange`, `placeholder`, `ariaLabel`, `validate?: (token) => string \| null`, `disabled` | 사이즈·색상처럼 순서 없는 다건 옵션 값을 입력받는 필드. Enter로 chip 추가, backspace 또는 chip `×`로 제거하며 `validate`는 토큰이 추가되는 시점에 즉시 검사한다 | 줄바꿈/쉼표 구분 textarea로 되돌리지 않는다. 제출 시점에만 값을 검증하지 않는다. |
 | `ActionToolbar`, `ToolbarLinkAction`, `ToolbarButtonAction`, `ToolbarIconButton` | `toolbar.tsx` | compact action rail | link: `href`; button: button props; icon button: `label`, `icon` | 인접 surface에 붙는 navigation/data action group | navigation과 data mutation을 같은 element 역할로 섞지 않는다. |
 
 ## Button 크기 역할 계층
