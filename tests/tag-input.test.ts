@@ -21,6 +21,30 @@ describe('TagInput', () => {
     expect((input as HTMLInputElement).value).toBe('')
   })
 
+  it('ignores Enter while an IME composition is active, then adds one completed token', () => {
+    render(React.createElement(Harness))
+    const input = screen.getByLabelText('태그 입력')
+    fireEvent.change(input, { target: { value: '블' } })
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+
+    expect(screen.queryByText('블')).toBeNull()
+    expect((input as HTMLInputElement).value).toBe('블')
+
+    fireEvent.change(input, { target: { value: '블랙' } })
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: false })
+
+    expect(screen.getAllByText('블랙')).toHaveLength(1)
+    expect((input as HTMLInputElement).value).toBe('')
+  })
+
+  it('keeps the input full width and flows added tags below it', () => {
+    render(React.createElement(Harness, { initial: ['S', 'M'] }))
+
+    expect(screen.getByLabelText('태그 입력').className).toContain('w-full')
+    expect(screen.getByTestId('tag-input-tags').className).toContain('flex-wrap')
+    expect(screen.getByTestId('tag-input-tags').textContent).toContain('SM')
+  })
+
   it('removes a chip via its own remove control', () => {
     render(React.createElement(Harness, { initial: ['S', 'M'] }))
     expect(screen.getByText('S')).toBeTruthy()

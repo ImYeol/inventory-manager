@@ -236,13 +236,13 @@ export default function MasterDataManager({
           >
             <BasicDataTable<ProductWorkspaceVariant>
               bare tableAriaLabel="내부 SKU 목록"
-              columns={[{ key: 'sku', label: 'SKU / 옵션' }, { key: 'inventory', label: '재고', align: 'right' }, { key: 'mappings', label: '판매 옵션' }, { key: 'reported', label: '마지막 보고 / 오류' }, { key: 'actions', label: '작업', align: 'right' }]}
+              columns={[{ key: 'sku', label: 'SKU / 옵션' }, { key: 'inventory', label: '출고 가능', align: 'right' }, { key: 'mappings', label: '판매 옵션' }, { key: 'reported', label: '마지막 보고 / 오류' }, { key: 'actions', label: '작업', align: 'right' }]}
               rows={filteredVariants} rowKey={(variant) => variant.id} onRowClick={openSkuModal} rowAriaLabel={(variant) => `${variant.sellerSku} 매핑 상세`}
               emptyState="등록된 내부 판매 옵션이 없습니다. 내부 상품을 등록한 뒤 채널 판매 옵션을 연결하세요."
               renderCell={(variant, columnKey) => {
                 const refs = refsForVariant(variant.id)
                 if (columnKey === 'sku') return <div><p className="font-mono text-sm font-medium text-[color:var(--foreground)]">{variant.sellerSku}</p><p className="text-sm text-[color:var(--muted)]">{variant.modelName} · {variant.sizeName} / {variant.colorName}</p></div>
-                if (columnKey === 'inventory') return <span className="font-mono tabular-nums text-sm text-[color:var(--foreground)]">{variant.onHand} / {variant.committed} / {variant.available} / {variant.incoming}</span>
+                if (columnKey === 'inventory') return <span className="font-mono tabular-nums text-sm text-[color:var(--foreground)]">{variant.available}</span>
                 if (columnKey === 'mappings') return <span className="text-sm text-[color:var(--muted)]">네이버 {refs.filter((ref) => ref.channel === 'naver').length} · 쿠팡 {refs.filter((ref) => ref.channel === 'coupang').length}</span>
                 if (columnKey === 'reported') return refs.length ? <div className="space-y-1">{refs.map((ref) => <div key={ref.id} className="flex items-center gap-2"><ChannelBadge channel={ref.channel} listingStatus={ref.lastSyncError ? 'sync-error' : ref.listingStatus} compact /><span className="font-mono text-xs text-[color:var(--muted)]">{ref.channelReported ?? '—'}</span>{ref.lastSyncError ? <span className="text-xs text-[color:var(--danger-foreground)]">{ref.lastSyncError}</span> : null}</div>)}</div> : <span className="text-sm text-[color:var(--muted-foreground)]">연결 필요</span>
                 if (columnKey === 'actions') return <Button type="button" variant="ghost" size="sm" onClick={(event) => { event.stopPropagation(); openSkuModal(variant) }}>상세</Button>

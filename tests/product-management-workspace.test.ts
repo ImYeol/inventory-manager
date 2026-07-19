@@ -52,14 +52,16 @@ const props = {
 beforeEach(() => Object.values(mocks).forEach((mock) => mock.mockReset()))
 
 describe('Product management workspace', () => {
-  it('renders an internal SKU table with inventory summary, mapping counts, and compact filters', () => {
+  it('renders an internal SKU table with an available-to-ship summary, mapping counts, and compact filters', () => {
     render(React.createElement(MasterDataManager, props))
 
     expect(screen.getByRole('columnheader', { name: 'SKU / 옵션' })).toBeTruthy()
-    expect(screen.getByRole('columnheader', { name: '재고' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: '출고 가능' })).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: '판매 옵션' })).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: '마지막 보고 / 오류' })).toBeTruthy()
-    expect(screen.getByText('12 / 4 / 8 / 6')).toBeTruthy()
+    const skuRow = screen.getByRole('row', { name: 'LP01-M-NV 매핑 상세' })
+    expect(within(skuRow).getAllByRole('cell')[1].textContent).toBe('8')
+    expect(within(skuRow).queryByText('12 / 4 / 8 / 6')).toBeNull()
     expect(screen.getByText('네이버 1 · 쿠팡 1')).toBeTruthy()
     expect(screen.getByRole('combobox', { name: '채널 필터' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: '매핑 상태 필터' })).toBeTruthy()

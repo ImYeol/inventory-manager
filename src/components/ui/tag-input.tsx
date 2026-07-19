@@ -52,6 +52,7 @@ export function TagInput({ value, onChange, placeholder, ariaLabel, validate, di
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
+      if (event.nativeEvent.isComposing) return
       event.preventDefault()
       addToken()
       return
@@ -63,7 +64,19 @@ export function TagInput({ value, onChange, placeholder, ariaLabel, validate, di
 
   return (
     <div className={cn('space-y-1.5', className)}>
-      <div className="flex flex-wrap items-center gap-1.5">
+      <Input
+        aria-label={ariaLabel}
+        value={draft}
+        disabled={disabled}
+        placeholder={placeholder}
+        onChange={(event) => {
+          setDraft(event.target.value)
+          if (error) setError(null)
+        }}
+        onKeyDown={handleKeyDown}
+        className="ui-control-sm w-full"
+      />
+      {value.length > 0 ? <div data-testid="tag-input-tags" className="flex flex-wrap gap-1.5">
         {value.map((token, index) => (
           <span key={`${token}-${index}`} className={ui.pillMuted}>
             <span>{token}</span>
@@ -78,19 +91,7 @@ export function TagInput({ value, onChange, placeholder, ariaLabel, validate, di
             </button>
           </span>
         ))}
-        <Input
-          aria-label={ariaLabel}
-          value={draft}
-          disabled={disabled}
-          placeholder={placeholder}
-          onChange={(event) => {
-            setDraft(event.target.value)
-            if (error) setError(null)
-          }}
-          onKeyDown={handleKeyDown}
-          className="ui-control-sm w-32 flex-1"
-        />
-      </div>
+      </div> : null}
       {error ? <p role="alert" className="text-xs text-[color:var(--danger-foreground)]">{error}</p> : null}
     </div>
   )
