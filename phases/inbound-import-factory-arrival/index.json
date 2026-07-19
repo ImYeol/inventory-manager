@@ -2,7 +2,7 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "pending",
+  "status": "blocked",
   "steps": [
     {
       "step": 0,
@@ -130,7 +130,8 @@
     {
       "step": 12,
       "name": "inbound-domain-contract-gap-closure",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-07-19T11:11:16+0900"
     },
     {
       "step": 13,
