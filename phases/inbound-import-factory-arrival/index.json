@@ -2,7 +2,7 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "blocked",
+  "status": "pending",
   "steps": [
     {
       "step": 0,
@@ -158,14 +158,15 @@
           "--check"
         ]
       ],
-      "started_at": "2026-07-19T11:20:01+0900",
-      "completed_at": "2026-07-19T11:26:30+0900",
-      "summary": "Closed the persisted-review and receiving-contract gaps: incomplete/unmapped rows remain immutable evidence and promotion remains the trusted blocker; receipt and follow-up operations carry a Korea-local editable business date through canonical payloads, idempotency and transaction dates; allocation move-all is reachable with a required reason and audit evidence; the arrival workspace keeps receipt dates and drafts scoped to the selected arrival or closure. Loader output now exposes receipt business dates. Forward migrations and fresh schema were updated together for the receipt date, review persistence, audit table, and move-all RPC. Direct acceptance passed: 259 tests, lint (four existing warnings), Prisma validation, production build, and diff check. The outer Harness still owns disposable database/fresh-schema behavioral execution."
+      "reopened_reason": "Semantic review found the forward receipt RPC migration, move-all total invariant, incomplete-review resume, supplier mapping maintenance, child follow-up aggregate, replace-allocation audit, grouped reconciliation, and scoped-error contracts were not actually complete.",
+      "started_at": "2026-07-19T12:05:49+0900",
+      "completed_at": "2026-07-19T12:10:00+0900",
+      "summary": "Closed the inbound contract gaps with persisted/resumable incomplete review evidence and promotion blocking, reachable supplier-SKU mapping maintenance and audit, closure-linked child follow-up receipts, Korea-local editable receipt business dates in evidence/transactions/idempotency, immutable reasoned allocation audits, default-warehouse move-all invariants, grouped pre-submit reconciliation, and scoped editor errors that retain drafts. The forward migration now also replaces the deployed registration RPC so incomplete reviews persist after upgrade, matching the fresh schema. Direct acceptance passed: 273 tests, lint (four existing warnings), Prisma validation, production build, and diff check. The committed behavioral fixture exercises receipt-date conflicts, allocation/audit/move-all behavior, cross-owner rejection, follow-up/correction parity, and incomplete-review promotion blocking; disposable PostgreSQL execution remains Harness-owned."
     },
     {
       "step": 13,
       "name": "arrival-progressive-disclosure-and-visual-quality",
-      "status": "blocked",
+      "status": "pending",
       "acceptance_commands": [
         [
           "npm",
@@ -187,9 +188,7 @@
           "diff",
           "--check"
         ]
-      ],
-      "started_at": "2026-07-19T11:27:35+0900",
-      "blocked_at": "2026-07-19T11:34:00+0900"
+      ]
     }
   ]
 }
