@@ -2,7 +2,7 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "completed",
+  "status": "pending",
   "steps": [
     {
       "step": 0,
@@ -88,6 +88,28 @@
       "started_at": "2026-07-19T06:24:05+0900",
       "completed_at": "2026-07-19T06:41:30+0900",
       "summary": "Integrated the canonical arrival workspace with allocation-level remainders, 30→20+10 warehouse splits, stable-id multi-row partial receipts, overage evidence, shortage closure, closure-linked follow-up, full-line correction, canonical status labels, repeated source-row evidence, and the two-stage Excel review/promotion launcher. Inventory now shows warehouse-specific committed/incoming values, including zero-on-hand variants, with arrival deep links and refresh after promotion. First-upload product creation opens separately so the local draft remains intact, then refreshes product choices in place. Full 251 tests, Prisma validation, lint (four pre-existing warnings), production build, and diff checks pass; Step 9 already proved the dedicated legacy-chain Docker behavior and fresh schema execution."
+    },
+    {
+      "step": 11,
+      "name": "completion-integrity-and-ui-ownership-correction",
+      "status": "pending",
+      "acceptance_commands": [
+        ["python3", ".agents/skills/seleccase-harness/scripts/test_execute_codex.py"],
+        ["python3", ".agents/skills/seleccase-review/scripts/test_review_codex.py"],
+        ["npm", "run", "test"],
+        ["npm", "run", "lint"],
+        ["npm", "run", "build"]
+      ]
+    },
+    {
+      "step": 12,
+      "name": "inbound-domain-contract-gap-closure",
+      "status": "pending"
+    },
+    {
+      "step": 13,
+      "name": "arrival-progressive-disclosure-and-visual-quality",
+      "status": "pending"
     }
   ]
 }

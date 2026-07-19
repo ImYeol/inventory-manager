@@ -50,7 +50,9 @@ describe('Nav', () => {
     expect(screen.getByRole('link', { name: '주문' }).getAttribute('href')).toBe('/orders')
     expect(screen.getByRole('link', { name: '재고 운영' }).getAttribute('href')).toBe('/inventory')
     expect(screen.getByRole('link', { name: '상품 관리' }).getAttribute('href')).toBe('/products')
-    expect(screen.getByRole('link', { name: '소싱' }).getAttribute('href')).toBe('/sourcing')
+    expect(screen.getByRole('button', { name: '소싱' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: '외부 공장' }).getAttribute('href')).toBe('/sourcing/factories')
+    expect(screen.getByRole('link', { name: '입고 예정' }).getAttribute('href')).toBe('/sourcing/arrivals')
     expect(screen.queryByRole('link', { name: '운송장' })).toBeNull()
     expect(screen.queryByRole('link', { name: '분석' })).toBeNull()
     expect(screen.queryByRole('link', { name: '스토어 연결' })).toBeNull()
@@ -69,12 +71,14 @@ describe('Nav', () => {
       ['주문', '/orders'],
       ['상품 관리', '/products'],
       ['재고 운영', '/inventory'],
-      ['소싱', '/sourcing'],
     ] as const
 
     destinations.forEach(([label, href]) => {
       expect(mobileMenu.getByRole('link', { name: label }).getAttribute('href')).toBe(href)
     })
+    expect(mobileMenu.getByRole('button', { name: '소싱' })).toBeTruthy()
+    expect(mobileMenu.getByRole('link', { name: '외부 공장' }).getAttribute('href')).toBe('/sourcing/factories')
+    expect(mobileMenu.getByRole('link', { name: '입고 예정' }).getAttribute('href')).toBe('/sourcing/arrivals')
     expect(screen.queryAllByRole('link', { name: '분석' })).toHaveLength(0)
     expect(mobileMenu.queryByRole('link', { name: '설정' })).toBeNull()
   })
@@ -84,8 +88,10 @@ describe('Nav', () => {
 
     render(React.createElement(Nav))
 
-    const sourcingLink = screen.getByRole('link', { name: '소싱' })
-    expect(sourcingLink.getAttribute('aria-current')).toBe('page')
+    const sourcingSection = screen.getByRole('button', { name: '소싱' })
+    const arrivalsLink = screen.getByRole('link', { name: '입고 예정' })
+    expect(sourcingSection.getAttribute('aria-expanded')).toBe('true')
+    expect(arrivalsLink.getAttribute('aria-current')).toBe('page')
   })
 
   it('shows the logged-in user profile summary when user data is provided', () => {

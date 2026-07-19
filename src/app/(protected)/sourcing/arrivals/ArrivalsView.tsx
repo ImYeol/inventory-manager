@@ -4,7 +4,7 @@ import { useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { closeFactoryArrivalShortage, createFactoryArrivalBatch, receiveFactoryArrivalRequest, recordFactoryArrivalFollowUp, replaceFactoryArrivalAllocations, reverseFactoryReceiptLine } from '@/lib/actions'
 import { StatusBadge } from '@/components/ui/badge-1'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ProductVariantCombobox, type ProductVariantOption } from '@/components/ui/product-variant-combobox'
 import InboundRegistrationSheet, { type InboundTemplateOption } from '@/app/components/inventory/InboundRegistrationSheet'
@@ -90,14 +90,6 @@ function createRow(): ArrivalRow {
   }
 }
 
-function parseDelimitedText(text: string) {
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => line.split(line.includes('\t') ? '\t' : ',').map((cell) => cell.trim()))
-}
-
 function buildReceiptDrafts(arrivals: ArrivalRecord[]) {
   return Object.fromEntries(arrivals.flatMap((arrival) => arrival.items.flatMap((item) => item.allocations.map((allocation) => [allocation.id, { quantity: 0, overageQuantity: 0, overageReason: '' } satisfies ReceiptDraft]))))
 }
@@ -167,20 +159,19 @@ export default function ArrivalsView({
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [entryMode, setEntryMode] = useState<'manual' | 'csv'>('manual')
   const [message, setMessage] = useState<string | null>(null)
   const [factoryId, setFactoryId] = useState<number | null>(factories.find((factory) => factory.isActive)?.id ?? factories[0]?.id ?? null)
   const [arrivalWarehouseId, setArrivalWarehouseId] = useState<number | null>(warehouses[0]?.id ?? null)
   const [expectedDate, setExpectedDate] = useState(new Date().toISOString().slice(0, 10))
   const [memo, setMemo] = useState('')
   const [rows, setRows] = useState<ArrivalRow[]>([createRow(), createRow()])
-  const [csvText, setCsvText] = useState('')
   const [receiptDrafts, setReceiptDrafts] = useState<Record<number, ReceiptDraft>>(() => buildReceiptDrafts(arrivals))
   const [allocationDrafts, setAllocationDrafts] = useState<Record<number, Record<number, number>>>(() => Object.fromEntries(arrivals.flatMap((arrival) => arrival.items.map((item) => [item.id, Object.fromEntries(item.allocations.map((allocation) => [allocation.warehouseId, allocation.allocatedQuantity]))]))))
   const [shortageDrafts, setShortageDrafts] = useState<Record<number, ShortageDraft>>({})
   const [followUpDrafts, setFollowUpDrafts] = useState<Record<number, FollowUpDraft>>({})
   const [correctionReasons, setCorrectionReasons] = useState<Record<number, string>>({})
   const [importOpen, setImportOpen] = useState(false)
+  const [manualOpen, setManualOpen] = useState(false)
   const receiptRequestIds = useRef<Record<number, string>>({})
   const followUpRequestIds = useRef<Record<number, string>>({})
   const correctionRequestIds = useRef<Record<number, string>>({})
@@ -219,47 +210,6 @@ export default function ArrivalsView({
     channels: { naver: 'unregistered', coupang: 'unregistered' },
   })))), [models])
 
-  const importCsvRows = () => {
-    const nextRows = parseDelimitedText(csvText).map((cells) => {
-      const [modelName = '', sizeName = '', colorName = '', quantityText = ''] = cells
-      const isHeader =
-        (modelName.toLowerCase() === '모델' || modelName.toLowerCase() === 'model') &&
-        (sizeName.toLowerCase() === '사이즈' || sizeName.toLowerCase() === 'size')
-
-      if (isHeader) return null
-
-      const model = models.find((entry) => entry.name === modelName)
-      const size = model?.sizes.find((entry) => entry.name === sizeName)
-      const color = model?.colors.find((entry) => entry.name === colorName)
-      const orderedQuantity = Number(quantityText)
-
-      const issues: string[] = []
-      if (!model) issues.push(`모델 "${modelName}"`)
-      if (!size) issues.push(`사이즈 "${sizeName}"`)
-      if (!color) issues.push(`색상 "${colorName}"`)
-      if (!Number.isFinite(orderedQuantity) || orderedQuantity <= 0) issues.push(`수량 "${quantityText}"`)
-
-      return {
-        key: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        modelId: model?.id ?? '',
-        sizeId: size?.id ?? '',
-        colorId: color?.id ?? '',
-        orderedQuantity: Number.isFinite(orderedQuantity) && orderedQuantity > 0 ? orderedQuantity : '',
-        error: issues.length > 0 ? issues.join(', ') : null,
-      } satisfies ArrivalRow
-    })
-
-    const filtered = nextRows.filter((row): row is ArrivalRow => row !== null)
-    if (filtered.length === 0) {
-      setMessage('가져올 CSV 행이 없습니다.')
-      return
-    }
-
-    setRows(filtered)
-    setMessage(`${filtered.length}개 행을 가져왔습니다.`)
-    setCsvText('')
-  }
-
   const submitRows = () => {
     const selectedFactoryId = factoryId
 
@@ -294,13 +244,13 @@ export default function ArrivalsView({
           warehouseId: arrivalWarehouseId,
           expectedDate,
           memo,
-          sourceChannel: entryMode,
+          sourceChannel: 'manual',
           items: validRows,
         })
         setRows([createRow(), createRow()])
         setMemo('')
-        setCsvText('')
         setMessage(`${validRows.length}개 예정 입고 항목을 등록했습니다.`)
+        setManualOpen(false)
         router.refresh()
       } catch (error) {
         setMessage(error instanceof Error ? error.message : '예정 입고 등록에 실패했습니다.')
@@ -370,8 +320,8 @@ export default function ArrivalsView({
     <div className={ui.shell}>
       <PageHeader
         title="입고 예정"
-        description="공장 예정 입고를 수동 또는 CSV로 등록하고 잔여 수량만 반영합니다."
-        actions={<Button type="button" size="sm" onClick={() => setImportOpen(true)}>엑셀 가져오기</Button>}
+        description="공장 엑셀을 검토·연결하고 창고 배정과 실제 입고를 관리합니다."
+        actions={<><Button type="button" variant="outline" size="sm" onClick={() => setManualOpen(true)}>수동 추가</Button><Button type="button" size="sm" onClick={() => setImportOpen(true)}>엑셀 가져오기</Button></>}
       />
 
       {schemaState.status === 'missing' && schemaState.message ? (
@@ -381,22 +331,78 @@ export default function ArrivalsView({
       ) : null}
 
       {message ? (
-        <Card variant="muted" className="mb-4 overflow-hidden">
+        <Card variant="muted" className="mb-4 overflow-hidden" aria-live="polite">
           <CardContent className="px-4 py-3 text-sm text-[color:var(--muted)]">{message}</CardContent>
         </Card>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <section className="space-y-4">
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setEntryMode('manual')} className={entryMode === 'manual' ? ui.tabActive : ui.tab}>
-              수동 등록
-            </button>
-            <button type="button" onClick={() => setEntryMode('csv')} className={entryMode === 'csv' ? ui.tabActive : ui.tab}>
-              CSV 등록
-            </button>
-          </div>
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold tracking-tight text-[color:var(--foreground)]">예정 목록</h2>
+          <span className={ui.pill}>총 {arrivals.length}건</span>
+        </div>
 
+        <div className={ui.tableShell}>
+          <div className="divide-y divide-[color:var(--border)]">
+            {arrivals.length === 0 ? (
+              <div className={ui.emptyState}>등록된 예정 입고가 없습니다.</div>
+            ) : (
+              arrivals.map((arrival) => (
+                <div key={arrival.id} className="space-y-4 px-4 py-4 md:px-5">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base font-semibold text-[color:var(--foreground)]">{arrival.factoryName}</h3>
+                        <StatusBadge tone={(arrivalStatus[arrival.status] ?? arrivalStatus.DRAFT).tone} className="px-2.5 py-1">
+                          {(arrivalStatus[arrival.status] ?? { label: arrival.status }).label}
+                        </StatusBadge>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[color:var(--muted-foreground)]">
+                        <span>{arrival.expectedDate}</span>
+                        <StatusBadge tone={arrival.sourceChannel === 'csv' ? 'info' : 'neutral'} className="px-2.5 py-1">
+                          {arrival.sourceChannel === 'csv' ? '엑셀 등록' : '수동 등록'}
+                        </StatusBadge>
+                      </div>
+                      {arrival.memo ? <p className="mt-2 text-sm text-[color:var(--muted)]">{arrival.memo}</p> : null}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className={ui.pillMuted}>총 수량 {arrival.totalOrderedQuantity}개</span>
+                      <span className={ui.pillMuted}>잔여 수량 {arrival.remainingQuantity}개</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 border-t border-[color:var(--border)] pt-4">
+                    <div><p className="text-sm font-semibold text-[color:var(--foreground)]">창고 배정 · 입고</p><p className="mt-1 text-sm text-[color:var(--muted-foreground)]">행별 배정을 먼저 저장하고 여러 창고·행의 실제 수량을 한 번에 반영합니다.</p></div>
+                    {arrival.items.map((item) => (
+                      <div key={item.id} className="space-y-3 border-t border-[color:var(--border)] pt-3 first:border-t-0 first:pt-0">
+                        <div className="flex items-center justify-between gap-3"><div><p className="text-sm font-semibold text-[color:var(--foreground)]">{item.modelName}</p><p className="text-xs text-[color:var(--muted-foreground)]">{item.sourceRowNumber ? `원본 행 ${item.sourceRowNumber} · ` : ''}{item.externalSku ? `외부 SKU ${item.externalSku} · ` : ''}{item.colorName} / {item.sizeName} · 주문 {item.orderedQuantity} · 입고 예정 {item.remainingQuantity}</p></div><button type="button" className={ui.buttonSecondary} onClick={() => saveAllocations(arrival.id, item)} disabled={isPending || ['RECEIVED','VARIANCE_CLOSED','CANCELLED'].includes(arrival.status)}>배정 저장</button></div>
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                          {warehouses.map((warehouse) => { const fixed = item.allocations.find((allocation) => allocation.warehouseId === warehouse.id); return <label key={warehouse.id} className="space-y-1"><span className={ui.label}>{warehouse.name}{fixed && fixed.normallyReceivedQuantity + fixed.shortageClosedQuantity > 0 ? ` · 고정 ${fixed.normallyReceivedQuantity + fixed.shortageClosedQuantity}` : ''}</span><input aria-label={`${item.modelName} ${warehouse.name} 배정 수량`} type="number" min={fixed ? fixed.normallyReceivedQuantity + fixed.shortageClosedQuantity : 0} value={allocationDrafts[item.id]?.[warehouse.id] ?? 0} onChange={(event) => setAllocationDrafts((current) => ({ ...current, [item.id]: { ...current[item.id], [warehouse.id]: Number(event.target.value) } }))} className={cx(ui.controlSm, 'text-right')} /></label> })}
+                        </div>
+                        {item.allocations.map((allocation) => { const draft = receiptDrafts[allocation.id] ?? { quantity: 0, overageQuantity: 0, overageReason: '' }; const shortage = shortageDrafts[allocation.id] ?? { quantity: 0, reason: '' }; return (
+                          <div key={allocation.id} className="grid gap-2 border-t border-[color:var(--border)] pt-3 md:grid-cols-[minmax(8rem,1fr)_7rem_7rem_minmax(10rem,1fr)] md:items-end">
+                            <div><p className="text-sm font-medium text-[color:var(--foreground)]">{allocation.warehouseName}</p><p className="text-xs text-[color:var(--muted-foreground)]">배정 {allocation.allocatedQuantity} · 정상 {allocation.normallyReceivedQuantity} · 부족 종료 {allocation.shortageClosedQuantity} · 잔여 {allocation.remainingQuantity}</p></div>
+                            <label><span className={ui.label}>정상 입고</span><input aria-label={`${allocation.warehouseName} 정상 입고`} type="number" min={0} max={allocation.remainingQuantity} value={draft.quantity} onChange={(event) => setReceiptDrafts((current) => ({ ...current, [allocation.id]: { ...draft, quantity: Number(event.target.value) } }))} className={cx(ui.controlSm, 'text-right')} /></label>
+                            <label><span className={ui.label}>초과</span><input aria-label={`${allocation.warehouseName} 초과 입고`} type="number" min={0} value={draft.overageQuantity} onChange={(event) => setReceiptDrafts((current) => ({ ...current, [allocation.id]: { ...draft, overageQuantity: Number(event.target.value) } }))} className={cx(ui.controlSm, 'text-right')} /></label>
+                            <label><span className={ui.label}>초과 사유</span><input aria-label={`${allocation.warehouseName} 초과 사유`} value={draft.overageReason} onChange={(event) => setReceiptDrafts((current) => ({ ...current, [allocation.id]: { ...draft, overageReason: event.target.value } }))} className={ui.controlSm} placeholder="공장 오발송 등" /></label>
+                            {allocation.remainingQuantity > 0 ? <div className="md:col-span-4 flex items-end gap-2"><label className="w-24"><span className={ui.label}>부족 수량</span><input aria-label={`${allocation.warehouseName} 부족 수량`} type="number" min={1} max={allocation.remainingQuantity} value={shortage.quantity} onChange={(event) => setShortageDrafts((current) => ({ ...current, [allocation.id]: { ...shortage, quantity: Number(event.target.value) } }))} className={cx(ui.controlSm, 'text-right')} /></label><label className="min-w-0 flex-1"><span className={ui.label}>부족 사유</span><input aria-label={`${allocation.warehouseName} 부족 사유`} value={shortage.reason} onChange={(event) => setShortageDrafts((current) => ({ ...current, [allocation.id]: { ...shortage, reason: event.target.value } }))} className={ui.controlSm} /></label><button type="button" className={ui.buttonSecondary} onClick={() => closeShortage(allocation.id)} disabled={isPending}>부족 종료</button></div> : null}
+                          </div>
+                        )})}
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between gap-3 border-t border-[color:var(--border)] pt-3"><p className="text-sm text-[color:var(--muted)]">정상 {arrival.items.flatMap((item) => item.allocations).reduce((sum, allocation) => sum + (receiptDrafts[allocation.id]?.quantity ?? 0), 0)} · 초과 {arrival.items.flatMap((item) => item.allocations).reduce((sum, allocation) => sum + (receiptDrafts[allocation.id]?.overageQuantity ?? 0), 0)} · 반영 후 예정 {Math.max(arrival.remainingQuantity - arrival.items.flatMap((item) => item.allocations).reduce((sum, allocation) => sum + (receiptDrafts[allocation.id]?.quantity ?? 0), 0), 0)}</p><button type="button" onClick={() => submitReceive(arrival)} disabled={schemaState.status === 'missing' || isPending || arrival.remainingQuantity === 0} className={ui.buttonPrimary}>입고 반영</button></div>
+                    {arrival.shortageClosures.length > 0 ? <div className="space-y-2 border-t border-[color:var(--border)] pt-3"><p className="text-sm font-semibold text-[color:var(--foreground)]">종료한 부족 · 후속 입고</p>{arrival.shortageClosures.map((closure) => { const draft = followUpDrafts[closure.id] ?? { warehouseId: warehouses[0]?.id ?? 0, quantity: 0, reason: '' }; return <div key={closure.id} className="grid gap-2 md:grid-cols-[minmax(8rem,1fr)_10rem_7rem_minmax(10rem,1fr)_auto] md:items-end"><p className="text-sm text-[color:var(--muted)]">{closure.quantity}개 · {closure.reason}</p><SelectField label="후속 창고" value={draft.warehouseId} placeholder="창고" options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))} onValueChange={(value) => setFollowUpDrafts((current) => ({ ...current, [closure.id]: { ...draft, warehouseId: Number(value ?? 0) } }))} /><label><span className={ui.label}>수량</span><input aria-label={`부족 #${closure.id} 후속 수량`} type="number" min={1} value={draft.quantity} onChange={(event) => setFollowUpDrafts((current) => ({ ...current, [closure.id]: { ...draft, quantity: Number(event.target.value) } }))} className={cx(ui.controlSm, 'text-right')} /></label><label><span className={ui.label}>사유</span><input aria-label={`부족 #${closure.id} 후속 사유`} value={draft.reason} onChange={(event) => setFollowUpDrafts((current) => ({ ...current, [closure.id]: { ...draft, reason: event.target.value } }))} className={ui.controlSm} /></label><button type="button" className={ui.buttonSecondary} onClick={() => recordFollowUp(closure.id)} disabled={isPending}>후속 입고</button></div> })}</div> : null}
+                    {arrival.receiptLines.length > 0 ? <div className="space-y-2 border-t border-[color:var(--border)] pt-3"><p className="text-sm font-semibold text-[color:var(--foreground)]">입고 기록</p>{arrival.receiptLines.map((line) => <div key={line.id} className="flex flex-col gap-2 sm:flex-row sm:items-end"><p className="min-w-0 flex-1 text-sm text-[color:var(--muted)]">정상 {line.normalQuantity} · 초과 {line.overageQuantity}{line.corrected ? ' · 정정 완료' : ''}</p>{!line.corrected ? <><label className="min-w-0 flex-1"><span className={ui.label}>정정 사유</span><input aria-label={`입고 기록 #${line.id} 정정 사유`} value={correctionReasons[line.id] ?? ''} onChange={(event) => setCorrectionReasons((current) => ({ ...current, [line.id]: event.target.value }))} className={ui.controlSm} /></label><button type="button" className={ui.buttonSecondary} onClick={() => reverseLine(line.id)} disabled={isPending}>전체 반전</button></> : null}</div>)}</div> : null}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </section>
+
+      <FixedSheet open={manualOpen} title="수동 입고 예정 추가" description="엑셀 없이 확인된 예정 수량을 직접 등록합니다." onOpenChange={setManualOpen}>
+        <section className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2">
             <div>
               <SelectField
@@ -427,26 +433,6 @@ export default function ArrivalsView({
               <textarea value={memo} onChange={(event) => setMemo(event.target.value)} className={cx(ui.control, 'min-h-24 resize-y')} />
             </div>
           </div>
-
-          {entryMode === 'csv' ? (
-            <Card variant="default" className="overflow-hidden">
-              <CardHeader className="px-4 py-3">
-                <CardTitle className="text-sm">CSV 붙여넣기</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 px-4 py-4">
-                <textarea
-                  id="arrival-csv"
-                  value={csvText}
-                  onChange={(event) => setCsvText(event.target.value)}
-                  placeholder={'모델,사이즈,색상,수량\nLP01,S,네이비,24'}
-                  className={cx(ui.control, 'min-h-28 resize-y font-mono text-sm')}
-                />
-                <button type="button" onClick={importCsvRows} className={ui.buttonSecondary} disabled={csvText.trim().length === 0}>
-                  CSV 행 가져오기
-                </button>
-              </CardContent>
-            </Card>
-          ) : null}
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -534,77 +520,7 @@ export default function ArrivalsView({
             </CardContent>
           </Card>
         </section>
-
-        <section className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-semibold tracking-tight text-[color:var(--foreground)]">예정 목록</h2>
-            </div>
-            <span className={ui.pill}>총 {arrivals.length}건</span>
-          </div>
-
-          <div className={ui.tableShell}>
-            <div className="divide-y divide-[color:var(--border)]">
-              {arrivals.length === 0 ? (
-                <div className={ui.emptyState}>등록된 예정 입고가 없습니다.</div>
-              ) : (
-                arrivals.map((arrival) => (
-                  <div key={arrival.id} className="space-y-4 px-4 py-4 md:px-5">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-semibold text-[color:var(--foreground)]">{arrival.factoryName}</h3>
-                          <StatusBadge
-                            tone={(arrivalStatus[arrival.status] ?? arrivalStatus.DRAFT).tone}
-                            className="px-2.5 py-1"
-                          >
-                            {(arrivalStatus[arrival.status] ?? { label: arrival.status }).label}
-                          </StatusBadge>
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[color:var(--muted-foreground)]">
-                          <span>{arrival.expectedDate}</span>
-                          <StatusBadge tone={arrival.sourceChannel === 'csv' ? 'info' : 'neutral'} className="px-2.5 py-1">
-                            {arrival.sourceChannel === 'csv' ? 'CSV 등록' : '수동 등록'}
-                          </StatusBadge>
-                        </div>
-                        {arrival.memo ? <p className="mt-2 text-sm text-[color:var(--muted)]">{arrival.memo}</p> : null}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <span className={ui.pillMuted}>총 수량 {arrival.totalOrderedQuantity}개</span>
-                        <span className={ui.pillMuted}>잔여 수량 {arrival.remainingQuantity}개</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4 border-t border-[color:var(--border)] pt-4">
-                      <div><p className="text-sm font-semibold text-[color:var(--foreground)]">창고 배정 · 입고</p><p className="mt-1 text-sm text-[color:var(--muted-foreground)]">행별 배정을 먼저 저장하고 여러 창고·행의 실제 수량을 한 번에 반영합니다.</p></div>
-                      {arrival.items.map((item) => (
-                        <div key={item.id} className="space-y-3 border-t border-[color:var(--border)] pt-3 first:border-t-0 first:pt-0">
-                          <div className="flex items-center justify-between gap-3"><div><p className="text-sm font-semibold text-[color:var(--foreground)]">{item.modelName}</p><p className="text-xs text-[color:var(--muted-foreground)]">{item.sourceRowNumber ? `원본 행 ${item.sourceRowNumber} · ` : ''}{item.externalSku ? `외부 SKU ${item.externalSku} · ` : ''}{item.colorName} / {item.sizeName} · 주문 {item.orderedQuantity} · 입고 예정 {item.remainingQuantity}</p></div><button type="button" className={ui.buttonSecondary} onClick={() => saveAllocations(arrival.id, item)} disabled={isPending || ['RECEIVED','VARIANCE_CLOSED','CANCELLED'].includes(arrival.status)}>배정 저장</button></div>
-                          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                            {warehouses.map((warehouse) => { const fixed = item.allocations.find((allocation) => allocation.warehouseId === warehouse.id); return <label key={warehouse.id} className="space-y-1"><span className={ui.label}>{warehouse.name}{fixed && fixed.normallyReceivedQuantity + fixed.shortageClosedQuantity > 0 ? ` · 고정 ${fixed.normallyReceivedQuantity + fixed.shortageClosedQuantity}` : ''}</span><input aria-label={`${item.modelName} ${warehouse.name} 배정 수량`} type="number" min={fixed ? fixed.normallyReceivedQuantity + fixed.shortageClosedQuantity : 0} value={allocationDrafts[item.id]?.[warehouse.id] ?? 0} onChange={(event) => setAllocationDrafts((current) => ({ ...current, [item.id]: { ...current[item.id], [warehouse.id]: Number(event.target.value) } }))} className={cx(ui.controlSm, 'text-right')} /></label> })}
-                          </div>
-                          {item.allocations.map((allocation) => { const draft = receiptDrafts[allocation.id] ?? { quantity: 0, overageQuantity: 0, overageReason: '' }; const shortage = shortageDrafts[allocation.id] ?? { quantity: 0, reason: '' }; return (
-                            <div key={allocation.id} className="grid gap-2 border-t border-[color:var(--border)] pt-3 md:grid-cols-[minmax(8rem,1fr)_7rem_7rem_minmax(10rem,1fr)] md:items-end">
-                              <div><p className="text-sm font-medium text-[color:var(--foreground)]">{allocation.warehouseName}</p><p className="text-xs text-[color:var(--muted-foreground)]">배정 {allocation.allocatedQuantity} · 정상 {allocation.normallyReceivedQuantity} · 부족 종료 {allocation.shortageClosedQuantity} · 잔여 {allocation.remainingQuantity}</p></div>
-                              <label><span className={ui.label}>정상 입고</span><input aria-label={`${allocation.warehouseName} 정상 입고`} type="number" min={0} max={allocation.remainingQuantity} value={draft.quantity} onChange={(event) => setReceiptDrafts((current) => ({ ...current, [allocation.id]: { ...draft, quantity: Number(event.target.value) } }))} className={cx(ui.controlSm, 'text-right')} /></label>
-                              <label><span className={ui.label}>초과</span><input aria-label={`${allocation.warehouseName} 초과 입고`} type="number" min={0} value={draft.overageQuantity} onChange={(event) => setReceiptDrafts((current) => ({ ...current, [allocation.id]: { ...draft, overageQuantity: Number(event.target.value) } }))} className={cx(ui.controlSm, 'text-right')} /></label>
-                              <label><span className={ui.label}>초과 사유</span><input aria-label={`${allocation.warehouseName} 초과 사유`} value={draft.overageReason} onChange={(event) => setReceiptDrafts((current) => ({ ...current, [allocation.id]: { ...draft, overageReason: event.target.value } }))} className={ui.controlSm} placeholder="공장 오발송 등" /></label>
-                              {allocation.remainingQuantity > 0 ? <div className="md:col-span-4 flex items-end gap-2"><label className="w-24"><span className={ui.label}>부족 수량</span><input aria-label={`${allocation.warehouseName} 부족 수량`} type="number" min={1} max={allocation.remainingQuantity} value={shortage.quantity} onChange={(event) => setShortageDrafts((current) => ({ ...current, [allocation.id]: { ...shortage, quantity: Number(event.target.value) } }))} className={cx(ui.controlSm, 'text-right')} /></label><label className="min-w-0 flex-1"><span className={ui.label}>부족 사유</span><input aria-label={`${allocation.warehouseName} 부족 사유`} value={shortage.reason} onChange={(event) => setShortageDrafts((current) => ({ ...current, [allocation.id]: { ...shortage, reason: event.target.value } }))} className={ui.controlSm} /></label><button type="button" className={ui.buttonSecondary} onClick={() => closeShortage(allocation.id)} disabled={isPending}>부족 종료</button></div> : null}
-                            </div>
-                          )})}
-                        </div>
-                      ))}
-                      <div className="flex items-center justify-between gap-3 border-t border-[color:var(--border)] pt-3"><p className="text-sm text-[color:var(--muted)]">정상 {arrival.items.flatMap((item) => item.allocations).reduce((sum, allocation) => sum + (receiptDrafts[allocation.id]?.quantity ?? 0), 0)} · 초과 {arrival.items.flatMap((item) => item.allocations).reduce((sum, allocation) => sum + (receiptDrafts[allocation.id]?.overageQuantity ?? 0), 0)} · 반영 후 예정 {Math.max(arrival.remainingQuantity - arrival.items.flatMap((item) => item.allocations).reduce((sum, allocation) => sum + (receiptDrafts[allocation.id]?.quantity ?? 0), 0), 0)}</p><button type="button" onClick={() => submitReceive(arrival)} disabled={schemaState.status === 'missing' || isPending || arrival.remainingQuantity === 0} className={ui.buttonPrimary}>입고 반영</button></div>
-                      {arrival.shortageClosures.length > 0 ? <div className="space-y-2 border-t border-[color:var(--border)] pt-3"><p className="text-sm font-semibold text-[color:var(--foreground)]">종료한 부족 · 후속 입고</p>{arrival.shortageClosures.map((closure) => { const draft = followUpDrafts[closure.id] ?? { warehouseId: warehouses[0]?.id ?? 0, quantity: 0, reason: '' }; return <div key={closure.id} className="grid gap-2 md:grid-cols-[minmax(8rem,1fr)_10rem_7rem_minmax(10rem,1fr)_auto] md:items-end"><p className="text-sm text-[color:var(--muted)]">{closure.quantity}개 · {closure.reason}</p><SelectField label="후속 창고" value={draft.warehouseId} placeholder="창고" options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))} onValueChange={(value) => setFollowUpDrafts((current) => ({ ...current, [closure.id]: { ...draft, warehouseId: Number(value ?? 0) } }))} /><label><span className={ui.label}>수량</span><input aria-label={`부족 #${closure.id} 후속 수량`} type="number" min={1} value={draft.quantity} onChange={(event) => setFollowUpDrafts((current) => ({ ...current, [closure.id]: { ...draft, quantity: Number(event.target.value) } }))} className={cx(ui.controlSm, 'text-right')} /></label><label><span className={ui.label}>사유</span><input aria-label={`부족 #${closure.id} 후속 사유`} value={draft.reason} onChange={(event) => setFollowUpDrafts((current) => ({ ...current, [closure.id]: { ...draft, reason: event.target.value } }))} className={ui.controlSm} /></label><button type="button" className={ui.buttonSecondary} onClick={() => recordFollowUp(closure.id)} disabled={isPending}>후속 입고</button></div> })}</div> : null}
-                      {arrival.receiptLines.length > 0 ? <div className="space-y-2 border-t border-[color:var(--border)] pt-3"><p className="text-sm font-semibold text-[color:var(--foreground)]">입고 기록</p>{arrival.receiptLines.map((line) => <div key={line.id} className="flex flex-col gap-2 sm:flex-row sm:items-end"><p className="min-w-0 flex-1 text-sm text-[color:var(--muted)]">정상 {line.normalQuantity} · 초과 {line.overageQuantity}{line.corrected ? ' · 정정 완료' : ''}</p>{!line.corrected ? <><label className="min-w-0 flex-1"><span className={ui.label}>정정 사유</span><input aria-label={`입고 기록 #${line.id} 정정 사유`} value={correctionReasons[line.id] ?? ''} onChange={(event) => setCorrectionReasons((current) => ({ ...current, [line.id]: event.target.value }))} className={ui.controlSm} /></label><button type="button" className={ui.buttonSecondary} onClick={() => reverseLine(line.id)} disabled={isPending}>전체 반전</button></> : null}</div>)}</div> : null}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </section>
-      </div>
+      </FixedSheet>
       <FixedSheet open={importOpen} title="입고 엑셀 가져오기" description="파일 검토와 SKU 연결을 저장한 뒤 두 번째 단계에서 기본 창고를 선택합니다." onOpenChange={setImportOpen}>
         <InboundRegistrationSheet suppliers={factories.map((factory) => ({ id: factory.id, name: factory.name }))} warehouses={warehouses} templates={inboundTemplates} productVariants={productVariants} returnTo="/sourcing/arrivals" onSaved={() => { setImportOpen(false); router.refresh() }} />
       </FixedSheet>

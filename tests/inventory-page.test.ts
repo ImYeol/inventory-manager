@@ -7,8 +7,6 @@ const mocks = vi.hoisted(() => ({
   getCatalogData: vi.fn(),
   getTransactionsWithRelations: vi.fn(),
   getProductWorkspaceData: vi.fn(),
-  getFactoriesData: vi.fn(),
-  getActiveInboundTemplates: vi.fn(),
   inventoryWorkspace: vi.fn(),
 }))
 
@@ -16,8 +14,6 @@ vi.mock('@/lib/data', () => ({
   getCatalogData: mocks.getCatalogData,
   getTransactionsWithRelations: mocks.getTransactionsWithRelations,
   getProductWorkspaceData: mocks.getProductWorkspaceData,
-  getFactoriesData: mocks.getFactoriesData,
-  getActiveInboundTemplates: mocks.getActiveInboundTemplates,
 }))
 
 vi.mock('@/app/components/inventory/InventoryWorkspace', () => ({
@@ -45,9 +41,6 @@ describe('InventoryPage', () => {
     mocks.getCatalogData.mockResolvedValue({ models, warehouses })
     mocks.getTransactionsWithRelations.mockResolvedValue({ transactions })
     mocks.getProductWorkspaceData.mockResolvedValue({ variants, channelProductRefs })
-    mocks.getFactoriesData.mockResolvedValue({ factories: [{ id: 4, name: '한빛 공장', isActive: true }] })
-    mocks.getActiveInboundTemplates.mockResolvedValue([{ id: 7, name: '중국 공장 기본', versionId: 11, versionNumber: 1 }])
-
     render(await InventoryPage())
 
     expect(mocks.getProductWorkspaceData).toHaveBeenCalledTimes(1)
@@ -57,8 +50,6 @@ describe('InventoryPage', () => {
       transactions,
       variants,
       channelProductRefs,
-      suppliers: [{ id: 4, name: '한빛 공장' }],
-      inboundTemplates: [{ id: 7, name: '중국 공장 기본', versionId: 11, versionNumber: 1 }],
     }))
     expect(screen.getByTestId('inventory-workspace')).toBeTruthy()
   })

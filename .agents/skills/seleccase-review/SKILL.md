@@ -32,6 +32,8 @@ Use this skill for repo-specific review passes.
 5. Run or verify the required validation commands when possible.
 6. Emit findings first. Keep summaries brief.
 
+The helper resolves the current feature branch before falling back to the latest phase and validates committed step output evidence directly. A completed phase with blocked, pending, or non-zero latest output is a review failure.
+
 ## Review Checklist
 1. Does the change follow the current contracts in `AGENTS.md` and `docs/`?
 2. Are hooks, repo contracts, and phase metadata aligned with the shipped behavior?

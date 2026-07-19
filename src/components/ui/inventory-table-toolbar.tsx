@@ -105,18 +105,18 @@ export function InventoryTableToolbar<T extends string>({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
         <ColumnVisibilityMenu columns={columns} visibleColumns={visibleColumns} onToggle={onToggleColumn} />
-        <Button type="button" onClick={onInbound} variant="success" size="sm" className="h-9 gap-2 rounded-lg px-3">
-          입고
+        <Button type="button" onClick={onInbound} variant="success" size="sm">
+          수동 입고
         </Button>
-        <Button type="button" variant="outline" onClick={onOutbound} size="sm" className="h-9 gap-2 rounded-lg px-3">
+        <Button type="button" variant="outline" onClick={onOutbound} size="sm">
           수동 출고
         </Button>
-        <Button type="button" variant="outline" onClick={onAdjustment} size="sm" className="h-9 gap-2 rounded-lg px-3">
+        <Button type="button" variant="outline" onClick={onAdjustment} size="sm">
           실사 조정
         </Button>
-        <Button type="button" variant="outline" onClick={onTransfer} size="sm" className="h-9 gap-2 rounded-lg px-3">
+        <Button type="button" variant="outline" onClick={onTransfer} size="sm">
           창고 이동
         </Button>
       </div>

@@ -42,7 +42,7 @@ async function openSelectAndChoose(label: string, optionName: string) {
 }
 
 describe('ArrivalsView', () => {
-  it('imports CSV rows and submits valid staging arrivals', async () => {
+  it('keeps manual arrival creation in a secondary sheet', async () => {
     mocks.createFactoryArrivalBatch.mockResolvedValue({ success: true, count: 1 })
 
     render(
@@ -65,17 +65,14 @@ describe('ArrivalsView', () => {
       }),
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'CSV 등록' }))
-    fireEvent.change(screen.getByPlaceholderText(/모델,사이즈,색상,수량/), {
-      target: { value: '모델,사이즈,색상,수량\nLP01,S,네이비,12' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'CSV 행 가져오기' }))
+    expect(screen.queryByRole('button', { name: 'CSV 등록' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '수동 추가' }))
 
     await openSelectAndChoose('공장', '광주 협력사')
     await openSelectAndChoose('입고 예정 창고', '대자동')
     fireEvent.click(screen.getByRole('combobox', { name: '항목 #1 상품 옵션' }))
     fireEvent.click(await screen.findByRole('option', { name: /LP01/ }))
-    expect(screen.getByText('CSV 붙여넣기').closest('section')?.className).toContain('ui-card')
+    fireEvent.change(screen.getAllByPlaceholderText('수량')[0], { target: { value: '12' } })
     expect(screen.getByText('항목 #1').closest('section')?.className).toContain('ui-card')
     expect(screen.getByRole('combobox', { name: '공장' }).className).toContain('ui-select-trigger')
     expect(screen.queryByRole('combobox', { name: '항목 #1 모델' })).toBeNull()
@@ -86,7 +83,7 @@ describe('ArrivalsView', () => {
       expect(mocks.createFactoryArrivalBatch).toHaveBeenCalledWith(
         expect.objectContaining({
           factoryId: 1,
-          sourceChannel: 'csv',
+          sourceChannel: 'manual',
           warehouseId: 12,
           items: [{ modelId: 1, sizeId: 10, colorId: 20, orderedQuantity: 12 }],
         }),
@@ -232,6 +229,7 @@ describe('ArrivalsView', () => {
     )
 
     expect(screen.getByText('소싱 스키마가 아직 배포되지 않았습니다. supabase/schema.sql 적용 후 다시 시도하세요.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '수동 추가' }))
     expect(screen.getByRole('button', { name: '예정 입고 등록' }).getAttribute('disabled')).not.toBeNull()
     expect(screen.getByRole('button', { name: '입고 반영' }).getAttribute('disabled')).not.toBeNull()
   })

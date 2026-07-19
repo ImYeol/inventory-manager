@@ -39,6 +39,12 @@
 
 ## Agent skills
 
+### Harness evidence
+
+- Repo hooks are pre-tool warnings only; they are neither product-decision memory nor completion evidence.
+- A phase is complete only when Harness-owned process, acceptance-command, and phase-output verification passes. A child agent's `completed` status or summary is not sufficient.
+- Cross-agent and Claude compatibility comes from committed `AGENTS.md`, `CONTEXT.md`, `docs/*`, and `phases/*`. `CLAUDE.md` is a pointer to those sources; personal memory must not duplicate them.
+
 ### Issue tracker
 
 Work items are tracked in GitHub Issues for this repository. See `docs/agents/issue-tracker.md`.

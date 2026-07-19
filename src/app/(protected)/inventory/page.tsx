@@ -1,15 +1,13 @@
-import { getActiveInboundTemplates, getCatalogData, getFactoriesData, getProductWorkspaceData, getTransactionsWithRelations } from '@/lib/data'
+import { getCatalogData, getProductWorkspaceData, getTransactionsWithRelations } from '@/lib/data'
 import InventoryWorkspace from '@/app/components/inventory/InventoryWorkspace'
 
 export const dynamic = 'force-dynamic'
 
 export default async function InventoryPage() {
-  const [{ models, warehouses }, { transactions }, workspace, { factories }, inboundTemplates] = await Promise.all([
+  const [{ models, warehouses }, { transactions }, workspace] = await Promise.all([
     getCatalogData(),
     getTransactionsWithRelations(),
     getProductWorkspaceData(),
-    getFactoriesData(),
-    getActiveInboundTemplates(),
   ])
 
   return <InventoryWorkspace
@@ -18,8 +16,6 @@ export default async function InventoryPage() {
     transactions={transactions}
     variants={workspace.variants}
     channelProductRefs={workspace.channelProductRefs}
-    suppliers={factories.filter((factory) => factory.isActive).map((factory) => ({ id: factory.id, name: factory.name }))}
-    inboundTemplates={inboundTemplates}
     committedByVariant={Object.fromEntries(workspace.variants.flatMap((variant) => Object.entries(variant.committedByWarehouse ?? {}).map(([warehouseId, quantity]) => [`${variant.modelId}:${variant.sizeId}:${variant.colorId}:${warehouseId}`, quantity])))}
     incomingByVariant={Object.fromEntries(workspace.variants.flatMap((variant) => Object.entries(variant.incomingByWarehouse ?? {}).map(([warehouseId, quantity]) => [
       `${variant.modelId}:${variant.sizeId}:${variant.colorId}:${warehouseId}`,

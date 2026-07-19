@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
+from subprocess import CompletedProcess
 from unittest.mock import patch
 
 import review_codex as rc
@@ -77,6 +78,38 @@ class ReviewCodexTests(unittest.TestCase):
         self.assertEqual(payload["phase"], "demo-phase")
         self.assertFalse(payload["phase_validation_ok"])
         self.assertEqual(payload["phase_validation_output"], "metadata mismatch")
+
+    def test_resolve_active_phase_prefers_current_feature_branch(self) -> None:
+        write_json(
+            self.fixture.root / "phases" / "index.json",
+            {
+                "phases": [
+                    {"dir": "other-phase", "status": "completed"},
+                    {"dir": "demo-phase", "status": "completed"},
+                ]
+            },
+        )
+
+        with patch.object(rc, "run_git", return_value=CompletedProcess(["git"], 0, stdout="feat-demo-phase\n", stderr="")):
+            selected, _, _ = rc.resolve_active_phase(self.fixture.root, None)
+
+        self.assertEqual(selected["dir"], "demo-phase")
+
+    def test_phase_validation_rejects_completed_step_with_failed_output(self) -> None:
+        phase = json.loads((self.fixture.root / "phases" / "demo-phase" / "index.json").read_text(encoding="utf-8"))
+        phase["status"] = "completed"
+        phase["steps"][1]["status"] = "completed"
+        phase["steps"][1]["summary"] = "Done"
+        write_json(self.fixture.root / "phases" / "demo-phase" / "index.json", phase)
+        write_json(
+            self.fixture.root / "phases" / "demo-phase" / "step1-output.json",
+            {"status": "pending", "returncode": 1},
+        )
+
+        valid, message = rc.phase_validation(self.fixture.root, "demo-phase")
+
+        self.assertFalse(valid)
+        self.assertIn("step1-output.json", message)
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ This is a single-context repository. Existing documents are authoritative; this 
 
 - All changes: `AGENTS.md`
 - Product scope and acceptance criteria: `docs/product/prd.md`
+- Inbound import, mapping, allocation, and receipt flow: `docs/product/inbound-receiving.md`
 - Ownership, routes, and data boundaries: `docs/architecture/overview.md`
 - UI behavior and composition: `docs/design/ui-guide.md`
 - Visual tokens: `docs/design/tokens.md`; motion tokens: `docs/design/motion.md`

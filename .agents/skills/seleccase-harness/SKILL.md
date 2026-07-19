@@ -50,7 +50,9 @@ description: 이 프로젝트의 Harness 워크플로우를 Codex CLI 기준으�
 
 ### E. 실행
 - 각 step은 별도의 headless Codex CLI 세션으로 실행된다.
-- step 세션은 종료 전에 `phases/{task-name}/step{N}-output.json`을 생성하거나 갱신해야 한다.
+- step agent가 phase index에 `completed`를 기록해도 후보 결과일 뿐이다. Codex process return code와 Harness-owned acceptance verification이 성공해야 완료로 인정한다.
+- 각 step의 `acceptance_commands`는 shell 문자열이 아니라 argv 배열 목록으로 phase index에 선언한다. Harness가 agent 종료 뒤 직접 실행하고 `step{N}-verification.json`에 결과를 기록한다.
+- 각 시도의 stdout/stderr는 `step{N}-attempt{M}-output.json`에 보존하고 latest 결과만 `step{N}-output.json`에 반영한다. 실패 증거를 성공 결과로 덮어쓰지 않는다.
 - 실행 형식:
 
 ```bash
@@ -66,9 +68,18 @@ npm run build
 npm run test
 ```
 
+Supabase schema를 참조하는 step은 browser 확인 전에 linked migration 상태를 읽기 전용으로 확인한다. 미반영 schema가 있으면 권한 없이 배포하지 않고 step을 blocked로 둔다. `npm run build`는 원격 schema readiness의 증거가 아니다.
+
+### Completion integrity
+
+- `codex exec`가 non-zero이면 agent가 index를 `completed`로 바꿨어도 실패다.
+- phase finalize 전에 모든 completed step의 latest output이 `status=completed`, `returncode=0`인지 확인한다.
+- `acceptance_commands`가 있는 step은 matching verification output이 성공해야 한다.
+- 브라우저/원격 schema처럼 argv command로 완전히 자동화할 수 없는 검증은 blocked로 남기거나 별도 corrective step에서 증거를 기록한다. “나중에 outer에서 확인”은 completed summary가 아니다.
+
 ## Error Recovery
 - step이 `error` 또는 `blocked`로 끝나면 원인 수정 후 다시 실행한다.
-- rerun은 `step{N}-output.json`을 다시 생성하고 실행기가 `index.json`을 동기화하게 둔다.
+- rerun은 새 attempt output을 만들며 이전 attempt evidence를 보존한다.
 
 ## Runtime Regression Test
 Harness runtime 자체를 수정할 때는 아래를 실행한다.

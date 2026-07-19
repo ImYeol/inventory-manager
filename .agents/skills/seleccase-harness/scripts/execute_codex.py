@@ -339,10 +339,7 @@ class HarnessExecutor:
         observed_status: str,
         prompt_path: Path,
     ) -> None:
-        output_path = step_file_for(self.paths["phase_dir"], step_number, suffix="-output.json")
-        write_json(
-            output_path,
-            {
+        payload = {
                 "phase": self.phase_name,
                 "phase_dir": self.phase_dir,
                 "step": step_number,
@@ -355,8 +352,52 @@ class HarnessExecutor:
                 "stdout": result.stdout,
                 "stderr": result.stderr,
                 "prompt_path": str(prompt_path.relative_to(self.root)),
+            }
+        attempt_output_path = step_file_for(self.paths["phase_dir"], step_number, suffix=f"-attempt{attempt}-output.json")
+        latest_output_path = step_file_for(self.paths["phase_dir"], step_number, suffix="-output.json")
+        write_json(attempt_output_path, payload)
+        write_json(latest_output_path, payload)
+
+    def run_acceptance_commands(self, step_number: int, commands: Any) -> tuple[bool, str]:
+        if commands is None:
+            return True, ""
+        if not isinstance(commands, list) or any(
+            not isinstance(command, list) or not command or not all(isinstance(part, str) for part in command)
+            for command in commands
+        ):
+            return False, "acceptance_commands must be an array of non-empty argv arrays"
+
+        results: list[dict[str, Any]] = []
+        for command in commands:
+            result = subprocess.run(command, cwd=self.root, capture_output=True, text=True)
+            results.append(
+                {
+                    "command": command,
+                    "returncode": result.returncode,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                }
+            )
+            if result.returncode != 0:
+                break
+
+        write_json(
+            step_file_for(self.paths["phase_dir"], step_number, suffix="-verification.json"),
+            {
+                "phase": self.phase_name,
+                "step": step_number,
+                "verified_at": stamp(),
+                "status": "completed" if results and all(item["returncode"] == 0 for item in results) else "error",
+                "commands": results,
             },
         )
+        failed = next((item for item in results if item["returncode"] != 0), None)
+        if failed:
+            rendered = " ".join(failed["command"])
+            detail = (failed["stderr"] or failed["stdout"] or "").strip()
+            failure_detail = detail or f"exit {failed['returncode']}"
+            return False, f"acceptance command failed ({rendered}): {failure_detail}"
+        return True, ""
 
     def build_prompt(
         self,
@@ -489,6 +530,27 @@ class HarnessExecutor:
             if result.returncode != 0:
                 raise RuntimeError(result.stderr.strip() or f"Failed to push '{self.branch_name}'")
 
+    def verify_completed_phase(self) -> None:
+        errors: list[str] = []
+        for step in self.phase_index.get("steps", []):
+            if step.get("status") != "completed":
+                errors.append(f"step {step.get('step')} is not completed")
+                continue
+            step_number = step["step"]
+            output_path = step_file_for(self.paths["phase_dir"], step_number, suffix="-output.json")
+            if not output_path.is_file():
+                errors.append(f"step{step_number}-output.json is missing")
+                continue
+            output = load_json(output_path)
+            if output.get("status") != "completed" or output.get("returncode") != 0:
+                errors.append(f"step{step_number}-output.json is not a successful completion record")
+            if step.get("acceptance_commands") is not None:
+                verification_path = step_file_for(self.paths["phase_dir"], step_number, suffix="-verification.json")
+                if not verification_path.is_file() or load_json(verification_path).get("status") != "completed":
+                    errors.append(f"step{step_number}-verification.json is missing or failed")
+        if errors:
+            raise RuntimeError("Phase completion evidence is invalid: " + "; ".join(errors))
+
     def run(self) -> int:
         if self.phase_index.get("status") == "blocked":
             blocked_step = next((step for step in self.phase_index["steps"] if step.get("status") == "blocked"), None)
@@ -505,12 +567,14 @@ class HarnessExecutor:
             self.refresh_state(persist_normalized=True)
 
             if self.phase_index.get("status") == "completed" and first_pending_step(self.phase_index) is None:
+                self.verify_completed_phase()
                 self.finalize_phase()
                 print(f"Phase '{self.phase_dir}' completed after {self.steps_run} step(s).")
                 return 0
 
             current = first_pending_step(self.phase_index)
             if current is None:
+                self.verify_completed_phase()
                 self.finalize_phase()
                 print(f"Phase '{self.phase_dir}' has no runnable steps.")
                 return 0
@@ -527,6 +591,7 @@ class HarnessExecutor:
             for attempt in range(1, MAX_RETRIES + 1):
                 self.refresh_state(persist_normalized=False)
                 current = lookup_step(self.phase_index, step_number)
+                acceptance_commands = deepcopy(current.get("acceptance_commands"))
                 prompt_text = self.build_prompt(self.phase_index, current, branch_name=self.branch_name, prev_error=prev_error)
                 prompt_path.write_text(prompt_text, encoding="utf-8")
 
@@ -553,7 +618,43 @@ class HarnessExecutor:
                     or refreshed_step.get("error_message")
                 )
 
+                if result.returncode != 0:
+                    process_error = (result.stderr or result.stdout or "").strip()
+                    error_message = process_error or f"codex exec failed with exit code {result.returncode}"
+                    if attempt < MAX_RETRIES:
+                        self.mark_step_pending_for_retry(self.paths, refreshed_phase, refreshed_top, step_number)
+                        prev_error = error_message
+                        print(f"Retrying step {step_number} after failed process: {error_message}")
+                        continue
+                    self.mark_step_error(
+                        self.paths,
+                        refreshed_phase,
+                        refreshed_top,
+                        step_number,
+                        f"[after {MAX_RETRIES} attempts] {error_message}",
+                    )
+                    self.commit_step(step_number, step_name)
+                    print(f"Phase '{self.phase_dir}' failed at step {step_number}: {error_message}")
+                    return 1
+
                 if refreshed_step.get("status") == "completed":
+                    acceptance_ok, acceptance_error = self.run_acceptance_commands(step_number, acceptance_commands)
+                    if not acceptance_ok:
+                        if attempt < MAX_RETRIES:
+                            self.mark_step_pending_for_retry(self.paths, refreshed_phase, refreshed_top, step_number)
+                            prev_error = acceptance_error
+                            print(f"Retrying step {step_number} after failed acceptance: {acceptance_error}")
+                            continue
+                        self.mark_step_error(
+                            self.paths,
+                            refreshed_phase,
+                            refreshed_top,
+                            step_number,
+                            f"[after {MAX_RETRIES} attempts] {acceptance_error}",
+                        )
+                        self.commit_step(step_number, step_name)
+                        print(f"Phase '{self.phase_dir}' failed at step {step_number}: {acceptance_error}")
+                        return 1
                     self.commit_step(step_number, step_name)
                     self.steps_run += 1
                     break
@@ -581,11 +682,7 @@ class HarnessExecutor:
                     print(f"Phase '{self.phase_dir}' failed at step {step_number}: {error_message}")
                     return 1
 
-                process_error = (result.stderr or result.stdout or "").strip()
-                if result.returncode != 0:
-                    error_message = process_error or f"codex exec failed with exit code {result.returncode}"
-                else:
-                    error_message = "Codex finished without recording a step outcome."
+                error_message = "Codex finished without recording a step outcome."
 
                 if attempt < MAX_RETRIES:
                     self.mark_step_pending_for_retry(self.paths, refreshed_phase, refreshed_top, step_number)

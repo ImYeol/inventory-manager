@@ -208,6 +208,105 @@ class ExecuteCodexTests(unittest.TestCase):
         self.assertEqual(output["returncode"], 1)
         self.assertEqual(output["stderr"], "lint failed\n")
 
+    def test_run_rejects_completed_index_when_codex_process_failed(self) -> None:
+        call_count = {"count": 0}
+
+        def fake_run_codex_for_step(self, *, prompt: str) -> CompletedProcess[str]:
+            call_count["count"] += 1
+            phase = ex.load_json(self.paths["phase_index"])
+            top = ex.load_json(self.paths["top_index"])
+            current = ex.first_pending_step(phase)
+            assert current is not None
+            current["status"] = "completed"
+            current["summary"] = "Claimed complete despite a failed process."
+            current["completed_at"] = ex.stamp()
+            ex.persist_phase_state(self.paths, phase, top)
+            return CompletedProcess(["codex"], 1, stdout="", stderr="build failed\n")
+
+        runner = ex.HarnessExecutor(self.fixture.root, "demo-phase")
+
+        with (
+            patch.object(ex, "ensure_branch"),
+            patch.object(ex.HarnessExecutor, "commit_step"),
+            patch.object(ex.HarnessExecutor, "finalize_phase"),
+            patch.object(ex.HarnessExecutor, "run_codex_for_step", fake_run_codex_for_step),
+            patch.object(ex, "progress_indicator", lambda label: contextlib.nullcontext()),
+        ):
+            result = runner.run()
+
+        self.assertEqual(result, 1)
+        self.assertEqual(call_count["count"], 3)
+        self.assertEqual(self.fixture.load_phase()["steps"][0]["status"], "error")
+        self.assertIn("build failed", self.fixture.load_phase()["steps"][0]["error_message"])
+
+    def test_step_attempt_outputs_are_preserved_separately(self) -> None:
+        runner = ex.HarnessExecutor(self.fixture.root, "demo-phase")
+        result = CompletedProcess(["codex"], 1, stdout="", stderr="failed\n")
+        prompt_path = self.fixture.root / "phases" / "demo-phase" / "step0-prompt.md"
+        prompt_path.write_text("prompt", encoding="utf-8")
+
+        runner.write_step_output(
+            step_number=0,
+            step_name="docs-foundation",
+            attempt=2,
+            result=result,
+            observed_status="pending",
+            prompt_path=prompt_path,
+        )
+
+        attempt_path = self.fixture.root / "phases" / "demo-phase" / "step0-attempt2-output.json"
+        self.assertTrue(attempt_path.exists())
+        self.assertEqual(json.loads(attempt_path.read_text(encoding="utf-8"))["stderr"], "failed\n")
+
+    def test_completed_step_is_rejected_when_harness_acceptance_command_fails(self) -> None:
+        phase = self.fixture.load_phase()
+        phase["steps"][0]["acceptance_commands"] = [["python3", "-c", "raise SystemExit(7)"]]
+        write_json(self.fixture.phase_path(), phase)
+
+        def fake_run_codex_for_step(self, *, prompt: str) -> CompletedProcess[str]:
+            phase_state = ex.load_json(self.paths["phase_index"])
+            top = ex.load_json(self.paths["top_index"])
+            current = ex.first_pending_step(phase_state)
+            assert current is not None
+            current["status"] = "completed"
+            current["summary"] = "Claimed complete."
+            current["completed_at"] = ex.stamp()
+            ex.persist_phase_state(self.paths, phase_state, top)
+            return CompletedProcess(["codex"], 0, stdout="ok\n", stderr="")
+
+        runner = ex.HarnessExecutor(self.fixture.root, "demo-phase")
+        with (
+            patch.object(ex, "ensure_branch"),
+            patch.object(ex.HarnessExecutor, "commit_step"),
+            patch.object(ex.HarnessExecutor, "finalize_phase"),
+            patch.object(ex.HarnessExecutor, "run_codex_for_step", fake_run_codex_for_step),
+            patch.object(ex, "progress_indicator", lambda label: contextlib.nullcontext()),
+        ):
+            result = runner.run()
+
+        self.assertEqual(result, 1)
+        self.assertIn("acceptance command failed", self.fixture.load_phase()["steps"][0]["error_message"])
+        verification = json.loads((self.fixture.root / "phases" / "demo-phase" / "step0-verification.json").read_text(encoding="utf-8"))
+        self.assertEqual(verification["commands"][0]["returncode"], 7)
+
+    def test_completed_phase_rejects_stale_step_output(self) -> None:
+        phase = self.fixture.load_phase()
+        for step in phase["steps"]:
+            step["status"] = "completed"
+            step["summary"] = "Done"
+        phase["status"] = "completed"
+        write_json(self.fixture.phase_path(), phase)
+        for step_number in (0, 1):
+            write_json(
+                self.fixture.root / "phases" / "demo-phase" / f"step{step_number}-output.json",
+                {"status": "completed" if step_number == 0 else "pending", "returncode": 0 if step_number == 0 else 1},
+            )
+
+        runner = ex.HarnessExecutor(self.fixture.root, "demo-phase")
+
+        with self.assertRaisesRegex(RuntimeError, "step1-output.json"):
+            runner.verify_completed_phase()
+
     def test_main_respects_push_flag_and_root_override(self) -> None:
         seen: list[bool] = []
 

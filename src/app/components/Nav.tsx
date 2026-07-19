@@ -15,7 +15,7 @@ import {
   ClipboardList,
 } from 'lucide-react'
 import { logout } from '@/app/login/actions'
-import { MenuLink } from '@/components/ui/menu'
+import { MenuLink, MenuSection } from '@/components/ui/menu'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,7 +43,11 @@ const directItems: NavItem[] = [
   { href: '/orders', label: '주문', icon: <ClipboardList className="h-4 w-4" /> },
   { href: '/products', label: '상품 관리', icon: <Database className="h-4 w-4" /> },
   { href: '/inventory', label: '재고 운영', icon: <Boxes className="h-4 w-4" /> },
-  { href: '/sourcing', label: '소싱', icon: <PackageSearch className="h-4 w-4" /> },
+]
+
+const sourcingItems: NavItem[] = [
+  { href: '/sourcing/factories', label: '외부 공장', icon: <span className="h-1.5 w-1.5 rounded-full bg-current" /> },
+  { href: '/sourcing/arrivals', label: '입고 예정', icon: <span className="h-1.5 w-1.5 rounded-full bg-current" /> },
 ]
 
 function isActivePath(pathname: string, href: string) {
@@ -80,6 +84,7 @@ function NavigationContent({
   onNavigate?: () => void
 }) {
   const userInitial = (user?.name?.trim().charAt(0) || user?.email?.trim().charAt(0) || 'U').toUpperCase()
+  const [sourcingOpen, setSourcingOpen] = useState(true)
 
   return (
     <>
@@ -101,6 +106,16 @@ function NavigationContent({
         {directItems.map((item) => (
           <NavLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />
         ))}
+        <MenuSection
+          title="소싱"
+          icon={<PackageSearch className="h-4 w-4" />}
+          open={sourcingOpen}
+          onToggle={() => setSourcingOpen((open) => !open)}
+        >
+          {sourcingItems.map((item) => (
+            <NavLink key={item.href} item={item} pathname={pathname} compact onNavigate={onNavigate} />
+          ))}
+        </MenuSection>
       </nav>
 
       <div className="mt-auto border-t border-[color:var(--border)] p-3">

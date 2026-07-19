@@ -223,11 +223,13 @@ Seleccase Inventory를 `dashboard 내부 분석 + 주문·송장 작업 + 상품
 - 채널 동기화는 증감값이 아닌 현재 `available`의 절대 수량을 전송한다. 동기화 실패는 내부 원장을 되돌리지 않고 최신 absolute quantity를 재시도·재조정하며, 성공 응답 뒤에만 `channelReported`를 그 절대 수량으로 갱신한다.
 
 ### 9. 소싱 > 외부 공장 / 입고 예정
+- 공급자 엑셀, 외부 SKU 연결, 창고 분할, 부분·초과·부족·후속·정정의 전체 acceptance contract는 [Inbound receiving](./inbound-receiving.md)을 따른다.
 - `외부 공장`은 카드형 목록이 아니라 `검색 + 상태 필터 + 등록 버튼 + table` 구조를 쓴다.
 - 공장 등록은 modal로 처리한다.
 - 공장 상세는 행 클릭 또는 상세 버튼으로 여는 modal에서 확인한다.
 - 공장 상세 modal에서 활성/비활성 토글을 수행한다.
 - `입고 예정`의 공장/모델/사이즈/색상/창고 선택도 shared select primitive를 사용한다.
+- `/sourcing/arrivals`는 공급자 엑셀 흐름의 단일 UI owner다. 재고 운영에서 같은 import sheet를 중복 노출하지 않는다.
 
 ## 비기능 요구사항
 - 기존 `inventory`와 `transactions` 원장 구조는 유지한다.

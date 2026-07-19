@@ -11,9 +11,6 @@ from pathlib import Path
 from typing import Any
 
 
-VALIDATION_SCRIPT = ".agents/skills/seleccase-harness/scripts/execute_codex.py"
-
-
 def repo_root_from_script(script_path: str | Path) -> Path:
     return Path(script_path).resolve().parents[4]
 
@@ -33,8 +30,15 @@ def resolve_active_phase(root: Path, requested_phase: str | None) -> tuple[dict[
         selected = next((entry for entry in phases if entry.get("dir") == requested_phase), None)
     else:
         selected = next((entry for entry in phases if entry.get("status") == "in_progress"), None)
+        branch = run_git(root, "rev-parse", "--abbrev-ref", "HEAD")
+        if selected is None and branch.returncode == 0:
+            branch_name = branch.stdout.strip()
+            selected = next(
+                (entry for entry in phases if branch_name in {f"feat-{entry.get('dir')}", f"codex/{entry.get('dir')}"}),
+                None,
+            )
         if selected is None and phases:
-            selected = phases[0]
+            selected = phases[-1]
     if selected is None:
         raise RuntimeError("No phase entry could be resolved.")
 
@@ -78,14 +82,31 @@ def changed_files(root: Path, base_ref: str | None) -> list[str]:
 
 
 def phase_validation(root: Path, phase_dir: str) -> tuple[bool, str]:
-    result = subprocess.run(
-        ["python3", VALIDATION_SCRIPT, "validate", phase_dir],
-        cwd=root,
-        capture_output=True,
-        text=True,
-    )
-    output = result.stdout.strip() or result.stderr.strip()
-    return result.returncode == 0, output
+    errors: list[str] = []
+    top_index = load_json(root / "phases" / "index.json")
+    phase_index = load_json(root / "phases" / phase_dir / "index.json")
+    top_entry = next((entry for entry in top_index.get("phases", []) if entry.get("dir") == phase_dir), None)
+    if top_entry is None:
+        errors.append(f"{phase_dir} is missing from phases/index.json")
+    elif top_entry.get("status") != phase_index.get("status"):
+        errors.append("top-level and phase status differ")
+
+    for step in phase_index.get("steps", []):
+        step_number = step.get("step")
+        step_path = root / "phases" / phase_dir / f"step{step_number}.md"
+        if not step_path.is_file():
+            errors.append(f"step{step_number}.md is missing")
+        if step.get("status") != "completed":
+            continue
+        output_path = root / "phases" / phase_dir / f"step{step_number}-output.json"
+        if not output_path.is_file():
+            errors.append(f"step{step_number}-output.json is missing")
+            continue
+        output = load_json(output_path)
+        if output.get("status") != "completed" or output.get("returncode") != 0:
+            errors.append(f"step{step_number}-output.json does not prove successful completion")
+
+    return (not errors, "OK" if not errors else "; ".join(errors))
 
 
 def build_markdown(selected: dict[str, Any], phase_index: dict[str, Any], current_step: dict[str, Any] | None, files: list[str], validation: tuple[bool, str]) -> str:

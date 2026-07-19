@@ -148,7 +148,7 @@ describe('InventoryWorkspace', () => {
     expect(screen.getByLabelText('상품명 검색')).toBeTruthy()
     expect(screen.getByLabelText('상태 필터')).toBeTruthy()
     expect(screen.getByRole('button', { name: '컬럼' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '입고' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '수동 입고' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '수동 출고' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '실사 조정' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '창고 이동' })).toBeTruthy()
@@ -173,10 +173,9 @@ describe('InventoryWorkspace', () => {
     fireEvent.click(within(menu).getByText('창고'))
     expect(within(screen.getByRole('table')).queryByText('창고')).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: '입고' }))
-    expect(screen.getByRole('dialog', { name: '입고 등록' })).toBeTruthy()
-    expect(screen.getByLabelText('입고 템플릿')).toBeTruthy()
-    expect(screen.getByText('파일을 놓거나 선택하세요')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '수동 입고' }))
+    expect(screen.getByRole('dialog', { name: '수동 입고' })).toBeTruthy()
+    expect(screen.getByText('InOutForm:inbound:2')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: '수동 출고' }))
     expect(screen.getByRole('dialog', { name: '수동 출고' })).toBeTruthy()
@@ -286,7 +285,7 @@ describe('InventoryWorkspace', () => {
     expect(screen.getByText('HistorySearch:-')).toBeTruthy()
     expect(screen.getByText('HistoryEmbedded:yes')).toBeTruthy()
     expect(screen.queryByRole('heading', { name: '이력 필터' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '입고' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '수동 입고' })).toBeNull()
     expect(screen.queryByRole('button', { name: '수동 출고' })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'SetHistoryWarehouse1' }))

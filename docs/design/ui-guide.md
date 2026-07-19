@@ -48,6 +48,8 @@
 21. 화면마다 component budget을 두고, 실제 작업 surface가 설명 surface보다 먼저 보이게 한다.
 22. 전역 액션은 영향을 주는 surface의 toolbar에 두며, navigation은 link, 데이터 변경은 button으로 분리한다.
 23. action naming은 짧은 동사를 우선하고, 상태는 큰 filled card보다 dot, badge, disabled, loading text 같은 저노이즈 표현을 우선한다.
+24. 복합 운영 화면은 progressive disclosure를 사용한다. 목록 행마다 모든 편집 입력을 항상 펼치지 않고 선택된 대상의 sheet/modal/action rail에서 조작한다.
+25. 공급자 Excel import는 소싱 입고 예정의 단일 surface다. 재고 운영은 동일 import component를 중복 렌더하지 않는다.
 
 ## Compact Action Doctrine
 - 운영 화면의 기본 순서는 `header -> compact toolbar -> primary surface`다.
@@ -200,6 +202,15 @@ src/components/ui/
 - 설정 화면에서 “스토어 연결은 다른 페이지에서 하라”는 안내 카드만 두는 패턴
 - 표보다 먼저 큰 제목/서브타이틀/설명 카드가 화면을 차지하는 패턴
 - 같은 너비의 긴 filled 버튼을 여러 개 병렬 배치하는 패턴
+- 예정 목록을 절반 폭으로 밀어내는 상시 수동/붙여넣기 등록 패널
+- 한 입고 행에 배정·부분 입고·부족·후속·정정 입력을 모두 항상 펼치는 패턴
+
+## Visual quality gate
+
+- UI phase 완료 전 desktop 화면에서 primary surface가 첫 viewport의 주 작업 면적을 차지하는지 브라우저로 확인한다.
+- 강한 border/shadow가 중첩되거나 form card가 table보다 먼저 보이면 구조를 평탄화한 뒤 완료한다.
+- 한글 label/table header에 uppercase를 시각 규칙으로 의존하지 않는다. 자간과 크기는 dense readability를 우선하며 전역 token 변경은 별도 design-system 검증으로 수행한다.
+- 테스트가 DOM 존재만 확인해 잘못된 IA를 보호하지 않도록 navigation child route와 primary/secondary surface ownership을 함께 검증한다.
 
 ## 메뉴 구조
 이 섹션은 canonical primary navigation 순서의 단일 SoT다: **대시보드 → 주문 → 상품 관리 → 재고 운영 → 소싱**. API 설정은 계정 메뉴의 `/settings?section=store-connections` deep link로 제공한다.
