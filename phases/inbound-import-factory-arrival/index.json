@@ -2,7 +2,7 @@
   "project": "Seleccase Inventory",
   "phase": "inbound-import-factory-arrival",
   "issue": 11,
-  "status": "pending",
+  "status": "blocked",
   "steps": [
     {
       "step": 0,
@@ -165,7 +165,7 @@
     {
       "step": 13,
       "name": "arrival-progressive-disclosure-and-visual-quality",
-      "status": "pending",
+      "status": "blocked",
       "acceptance_commands": [
         [
           "npm",
@@ -187,7 +187,9 @@
           "diff",
           "--check"
         ]
-      ]
+      ],
+      "started_at": "2026-07-19T11:27:35+0900",
+      "blocked_at": "2026-07-19T11:34:00+0900"
     }
   ]
 }
