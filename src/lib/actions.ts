@@ -616,23 +616,33 @@ export async function receiveFactoryArrival(input: {
   return { success: true }
 }
 
-export async function replaceFactoryArrivalAllocations(input: { arrivalId: number; itemId: number; allocations: Array<{ warehouseId: number; quantity: number }> }) {
+export async function replaceFactoryArrivalAllocations(input: { arrivalId: number; itemId: number; allocations: Array<{ warehouseId: number; quantity: number }>; reason: string }) {
   if (!Number.isInteger(input.arrivalId) || !Number.isInteger(input.itemId)) throw new Error('입고 예정 행을 찾을 수 없습니다.')
+  if (!input.reason.trim()) throw new Error('배정 변경 사유를 입력해주세요.')
   assertAllocationSplit(input.allocations.reduce((sum, row) => sum + row.quantity, 0), input.allocations)
   await runFactoryArrivalOperation('replace_factory_arrival_allocations', {
     arrival_id: input.arrivalId, item_id: input.itemId,
     allocations: input.allocations.map((row) => ({ warehouse_id: row.warehouseId, quantity: row.quantity })),
+    reason: input.reason.trim(),
   })
   revalidateInventoryPaths(); revalidatePath('/sourcing/arrivals')
   return { success: true }
 }
 
-export async function receiveFactoryArrivalRequest(input: { arrivalId: number; receiptRequestId: string; lines: Array<{ allocationId: number; quantity: number; overageQuantity?: number; overageReason?: string }> }) {
+export async function receiveFactoryArrivalRequest(input: { arrivalId: number; receiptRequestId: string; receiptBusinessDate: string; lines: Array<{ allocationId: number; quantity: number; overageQuantity?: number; overageReason?: string }> }) {
   if (!input.arrivalId || !input.receiptRequestId.trim() || !input.lines.length || input.lines.some((line) => !line.allocationId || !Number.isInteger(line.quantity) || line.quantity < 0 || !Number.isInteger(line.overageQuantity ?? 0) || (line.overageQuantity ?? 0) < 0)) throw new Error('입고 요청 정보가 올바르지 않습니다.')
-  const payload = { arrivalId: input.arrivalId, receiptRequestId: input.receiptRequestId.trim(), lines: input.lines.map((line) => ({ allocationId: line.allocationId, quantity: line.quantity, overageQuantity: line.overageQuantity ?? 0, overageReason: line.overageReason?.trim() ?? '' })) }
-  const result = await runFactoryArrivalOperation('receive_factory_arrival_request', { arrival_id: payload.arrivalId, receipt_request_id: payload.receiptRequestId, lines: payload.lines.map((line) => ({ allocation_id: line.allocationId, quantity: line.quantity, overage_quantity: line.overageQuantity, overage_reason: line.overageReason })) })
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.receiptBusinessDate)) throw new Error('입고 업무일을 입력해주세요.')
+  const payload = { arrivalId: input.arrivalId, receiptRequestId: input.receiptRequestId.trim(), receiptBusinessDate: input.receiptBusinessDate, lines: input.lines.map((line) => ({ allocationId: line.allocationId, quantity: line.quantity, overageQuantity: line.overageQuantity ?? 0, overageReason: line.overageReason?.trim() ?? '' })) }
+  const result = await runFactoryArrivalOperation('receive_factory_arrival_request', { arrival_id: payload.arrivalId, receipt_request_id: payload.receiptRequestId, receipt_business_date: payload.receiptBusinessDate, lines: payload.lines.map((line) => ({ allocation_id: line.allocationId, quantity: line.quantity, overage_quantity: line.overageQuantity, overage_reason: line.overageReason })) })
   revalidateInventoryPaths(); revalidatePath('/sourcing/arrivals')
   return { success: true, result }
+}
+
+export async function moveFactoryArrivalRemaindersToWarehouse(input: { arrivalId: number; warehouseId: number; reason: string }) {
+  if (!input.arrivalId || !input.warehouseId || !input.reason.trim()) throw new Error('기본 창고와 배정 변경 사유를 입력해주세요.')
+  await runFactoryArrivalOperation('move_factory_arrival_remainders_to_warehouse', { arrival_id: input.arrivalId, warehouse_id: input.warehouseId, reason: input.reason.trim() })
+  revalidateInventoryPaths(); revalidatePath('/sourcing/arrivals')
+  return { success: true }
 }
 
 export async function closeFactoryArrivalShortage(input: { allocationId: number; quantity: number; reason: string }) {

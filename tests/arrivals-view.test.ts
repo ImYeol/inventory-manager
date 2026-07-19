@@ -151,6 +151,7 @@ describe('ArrivalsView', () => {
       expect(mocks.receiveFactoryArrivalRequest).toHaveBeenCalledWith({
         arrivalId: 101,
         receiptRequestId: expect.any(String),
+        receiptBusinessDate: expect.any(String),
         lines: [{ allocationId: 301, quantity: 2, overageQuantity: 1, overageReason: '공장 오발송' }],
       }),
     )
@@ -172,7 +173,7 @@ describe('ArrivalsView', () => {
       }],
     }))
     fireEvent.click(screen.getByRole('button', { name: '배정 저장' }))
-    await waitFor(() => expect(mocks.replaceFactoryArrivalAllocations).toHaveBeenCalledWith({ arrivalId: 101, itemId: 201, allocations: [{ warehouseId: 11, quantity: 20 }, { warehouseId: 12, quantity: 10 }] }))
+    await waitFor(() => expect(mocks.replaceFactoryArrivalAllocations).toHaveBeenCalledWith({ arrivalId: 101, itemId: 201, reason: '', allocations: [{ warehouseId: 11, quantity: 20 }, { warehouseId: 12, quantity: 10 }] }))
     fireEvent.change(screen.getByLabelText('오금동 부족 수량'), { target: { value: '1' } }); fireEvent.change(screen.getByLabelText('오금동 부족 사유'), { target: { value: '추가 미발송' } }); fireEvent.click(screen.getAllByRole('button', { name: '부족 종료' })[0])
     await waitFor(() => expect(mocks.closeFactoryArrivalShortage).toHaveBeenCalledWith({ allocationId: 301, quantity: 1, reason: '추가 미발송' }))
     fireEvent.change(screen.getByLabelText('부족 #401 후속 수량'), { target: { value: '1' } }); fireEvent.change(screen.getByLabelText('부족 #401 후속 사유'), { target: { value: '늦은 박스' } }); fireEvent.click(screen.getByRole('button', { name: '후속 입고' }))

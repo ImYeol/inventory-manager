@@ -29,4 +29,12 @@ describe('factory arrival operation contracts', () => {
       expect(sql).toContain('immutable_payload')
     }
   })
+
+  it('keeps business date and allocation reasons in the trusted operation contract', () => {
+    const migration = readFileSync(resolve(process.cwd(), 'supabase/migrations/20260719120000_inbound_domain_contract_gap_closure.sql'), 'utf8')
+    expect(migration).toContain('receipt_business_date')
+    expect(migration).toContain('factory_arrival_allocation_audits')
+    expect(migration).toContain("btrim(coalesce(p_payload->>'reason',''))=''" )
+    expect(migration).toContain('move_factory_arrival_remainders_to_warehouse')
+  })
 })

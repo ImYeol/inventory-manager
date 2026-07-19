@@ -1088,7 +1088,7 @@ export async function runReceiveFactoryArrival(
   if (error) throw new Error(error.message)
 }
 
-export async function runFactoryArrivalOperation(name: 'replace_factory_arrival_allocations' | 'receive_factory_arrival_request' | 'close_factory_arrival_shortage' | 'record_factory_arrival_follow_up' | 'reverse_factory_receipt_line', payload: Record<string, unknown>) {
+export async function runFactoryArrivalOperation(name: 'replace_factory_arrival_allocations' | 'move_factory_arrival_remainders_to_warehouse' | 'receive_factory_arrival_request' | 'close_factory_arrival_shortage' | 'record_factory_arrival_follow_up' | 'reverse_factory_receipt_line', payload: Record<string, unknown>) {
   const { supabase } = await getSupabaseWithUser()
   const { data, error } = await supabase.rpc(name, { p_payload: payload })
   if (error) throw new Error(error.message)

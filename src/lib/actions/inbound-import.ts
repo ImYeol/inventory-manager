@@ -108,7 +108,8 @@ export async function saveInboundTemplateDraft(input: {
   shipmentNumber: string
 }) {
   if (!input.rows.length) throw new Error('저장할 입고 행이 없습니다.')
-  if (!classifyInboundReviewRows(input.rows).valid) throw new Error('입고 검토 차단 항목을 먼저 해결해주세요.')
+  // Source evidence is intentionally persisted even when mapping/quantity review is
+  // incomplete. Promotion remains the separate trusted blocker.
   const shipmentNumber = normalizeExternalShipmentNumber(input.shipmentNumber)
   if (!shipmentNumber) throw new Error('외부 출고/참조 번호를 입력해주세요.')
   const { supabase, user } = await getSupabaseWithUser()
@@ -146,7 +147,8 @@ export async function saveInboundTemplateDraft(input: {
     const id = Number(data[0].revision_id)
     revalidatePath('/sourcing/arrivals')
     revalidatePath('/inventory')
-    return { success: true, id, importId: Number(data[0].inbound_import_id), proposedRevision: Boolean(data[0].proposed_revision), saved: input.rows.length, invalid: input.rows.filter((row) => row.validationError).length }
+    const review = classifyInboundReviewRows(input.rows)
+    return { success: true, id, importId: Number(data[0].inbound_import_id), proposedRevision: Boolean(data[0].proposed_revision), saved: input.rows.length, invalid: input.rows.filter((row) => row.validationError).length, blockers: review.blockers }
   } catch (error) {
     if (source) await supabase.storage.from('inbound-source-files').remove([source.storagePath])
     throw error
