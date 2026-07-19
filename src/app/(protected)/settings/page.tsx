@@ -1,6 +1,4 @@
-import Link from 'next/link'
 import { getShippingSettingsSummary } from '@/lib/actions/shipping-settings'
-import { Button } from '@/components/ui/button'
 import { PageHeader, ui } from '../../components/ui'
 import SettingsView from './SettingsView'
 
@@ -30,9 +28,8 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps =
   return (
     <div className={ui.shell}>
       <PageHeader
-        title="설정"
+        title="API 설정"
         description="네이버·쿠팡 채널 연결에 필요한 API 정보를 관리합니다."
-        actions={<Button asChild variant="secondary" size="sm"><Link href="/settings/parse-templates">파싱 템플릿 관리</Link></Button>}
       />
       <SettingsView summary={summary} focusProvider={focusProvider} />
     </div>
