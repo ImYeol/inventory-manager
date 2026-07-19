@@ -36,3 +36,6 @@ Read only the decisions relevant to the change. A proposal that conflicts with a
 | [029](0029-orders-inventory-state-model.md) | Orders and inventory state model |
 | [030](0030-channel-first-product-management.md) | Channel-first product management |
 | [031](0031-sku-channel-mapping-and-inventory-operations.md) | Internal SKU-first explicit channel mapping and inventory operations (supersedes ADR-030) |
+| [032](0032-inbound-import-factory-arrival-boundary.md) | Inbound imports are evidence; FactoryArrival owns expected receipts |
+| [033](0033-arrival-allocation-receipt-and-variance.md) | Allocation plans are mutable; receipt and variance evidence is immutable |
+| [034](0034-parse-template-shared-primitive.md) | Parse template is a shared primitive; Settings owns management, persistence stays domain-specific |
