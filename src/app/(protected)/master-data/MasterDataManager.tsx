@@ -221,9 +221,9 @@ export default function MasterDataManager({
   return (
     <div className="space-y-4">
       {message ? <div role="status" aria-live="polite" className={cx(ui.surfaceMuted, 'px-4 py-3 text-sm font-medium', message.type === 'success' ? 'text-[color:var(--success-foreground)]' : 'text-[color:var(--danger-foreground)]')}>{message.text}</div> : null}
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)} className="mt-4 space-y-4">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)} className="mt-4">
         <TabsList aria-label="상품 관리 보기 전환"><TabsTrigger value="product">상품</TabsTrigger><TabsTrigger value="warehouse">창고</TabsTrigger><TabsTrigger value="supplier-audit">공급자 SKU 감사</TabsTrigger></TabsList>
-        <TabsContent value="product" className="m-0">
+        <TabsContent value="product">
           <TableSurface
             toolbar={<FilterToolbar>
               <div className="flex min-w-0 items-center gap-2">
@@ -251,7 +251,7 @@ export default function MasterDataManager({
             />
           </TableSurface>
         </TabsContent>
-        <TabsContent value="warehouse" className="m-0">
+        <TabsContent value="warehouse">
           <TableSurface toolbar={<FilterToolbar><span className={ui.dataMeta}>{warehouseRows.length}개 창고</span><ActionToolbar><Button type="button" variant="secondary" size="sm" onClick={() => { setWarehouseName(''); setIsWarehouseModalOpen(true) }}>창고 등록</Button></ActionToolbar></FilterToolbar>}>
             <BasicDataTable<WarehouseRow> bare columns={[{ key: 'warehouse', label: '창고' }, { key: 'skuCount', label: 'SKU', align: 'right' }, { key: 'stockQty', label: '현재 재고', align: 'right' }, { key: 'movement', label: '최근 변동' }, { key: 'actions', label: '작업', align: 'right' }]} rows={warehouseRows} rowKey={(row) => row.warehouse.id} emptyState="등록된 창고가 없습니다." renderCell={(row, key) => {
               if (key === 'warehouse') return <span className="font-medium">{row.warehouse.name}</span>
@@ -263,7 +263,7 @@ export default function MasterDataManager({
             }} />
           </TableSurface>
         </TabsContent>
-        <TabsContent value="supplier-audit" className="m-0">
+        <TabsContent value="supplier-audit">
           <p className={cx(ui.helpText, 'px-1')}>일상적인 공급자 SKU 추가·해제는 상품 탭의 SKU 상세에서 처리합니다. 이 탭은 전체 목록 감사와 재지정·비활성화 이력 조회용입니다.</p>
           <TableSurface toolbar={<FilterToolbar><div className="flex min-w-0 items-center gap-2"><Input aria-label="공급자 SKU 검색" value={supplierSkuQuery} onChange={(event) => setSupplierSkuQuery(event.target.value)} placeholder="공급자, 외부 SKU, 내부 SKU 검색" className="w-64 ui-control-sm" /><Select value={supplierSkuState} onValueChange={(value) => setSupplierSkuState(value as typeof supplierSkuState)}><SelectTrigger aria-label="공급자 SKU 상태" className="w-28 ui-control-sm"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">활성</SelectItem><SelectItem value="inactive">비활성</SelectItem><SelectItem value="all">전체</SelectItem></SelectContent></Select></div><span className={ui.dataMeta}>{filteredSupplierMappings.length}개 매핑</span></FilterToolbar>}>
             <BasicDataTable<SupplierSkuMappingRow> bare tableAriaLabel="공급자 SKU 매핑 목록" columns={[{ key: 'supplier', label: '공급자' }, { key: 'external', label: '외부 SKU' }, { key: 'internal', label: '내부 SKU' }, { key: 'state', label: '상태' }, { key: 'date', label: '변경일' }, { key: 'action', label: '작업', align: 'right' }]} rows={filteredSupplierMappings} rowKey={(mapping) => mapping.id} emptyState="조건에 맞는 공급자 SKU 매핑이 없습니다." renderCell={(mapping, key) => {

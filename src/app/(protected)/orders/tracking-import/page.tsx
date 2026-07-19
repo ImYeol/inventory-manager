@@ -1,23 +1,6 @@
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
-import { PageHeader, ui } from '@/app/components/ui'
-import { Button } from '@/components/ui/button'
-import { listTrackingPresets } from '@/lib/actions/tracking-import'
-import TrackingImportWorkspace from './tracking-import-workspace'
+import { redirect } from 'next/navigation'
 
-export default async function TrackingImportPage() {
-  const presets = await listTrackingPresets()
-  return (
-    <div className={ui.shell}>
-      <PageHeader
-        title="송장 업로드"
-        actions={
-          <Button asChild variant="secondary" size="sm">
-            <Link href="/orders"><ArrowLeft aria-hidden="true" />주문으로</Link>
-          </Button>
-        }
-      />
-      <TrackingImportWorkspace initialPresets={presets} />
-    </div>
-  )
+// 송장 등록은 주문 페이지의 FixedSheet 모달로 흡수됐다(ui-guide.md 규칙 17). 이 경로는 legacy alias다.
+export default function TrackingImportPage() {
+  redirect('/orders')
 }

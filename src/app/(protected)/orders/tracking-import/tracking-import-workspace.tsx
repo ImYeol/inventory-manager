@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import { BasicDataTable } from '@/components/ui/basic-data-table'
 import { Button } from '@/components/ui/button'
+import { FileDropInput } from '@/components/ui/file-drop-input'
 import { Input } from '@/components/ui/input'
 import { TableSurface } from '@/components/ui/table-surface'
 import {
@@ -141,9 +142,15 @@ export default function TrackingImportWorkspace({ initialPresets = [] }: Props) 
   }
 
   return <div className="space-y-4">
-    <TableSurface toolbar={<div className="flex items-center gap-2"><span className="text-sm text-[color:var(--muted-foreground)]">파일 → 시트/헤더 → 컬럼 매핑 → 미리보기 → 발송</span><Button asChild variant="secondary"><label className="cursor-pointer">파일 선택<input aria-label="송장 파일" type="file" accept=".xlsx,.xls,.csv" className="sr-only" onChange={(event) => onFile(event.target.files?.[0])} /></label></Button></div>}>
-      <div className="p-4 text-sm text-[color:var(--muted-foreground)]">원본 파일은 저장하지 않고, 매핑된 행과 검증 결과만 반영합니다.</div>
-    </TableSurface>
+    <div className="space-y-1">
+      <p className="text-sm text-[color:var(--muted-foreground)]">파일 → 시트/헤더 → 컬럼 매핑 → 미리보기 → 발송</p>
+      <FileDropInput
+        ariaLabel="송장 파일"
+        accept=".xlsx,.xls,.csv"
+        onFile={onFile}
+        description="원본 파일은 저장하지 않고, 매핑된 행과 검증 결과만 반영합니다."
+      />
+    </div>
     {sample ? <TableSurface toolbar={<div className="flex items-center gap-2"><span className="text-sm font-medium">파싱 템플릿</span><Input aria-label="새 프리셋 이름" value={presetName} onChange={(event) => setPresetName(event.target.value)} placeholder="복제 프리셋 이름" /><Button type="button" variant="secondary" disabled={isPending || !presetName.trim()} onClick={savePreset}>저장</Button></div>}>
       <div className="p-4">
         <ParseTemplateBuilder<TrackingField>

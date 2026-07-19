@@ -60,7 +60,9 @@ export function extractHeaders(sample: ParseTemplateSample, sheetName: string, h
 }
 
 export function extractDataRows(sample: ParseTemplateSample, sheetName: string, headerRowNumber: number): string[][] {
-  return sheetRows(sample, sheetName).slice(headerRowNumber)
+  return sheetRows(sample, sheetName)
+    .slice(headerRowNumber)
+    .filter((row) => row.some((cell) => cell.trim() !== ''))
 }
 
 /** Zips headers + raw data rows into header-keyed records, for consumers that normalize by header name. */

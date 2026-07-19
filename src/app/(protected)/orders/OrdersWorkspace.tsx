@@ -6,13 +6,16 @@ import { BasicDataTable } from '@/components/ui/basic-data-table'
 import { Button } from '@/components/ui/button'
 import { ChannelBadge } from '@/components/ui/channel-badge'
 import { FilterToolbar } from '@/components/ui/filter-toolbar'
+import { FixedSheet } from '@/components/ui/fixed-sheet'
 import { Input } from '@/components/ui/input'
 import { ProductVariantCombobox, type ProductVariantOption } from '@/components/ui/product-variant-combobox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { TableSurface } from '@/components/ui/table-surface'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ActionToolbar, ToolbarButtonAction, ToolbarLinkAction } from '@/components/ui/toolbar'
+import { ActionToolbar, ToolbarButtonAction } from '@/components/ui/toolbar'
 import { assignOrderLine, syncOrders } from '@/lib/actions/order-sync'
+import type { SavedTrackingPreset } from '@/lib/actions/tracking-import'
+import TrackingImportWorkspace from './tracking-import/tracking-import-workspace'
 
 type OrderLine = {
   id: number
@@ -61,11 +64,13 @@ export default function OrdersWorkspace({
   variants,
   warehouses,
   initialView = '신규',
+  trackingPresets = [],
 }: {
   orders: OrderRow[]
   variants: ProductVariantOption[]
   warehouses: Warehouse[]
   initialView?: OrderView
+  trackingPresets?: SavedTrackingPreset[]
 }) {
   const [view, setView] = useState<OrderView>(initialView)
   const [search, setSearch] = useState('')
@@ -73,6 +78,7 @@ export default function OrdersWorkspace({
   const [assignments, setAssignments] = useState<Record<number, Assignment>>({})
   const [lineStatuses, setLineStatuses] = useState<Record<number, string>>({})
   const [message, setMessage] = useState('')
+  const [isTrackingImportOpen, setIsTrackingImportOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   const rows = useMemo(() => orders.filter((order) => {
@@ -162,7 +168,7 @@ export default function OrdersWorkspace({
                   setMessage('주문 동기화에 실패했습니다.')
                 }
               })}>주문 동기화</ToolbarButtonAction>
-              <ToolbarLinkAction href="/orders/tracking-import">송장 등록</ToolbarLinkAction>
+              <ToolbarButtonAction onClick={() => setIsTrackingImportOpen(true)}>송장 등록</ToolbarButtonAction>
             </ActionToolbar>
           </div>
         </FilterToolbar>
@@ -206,6 +212,9 @@ export default function OrdersWorkspace({
         />
       </TableSurface>
       <p aria-live="polite" className="text-sm text-[color:var(--muted-foreground)]">{message}</p>
+      <FixedSheet open={isTrackingImportOpen} title="송장 업로드" onClose={() => setIsTrackingImportOpen(false)}>
+        <TrackingImportWorkspace initialPresets={trackingPresets} />
+      </FixedSheet>
     </div>
   )
 }

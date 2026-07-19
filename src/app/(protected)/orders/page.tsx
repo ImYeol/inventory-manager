@@ -1,5 +1,6 @@
 import { PageHeader, ui } from '../../components/ui'
 import { getOrdersWorkspaceData } from '@/lib/actions/order-sync'
+import { listTrackingPresets } from '@/lib/actions/tracking-import'
 import { getCatalogData, getProductWorkspaceData } from '@/lib/data'
 import OrdersWorkspace from './OrdersWorkspace'
 import type { OrderView } from './OrdersWorkspace'
@@ -14,10 +15,11 @@ const viewMap: Record<string, OrderView> = {
 }
 
 export default async function OrdersPage({ searchParams }: { searchParams?: Promise<{ view?: string }> } = {}) {
-  const [orders, catalog, productWorkspace] = await Promise.all([
+  const [orders, catalog, productWorkspace, trackingPresets] = await Promise.all([
     getOrdersWorkspaceData(),
     getCatalogData(),
     getProductWorkspaceData(),
+    listTrackingPresets(),
   ])
   const view = viewMap[(await searchParams)?.view ?? 'new'] ?? '신규'
   const variants = productWorkspace.variants.map((variant) => ({
@@ -35,7 +37,7 @@ export default async function OrdersPage({ searchParams }: { searchParams?: Prom
   return (
     <div className={ui.shell}>
       <PageHeader title="주문" />
-      <OrdersWorkspace orders={orders as never} variants={variants} warehouses={catalog.warehouses} initialView={view} />
+      <OrdersWorkspace orders={orders as never} variants={variants} warehouses={catalog.warehouses} initialView={view} trackingPresets={trackingPresets} />
     </div>
   )
 }

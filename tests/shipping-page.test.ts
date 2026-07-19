@@ -6,8 +6,8 @@ vi.mock('next/navigation', () => ({ redirect }))
 import ShippingPage from '@/app/(protected)/shipping/page'
 
 describe('ShippingPage', () => {
-  it('redirects the legacy shipping route to the orders-owned tracking import', async () => {
+  it('redirects the legacy shipping route to orders, where tracking import now lives as a modal', async () => {
     await ShippingPage()
-    expect(redirect).toHaveBeenCalledWith('/orders/tracking-import')
+    expect(redirect).toHaveBeenCalledWith('/orders')
   })
 })

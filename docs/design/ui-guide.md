@@ -50,6 +50,7 @@
 23. action naming은 짧은 동사를 우선하고, 상태는 큰 filled card보다 dot, badge, disabled, loading text 같은 저노이즈 표현을 우선한다.
 24. 복합 운영 화면은 progressive disclosure를 사용한다. 목록 행마다 모든 편집 입력을 항상 펼치지 않고 선택된 대상의 sheet/modal/action rail에서 조작한다.
 25. 공급자 Excel import는 소싱 입고 예정의 단일 surface다. 재고 운영은 동일 import component를 중복 렌더하지 않는다.
+26. 파일 업로드 필드는 항상 `FileDropInput`(`file-drop-input.tsx`) 하나로 통일한다. 선택된 파일명 표시와 drag-active 시각 피드백을 생략한 bare `<Input type="file">`을 화면별로 새로 만들지 않는다.
 
 ## Compact Action Doctrine
 - 운영 화면의 기본 순서는 `header -> compact toolbar -> primary surface`다.
@@ -225,7 +226,7 @@ src/components/ui/
   - `창고`
 - `재고 운영`
 - `소싱`
-  - `외부 공장`
+  - `입고처`
   - `입고 예정`
 - `계정 메뉴`
   - `API 설정` → `/settings?section=store-connections`
@@ -329,7 +330,7 @@ src/components/ui/
 
 ## 소싱 패턴
 - 소싱 화면의 primary surface는 table/workspace다.
-- 외부 공장과 입고 예정은 카드형 요약보다 필터 가능한 table/workspace로 먼저 구성한다.
+- 입고처와 입고 예정은 카드형 요약보다 필터 가능한 table/workspace로 먼저 구성한다.
 - register/detail 같은 짧은 editing flow는 modal로 보조하고, surface 자체를 card summary로 대체하지 않는다.
 - header 다음에 `toolbar -> section title -> table/list`가 바로 이어져야 한다.
 - filter toolbar와 table은 `TableSurface` 하나로 묶어 이음새 없는 단일 surface로 읽히게 한다. filter 박스와 table shell을 별도 카드 2개로 쌓지 않는다.
@@ -403,6 +404,7 @@ src/components/ui/
 - hollow corner, segmented seam, 이질적인 border split이 보이면 card variant가 아니라 shared primitive 구조를 다시 봐야 한다.
 - page-local border patch로 임시 봉합하지 말고 shared card/surface primitive의 variant와 padding/token을 고쳐서 해결한다.
 - Card의 divider/body 관계는 [card composition contract](../../design-system/contracts/card.composition.json)가 정의한다. 이 문서는 의도를 설명하고, contract는 component composition을 정의하며, code와 harness가 이를 검증한다.
+- `globals.css`에서 `.a, .b, .c { ... }` 형태로 셀렉터를 묶어 쓰는 규칙(예: `.surface, .ui-surface, .ui-card`)에 새 속성을 추가할 때는 그 속성이 목록의 모든 셀렉터에 적용돼도 안전한지 먼저 확인한다. 한 컴포넌트(`Card`)의 버그를 고치려고 공유 셀렉터 그룹에 속성을 추가하면, 같은 그룹을 쓰는 다른 컴포넌트(`FixedSheet`의 `.ui-surface-strong` 등)에도 의도치 않게 그 속성이 퍼진다. 고쳐야 할 속성은 실제로 필요한 가장 좁은 셀렉터(`.ui-card` 단독 규칙)에 추가하고, 그룹 규칙에는 정말 모든 멤버가 공유해야 하는 속성만 남긴다.
 
 ## 인지·그룹핑 원칙
 

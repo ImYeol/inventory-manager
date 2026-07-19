@@ -1,13 +1,15 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
   getCatalogData: vi.fn(),
   getOrdersWorkspaceData: vi.fn(),
   getProductWorkspaceData: vi.fn(),
+  listTrackingPresets: vi.fn(),
 }))
 vi.mock('@/lib/actions/order-sync', () => ({ getOrdersWorkspaceData: mocks.getOrdersWorkspaceData }))
+vi.mock('@/lib/actions/tracking-import', () => ({ listTrackingPresets: mocks.listTrackingPresets }))
 vi.mock('@/lib/data', () => ({
   getCatalogData: mocks.getCatalogData,
   getProductWorkspaceData: mocks.getProductWorkspaceData,
@@ -20,6 +22,7 @@ describe('OrdersPage', () => {
     mocks.getOrdersWorkspaceData.mockResolvedValue([])
     mocks.getCatalogData.mockResolvedValue({ warehouses: [] })
     mocks.getProductWorkspaceData.mockResolvedValue({ variants: [] })
+    mocks.listTrackingPresets.mockResolvedValue([])
     render(await OrdersPage({ searchParams: Promise.resolve({ view: 'exception' }) }))
     expect(screen.getByRole('heading', { name: '주문' })).toBeTruthy()
     expect(screen.getByText('출고 준비')).toBeTruthy()
@@ -30,7 +33,9 @@ describe('OrdersPage', () => {
     expect(screen.getByText('0건')).toBeTruthy()
     expect(screen.getByRole('button', { name: '필터 초기화' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '주문 동기화' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: '송장 등록' }).getAttribute('href')).toBe('/orders/tracking-import')
+    expect(screen.getByRole('button', { name: '송장 등록' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '송장 등록' }))
+    expect(screen.getByRole('dialog', { name: '송장 업로드' })).toBeTruthy()
     expect(screen.getByRole('table', { name: '주문 목록' })).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: '채널' }).className).toContain('px-3')
     expect(screen.getByRole('columnheader', { name: '채널' }).className).toContain('py-2.5')
@@ -56,6 +61,7 @@ describe('OrdersPage', () => {
     mocks.getProductWorkspaceData.mockResolvedValue({
       variants: [{ id: 3, modelName: 'LP01', sizeName: 'S', colorName: '네이비', sellerSku: 'LP01-NV-S' }],
     })
+    mocks.listTrackingPresets.mockResolvedValue([])
 
     render(await OrdersPage({ searchParams: Promise.resolve({ view: 'exception' }) }))
 

@@ -90,6 +90,29 @@ describe('Product management workspace', () => {
     expect(mocks.refresh).toHaveBeenCalled()
   })
 
+  it('opens the channel dropdown when adding a mapping and lets you switch away from the naver default', async () => {
+    mocks.createChannelProductMapping.mockResolvedValue({ success: true })
+    render(React.createElement(MasterDataManager, props))
+
+    fireEvent.click(screen.getByRole('button', { name: '상세' }))
+    const dialog = screen.getByRole('dialog', { name: 'SKU 매핑' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '매핑 추가' }))
+
+    const channelSelect = within(dialog).getByRole('combobox', { name: '채널 선택' })
+    expect(channelSelect.textContent).toContain('네이버')
+    fireEvent.click(channelSelect)
+    expect(screen.getByRole('option', { name: '쿠팡' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('option', { name: '쿠팡' }))
+    expect(within(dialog).getByRole('combobox', { name: '채널 선택' }).textContent).toContain('쿠팡')
+
+    fireEvent.change(within(dialog).getByLabelText('판매자 SKU'), { target: { value: 'LP01-M-CP' } })
+    fireEvent.change(within(dialog).getByLabelText('채널 상품 ID'), { target: { value: 'CP-2' } })
+    fireEvent.change(within(dialog).getByLabelText('채널 옵션 ID'), { target: { value: 'CPV-2' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }))
+
+    await waitFor(() => expect(mocks.createChannelProductMapping).toHaveBeenCalledWith({ variantId: 101, channel: 'coupang', sellerSku: 'LP01-M-CP', externalProductId: 'CP-2', externalVariantId: 'CPV-2' }))
+  })
+
   it('edits and unlinks a mapping from its SKU modal', async () => {
     mocks.updateChannelProductMapping.mockResolvedValue({ success: true })
     mocks.unlinkChannelProductMapping.mockResolvedValue({ success: true })

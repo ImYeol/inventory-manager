@@ -281,13 +281,13 @@ export default function InventoryWorkspace({
     <div className={ui.shell}>
       <PageHeader title="재고 운영" description="재고를 조회하고 바로 입고/출고 처리합니다." />
 
-      <Tabs value={activeView} onValueChange={(value) => setActiveView(value as ViewMode)} className="mt-4 space-y-4">
+      <Tabs value={activeView} onValueChange={(value) => setActiveView(value as ViewMode)} className="mt-4">
         <TabsList aria-label="재고 운영 보기 전환">
           <TabsTrigger value="list">목록</TabsTrigger>
           <TabsTrigger value="history">이력</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="list" className="m-0">
+        <TabsContent value="list">
           <TableSurface
             toolbar={
               <InventoryTableToolbar
@@ -324,7 +324,7 @@ export default function InventoryWorkspace({
           </TableSurface>
         </TabsContent>
 
-        <TabsContent value="history" className="m-0">
+        <TabsContent value="history">
           <HistoryView
             transactions={transactions.map((tx) => ({ ...tx, warehouse: tx.warehouseName }))}
             models={models.map((model) => ({ id: model.id, name: model.name }))}

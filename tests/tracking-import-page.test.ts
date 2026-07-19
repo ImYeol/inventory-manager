@@ -5,28 +5,21 @@ import { render, screen } from '@testing-library/react'
 import fs from 'node:fs'
 import path from 'node:path'
 
-const mocks = vi.hoisted(() => ({
-  listTrackingPresets: vi.fn(),
-}))
-vi.mock('@/lib/actions/tracking-import', () => ({
-  listTrackingPresets: mocks.listTrackingPresets,
-}))
+const redirect = vi.hoisted(() => vi.fn())
+vi.mock('next/navigation', () => ({ redirect }))
 
 import TrackingImportPage from '@/app/(protected)/orders/tracking-import/page'
 import TrackingImportWorkspace from '@/app/(protected)/orders/tracking-import/tracking-import-workspace'
 
-describe('TrackingImportWorkspace', () => {
-  it('provides an explicit canonical return link to orders in the page header', async () => {
-    mocks.listTrackingPresets.mockResolvedValue([])
-
-    render(await TrackingImportPage())
-
-    const returnLink = screen.getByRole('link', { name: '주문으로' })
-    expect(returnLink.getAttribute('href')).toBe('/orders')
-    expect(returnLink.querySelector('[aria-hidden="true"]')).toBeTruthy()
+describe('TrackingImportPage', () => {
+  it('redirects the legacy standalone route to /orders now that the flow lives in the orders FixedSheet modal', () => {
+    TrackingImportPage()
+    expect(redirect).toHaveBeenCalledWith('/orders')
   })
+})
 
-  it('shows the file-to-dispatch workflow and reuses a dense preview surface', () => {
+describe('TrackingImportWorkspace', () => {
+  it('shows the file-to-dispatch workflow with a drag-and-drop file input and reuses a dense preview surface', () => {
     render(React.createElement(TrackingImportWorkspace))
     expect(screen.getByText('파일 → 시트/헤더 → 컬럼 매핑 → 미리보기 → 발송')).toBeTruthy()
     expect(screen.getByLabelText('송장 파일')).toBeTruthy()
@@ -38,7 +31,7 @@ describe('TrackingImportWorkspace', () => {
     expect(source).toContain('시트 선택')
     expect(source).toContain('헤더 행')
     expect(source).toContain('saveTrackingPreset')
-    expect(source).toContain("from '@/components/ui/button'")
-    expect(source).not.toMatch(/ui-button-(?:primary|secondary)/)
+    expect(source).toContain('FileDropInput')
+    expect(source).not.toMatch(/<input[^>]*type="file"/)
   })
 })
