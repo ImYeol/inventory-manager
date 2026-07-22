@@ -8,11 +8,9 @@ export default async function LoginPage({
 }: {
   searchParams?: Promise<{
     error?: string
-  }> | {
-    error?: string
-  }
+  }>
 }) {
-  const resolvedSearchParams = await (searchParams ?? Promise.resolve({}))
+  const resolvedSearchParams = (await searchParams) ?? {}
   const authError = resolvedSearchParams?.error === 'auth'
 
   const supabase = await createSupabaseServerClient()
@@ -33,7 +31,7 @@ export default async function LoginPage({
         <div className="mb-8 space-y-3 text-center">
           <span className={ui.pageKicker}>Inventory Manager</span>
           <h1 className="text-3xl font-semibold tracking-tight text-[color:var(--foreground)]">로그인</h1>
-          <p className="mx-auto max-w-sm text-sm leading-6 text-[color:var(--muted)]">
+          <p className="mx-auto max-w-sm text-sm leading-6 text-[color:var(--muted-foreground)]">
             Google 계정으로 로그인해 재고관리 시스템에 접근합니다.
           </p>
           {authError ? (

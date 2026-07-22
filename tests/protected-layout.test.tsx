@@ -1,21 +1,20 @@
 import React from 'react'
 import { render, cleanup } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  session: null as null | {
-    user: {
-      email: string | null
-      user_metadata?: Record<string, string | undefined>
-    }
+  user: null as null | {
+    email: string | null
+    user_metadata?: Record<string, string | undefined>
   },
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(async () => ({
     auth: {
-      getSession: vi.fn(async () => ({
-        data: { session: mocks.session },
+      getUser: vi.fn(async () => ({
+        data: { user: mocks.user },
+        error: null,
       })),
     },
   })),
@@ -32,6 +31,19 @@ vi.mock('next/navigation', () => ({
 import ProtectedLayout from '@/app/(protected)/layout'
 import Nav from '@/app/components/Nav'
 
+beforeEach(() => {
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })) as unknown as typeof window.matchMedia
+})
+
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
@@ -39,12 +51,10 @@ afterEach(() => {
 
 describe('ProtectedLayout', () => {
   it('passes normalized user profile data to Nav', async () => {
-    mocks.session = {
-      user: {
-        email: 'hong@example.com',
-        user_metadata: {
-          full_name: '홍길동',
-        },
+    mocks.user = {
+      email: 'hong@example.com',
+      user_metadata: {
+        full_name: '홍길동',
       },
     }
 
@@ -57,15 +67,14 @@ describe('ProtectedLayout', () => {
           email: 'hong@example.com',
         },
       }),
+      undefined,
     )
   })
 
   it('falls back to the email prefix when profile name is missing', async () => {
-    mocks.session = {
-      user: {
-        email: 'tester@example.com',
-        user_metadata: {},
-      },
+    mocks.user = {
+      email: 'tester@example.com',
+      user_metadata: {},
     }
 
     render(await ProtectedLayout({ children: React.createElement('div', null, 'child') }))
@@ -77,6 +86,7 @@ describe('ProtectedLayout', () => {
           email: 'tester@example.com',
         },
       }),
+      undefined,
     )
   })
 })

@@ -85,7 +85,7 @@ export default function ManualInboundDraftRows({ rows }: { rows: ManualInboundDr
             <div key={row.id} className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0 text-sm">
                 <p className="font-medium text-[color:var(--foreground)]">{row.externalSku} <span className="font-normal text-[color:var(--muted-foreground)]">· {row.template}</span></p>
-                <p className="mt-1 text-[color:var(--muted)]">{row.supplierName} · {row.warehouseName} · {row.quantity - row.receivedQuantity}개 남음</p>
+                <p className="mt-1 text-[color:var(--muted-foreground)]">{row.supplierName} · {row.warehouseName} · {row.quantity - row.receivedQuantity}개 남음</p>
               </div>
               {matched ? (
                 <div className="flex items-center gap-2">

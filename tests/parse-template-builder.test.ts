@@ -153,3 +153,60 @@ describe('ParseTemplateBuilder component', () => {
     expect(onMapping).not.toHaveBeenCalled()
   })
 })
+
+function CustomMappingHarness({ onMappingsChange }: { onMappingsChange: (mappings: { key: string; name: string; column: string }[]) => void }) {
+  const [customMappings, setCustomMappings] = React.useState<Array<{ key: string; name: string; column: string }>>([])
+  return React.createElement(ParseTemplateBuilder<InboundRole>, {
+    roles: inboundRoles,
+    sample,
+    sheetName: '입고',
+    headerRowNumber: 1,
+    mapping: { externalSku: '', quantity: '' },
+    onSheetChange: vi.fn(),
+    onHeaderRowChange: vi.fn(),
+    onMappingChange: vi.fn(),
+    customMappings,
+    onCustomMappingsChange: (next) => { setCustomMappings(next); onMappingsChange(next) },
+  })
+}
+
+describe('ParseTemplateBuilder free-text custom mappings', () => {
+  it('hides the custom-mapping section when onCustomMappingsChange is not provided', () => {
+    render(React.createElement(Harness, { onMapping: vi.fn() }))
+    expect(screen.queryByRole('button', { name: '열 매핑 추가' })).toBeNull()
+  })
+
+  it('adds a row, names it, and maps it to a header column', async () => {
+    const onMappingsChange = vi.fn()
+    render(React.createElement(CustomMappingHarness, { onMappingsChange }))
+
+    fireEvent.click(screen.getByRole('button', { name: '열 매핑 추가' }))
+    expect(onMappingsChange).toHaveBeenCalledWith([expect.objectContaining({ name: '', column: '' })])
+
+    fireEvent.change(screen.getByLabelText('열 이름'), { target: { value: '박스번호' } })
+    await waitFor(() => expect(onMappingsChange).toHaveBeenCalledWith([expect.objectContaining({ name: '박스번호' })]))
+
+    fireEvent.click(screen.getByRole('combobox', { name: '박스번호 매핑' }))
+    fireEvent.click(await screen.findByRole('option', { name: '비고' }))
+    await waitFor(() => expect(onMappingsChange).toHaveBeenCalledWith([expect.objectContaining({ name: '박스번호', column: '비고' })]))
+  })
+
+  it('removes a row', () => {
+    const onMappingsChange = vi.fn()
+    render(React.createElement(ParseTemplateBuilder<InboundRole>, {
+      roles: inboundRoles,
+      sample,
+      sheetName: '입고',
+      headerRowNumber: 1,
+      mapping: { externalSku: '', quantity: '' },
+      onSheetChange: vi.fn(),
+      onHeaderRowChange: vi.fn(),
+      onMappingChange: vi.fn(),
+      customMappings: [{ key: 'row-1', name: '박스번호', column: '비고' }],
+      onCustomMappingsChange: onMappingsChange,
+    }))
+
+    fireEvent.click(screen.getByRole('button', { name: '열 매핑 삭제' }))
+    expect(onMappingsChange).toHaveBeenCalledWith([])
+  })
+})

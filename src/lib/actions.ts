@@ -629,7 +629,7 @@ export async function receiveFactoryArrival(input: {
   return { success: true }
 }
 
-export async function replaceFactoryArrivalAllocations(input: { arrivalId: number; itemId: number; allocations: Array<{ warehouseId: number; quantity: number }>; reason: string }) {
+export async function replaceFactoryArrivalAllocations(input: { arrivalId: number; itemId: number; allocations: Array<{ warehouseId: number; quantity: number }>; reason: string }): Promise<FactoryArrivalActionResult> {
   try {
     if (!Number.isInteger(input.arrivalId) || !Number.isInteger(input.itemId)) throw new Error('입고 예정 행을 찾을 수 없습니다.')
     if (!input.reason.trim()) throw new Error('배정 변경 사유를 입력해주세요.')
@@ -646,7 +646,7 @@ export async function replaceFactoryArrivalAllocations(input: { arrivalId: numbe
   return { success: true }
 }
 
-export async function receiveFactoryArrivalRequest(input: { arrivalId: number; receiptRequestId: string; receiptBusinessDate: string; lines: Array<{ allocationId: number; quantity: number; overageQuantity?: number; overageReason?: string }> }) {
+export async function receiveFactoryArrivalRequest(input: { arrivalId: number; receiptRequestId: string; receiptBusinessDate: string; lines: Array<{ allocationId: number; quantity: number; overageQuantity?: number; overageReason?: string }> }): Promise<FactoryArrivalActionResult> {
   let result: unknown
   try {
     if (!input.arrivalId || !input.receiptRequestId.trim() || !input.lines.length || input.lines.some((line) => !line.allocationId || !Number.isInteger(line.quantity) || line.quantity < 0 || !Number.isInteger(line.overageQuantity ?? 0) || (line.overageQuantity ?? 0) < 0)) throw new Error('입고 요청 정보가 올바르지 않습니다.')
@@ -660,7 +660,7 @@ export async function receiveFactoryArrivalRequest(input: { arrivalId: number; r
   return { success: true, result }
 }
 
-export async function moveFactoryArrivalRemaindersToWarehouse(input: { arrivalId: number; warehouseId: number; reason: string }) {
+export async function moveFactoryArrivalRemaindersToWarehouse(input: { arrivalId: number; warehouseId: number; reason: string }): Promise<FactoryArrivalActionResult> {
   try {
     if (!input.arrivalId || !input.warehouseId || !input.reason.trim()) throw new Error('기본 창고와 배정 변경 사유를 입력해주세요.')
     await runFactoryArrivalOperation('move_factory_arrival_remainders_to_warehouse', { arrival_id: input.arrivalId, warehouse_id: input.warehouseId, reason: input.reason.trim() })
@@ -671,7 +671,7 @@ export async function moveFactoryArrivalRemaindersToWarehouse(input: { arrivalId
   return { success: true }
 }
 
-export async function closeFactoryArrivalShortage(input: { allocationId: number; quantity: number; reason: string }) {
+export async function closeFactoryArrivalShortage(input: { allocationId: number; quantity: number; reason: string }): Promise<FactoryArrivalActionResult> {
   try {
     if (!input.allocationId || !Number.isInteger(input.quantity) || input.quantity <= 0 || !input.reason.trim()) throw new Error('부족 수량과 사유를 입력해주세요.')
     await runFactoryArrivalOperation('close_factory_arrival_shortage', { allocation_id: input.allocationId, quantity: input.quantity, reason: input.reason.trim() })
@@ -682,7 +682,7 @@ export async function closeFactoryArrivalShortage(input: { allocationId: number;
   return { success: true }
 }
 
-export async function recordFactoryArrivalFollowUp(input: { closureId: number; warehouseId: number; quantity: number; reason: string; receiptRequestId: string; receiptBusinessDate: string }) {
+export async function recordFactoryArrivalFollowUp(input: { closureId: number; warehouseId: number; quantity: number; reason: string; receiptRequestId: string; receiptBusinessDate: string }): Promise<FactoryArrivalActionResult> {
   try {
     if (!input.closureId || !input.warehouseId || !Number.isInteger(input.quantity) || input.quantity <= 0 || !input.reason.trim() || !input.receiptRequestId.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(input.receiptBusinessDate)) throw new Error('후속 입고 정보를 모두 입력해주세요.')
     await runFactoryArrivalOperation('record_factory_arrival_follow_up', { closure_id: input.closureId, warehouse_id: input.warehouseId, quantity: input.quantity, reason: input.reason.trim(), receipt_request_id: input.receiptRequestId.trim(), receipt_business_date: input.receiptBusinessDate })
@@ -693,7 +693,7 @@ export async function recordFactoryArrivalFollowUp(input: { closureId: number; w
   return { success: true }
 }
 
-export async function reverseFactoryReceiptLine(input: { receiptLineId: number; correctionRequestId: string; reason: string }) {
+export async function reverseFactoryReceiptLine(input: { receiptLineId: number; correctionRequestId: string; reason: string }): Promise<FactoryArrivalActionResult> {
   try {
     if (!input.receiptLineId || !input.correctionRequestId.trim() || !input.reason.trim()) throw new Error('정정 요청 ID와 사유를 입력해주세요.')
     await runFactoryArrivalOperation('reverse_factory_receipt_line', { receipt_line_id: input.receiptLineId, correction_request_id: input.correctionRequestId.trim(), reason: input.reason.trim() })

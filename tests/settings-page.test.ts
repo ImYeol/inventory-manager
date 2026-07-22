@@ -49,7 +49,7 @@ describe('SettingsPage', () => {
     }
     mocks.getShippingSettingsSummary.mockResolvedValue(summary)
 
-    render(await SettingsPage())
+    render(await SettingsPage({}))
 
     expect(mocks.getShippingSettingsSummary).toHaveBeenCalledTimes(1)
     expect(mocks.settingsView).toHaveBeenCalledTimes(1)

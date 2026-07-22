@@ -5,19 +5,14 @@ import SettingsView from './SettingsView'
 export const dynamic = 'force-dynamic'
 
 type SettingsPageProps = {
-  searchParams?:
-    | Promise<{
-        section?: string
-        provider?: string
-      }>
-    | {
-        section?: string
-        provider?: string
-      }
+  searchParams?: Promise<{
+    section?: string
+    provider?: string
+  }>
 }
 
-export default async function SettingsPage({ searchParams }: SettingsPageProps = {}) {
-  const resolvedSearchParams = await (searchParams ?? Promise.resolve({}))
+export default async function SettingsPage({ searchParams }: SettingsPageProps) {
+  const resolvedSearchParams = (await searchParams) ?? {}
   const focusProvider =
     resolvedSearchParams.section === 'store-connections' &&
     (resolvedSearchParams.provider === 'naver' || resolvedSearchParams.provider === 'coupang')

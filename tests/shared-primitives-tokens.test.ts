@@ -6,21 +6,18 @@ const source = (relativePath: string) => fs.readFileSync(path.resolve(process.cw
 
 const primitiveSources = [
   'src/components/ui/table.tsx',
-  'src/components/ui/basic-data-table.tsx',
-  'src/components/ui/inventory-data-table.tsx',
+  'src/components/ui/data-table.tsx',
   'src/components/ui/store-connection-row.tsx',
   'src/components/ui/store-connection-status.tsx',
   'src/components/ui/column-visibility-menu.tsx',
   'src/components/ui/card.tsx',
   'src/components/ui/modal.tsx',
-  'src/components/ui/fixed-sheet.tsx',
   'src/components/ui/dropdown-menu.tsx',
 ].map(source)
 
 const storeConnectionStatusSource = source('src/components/ui/store-connection-status.tsx')
 const cardPrimitiveSource = source('src/components/ui/card.tsx')
 const modalPrimitiveSource = source('src/components/ui/modal.tsx')
-const fixedSheetPrimitiveSource = source('src/components/ui/fixed-sheet.tsx')
 const dropdownMenuPrimitiveSource = source('src/components/ui/dropdown-menu.tsx')
 
 describe('shared primitive token usage', () => {
@@ -41,13 +38,11 @@ describe('shared primitive token usage', () => {
 })
 
 describe('elevation baseline consumption (ADR-018 UI-system-check)', () => {
-  it('keeps Card, Modal, and FixedSheet wired to their tokenized elevation preset', () => {
+  it('keeps Card and Modal wired to their tokenized elevation preset', () => {
     // Card default surface resolves to `.ui-card` (elevation-2 in globals.css).
     expect(cardPrimitiveSource).toContain('default: ui.card')
     // Modal resolves to `.ui-modal` (elevation-4 in globals.css).
     expect(modalPrimitiveSource).toContain('ui.modal')
-    // FixedSheet is the sole consumer of `ui.surfaceStrong` (`.ui-surface-strong`, elevation-4).
-    expect(fixedSheetPrimitiveSource).toContain('ui.surfaceStrong')
   })
 
   it('never hardcodes a one-off box-shadow on the overlay/surface primitives', () => {
@@ -56,7 +51,6 @@ describe('elevation baseline consumption (ADR-018 UI-system-check)', () => {
     for (const primitiveSource of [
       cardPrimitiveSource,
       modalPrimitiveSource,
-      fixedSheetPrimitiveSource,
       dropdownMenuPrimitiveSource,
     ]) {
       expect(primitiveSource).not.toMatch(oneOffShadow)

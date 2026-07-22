@@ -2,25 +2,99 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { useController, useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { fieldConfig, ZodProvider } from '@autoform/zod'
+import { AutoForm } from '@autoform/react/react-hook-form'
+import type { ColumnDef } from '@tanstack/react-table'
 import { createFactory, setFactoryActive } from '@/lib/actions'
 import { createInboundTemplateVersion, getInboundTemplatesForSupplier, inspectInboundTemplateSample, setInboundTemplateActive, type InboundTemplateSample } from '@/lib/actions/inbound-import'
 import { StatusBadge } from '@/components/ui/badge-1'
-import { BasicDataTable } from '@/components/ui/basic-data-table'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { DataTable } from '@/components/ui/data-table'
 import { FileDropInput } from '@/components/ui/file-drop-input'
-import { FilterToolbar } from '@/components/ui/filter-toolbar'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { ParseTemplateBuilder } from '@/components/ui/parse-template-builder'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { TableSurface } from '@/components/ui/table-surface'
 import { PageHeader, cx, ui } from '@/app/components/ui'
+import { autoFormUiComponents } from '@/components/ui/autoform/ui-components'
+import { autoFormFieldComponents } from '@/components/ui/autoform/form-components'
 
 type InboundParseTemplateRow = { id: number; name: string; versionId: number; versionNumber: number; active: boolean }
 
 const inboundRoles = [{ key: 'externalSku' as const, label: '외부 SKU', required: true }, { key: 'quantity' as const, label: '수량', required: true }]
+
+const versionFormSchema = z.object({
+  name: z.string().trim().min(1, '파싱 템플릿 이름을 입력하세요.'),
+  sheetName: z.string().trim().min(1, '시트를 선택하세요.'),
+  headerRowNumber: z.coerce.number().int('헤더 행은 정수여야 합니다.').min(1, '헤더 행은 1 이상이어야 합니다.'),
+  mapping: z.object({
+    externalSku: z.string().trim().min(1, '외부 SKU 열을 선택하세요.'),
+    quantity: z.string().trim().min(1, '수량 열을 선택하세요.'),
+  }),
+  customMappings: z.array(
+    z.object({ key: z.string(), name: z.string(), column: z.string() }),
+  ),
+})
+
+type VersionFormValues = z.output<typeof versionFormSchema>
+type VersionFormInput = z.input<typeof versionFormSchema>
+
+const versionFormDefaults: VersionFormValues = {
+  name: '',
+  sheetName: '',
+  headerRowNumber: 1,
+  mapping: { externalSku: '', quantity: '' },
+  customMappings: [],
+}
+
+// AutoForm(zod 스키마 기반 자동 폼 생성기, 이슈 #31 실험) 실험 대상 스키마.
+// 기존 필수/선택 규칙(이름만 필수, 나머지는 선택)을 그대로 유지한다.
+const factoryFormSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, '입고처 이름을 입력하세요.')
+    .check(fieldConfig({ label: '입고처 이름', inputProps: { placeholder: '예: 광주 봉제 협력사' } })),
+  contactName: z
+    .string()
+    .trim()
+    .check(fieldConfig({ label: '담당자', inputProps: { placeholder: '담당자 이름' } }))
+    .optional(),
+  phone: z
+    .string()
+    .trim()
+    .check(fieldConfig({ label: '전화번호', inputProps: { placeholder: '010-0000-0000' } }))
+    .optional(),
+  email: z
+    .string()
+    .trim()
+    .check(fieldConfig({ label: '이메일', inputProps: { placeholder: 'factory@example.com' } }))
+    .optional(),
+  notes: z
+    .string()
+    .trim()
+    .check(
+      fieldConfig({ label: '메모', fieldType: 'textarea', inputProps: { placeholder: '납기 메모, 연락 가능 시간, 특이사항' } }),
+    )
+    .optional(),
+})
+
+type FactoryFormValues = z.output<typeof factoryFormSchema>
+
+const factoryFormProvider = new ZodProvider(factoryFormSchema)
 
 type FactoryData = {
   id: number
@@ -52,53 +126,8 @@ type SourcingSchemaState = {
 
 type FactoryStatusFilter = 'all' | 'active' | 'inactive'
 
-type SelectOption<Value extends string | number> = {
-  value: Value
-  label: string
-}
-
 function normalize(value: string | null) {
   return value?.toLowerCase().trim() ?? ''
-}
-
-function SelectField<Value extends string | number>({
-  label,
-  value,
-  placeholder,
-  options,
-  onValueChange,
-  disabled,
-  hideLabel,
-}: {
-  label: string
-  value: Value | null
-  placeholder: string
-  options: Array<SelectOption<Value>>
-  onValueChange: (value: Value | null) => void
-  disabled?: boolean
-  hideLabel?: boolean
-}) {
-  return (
-    <div className={hideLabel ? 'w-full sm:w-[11rem]' : 'min-w-[11rem]'}>
-      <label className={hideLabel ? 'sr-only' : ui.label}>{label}</label>
-      <Select
-        value={value !== null ? String(value) : undefined}
-        onValueChange={(next) => onValueChange(next ? (next as Value) : null)}
-        disabled={disabled}
-      >
-        <SelectTrigger aria-label={label} className={ui.controlSm}>
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={String(option.value)} value={String(option.value)}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  )
 }
 
 function getArrivalStatusTone(status: string) {
@@ -123,23 +152,23 @@ export default function FactoriesView({
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<FactoryStatusFilter>('all')
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
+  const [registerFormError, setRegisterFormError] = useState<string | null>(null)
   const [selectedFactoryId, setSelectedFactoryId] = useState<number | null>(null)
-  const [draft, setDraft] = useState({
-    name: '',
-    contactName: '',
-    phone: '',
-    email: '',
-    notes: '',
-  })
 
   const [templates, setTemplates] = useState<InboundParseTemplateRow[]>([])
   const [templateLoadError, setTemplateLoadError] = useState<string | null>(null)
   const [versionModal, setVersionModal] = useState<InboundParseTemplateRow | 'new' | null>(null)
-  const [versionName, setVersionName] = useState('')
   const [versionSample, setVersionSample] = useState<InboundTemplateSample | null>(null)
-  const [versionSheetName, setVersionSheetName] = useState('')
-  const [versionHeaderRow, setVersionHeaderRow] = useState(1)
-  const [versionMapping, setVersionMapping] = useState<{ externalSku: string; quantity: string }>({ externalSku: '', quantity: '' })
+
+  const versionForm = useForm<VersionFormInput, unknown, VersionFormValues>({
+    resolver: zodResolver(versionFormSchema),
+    defaultValues: versionFormDefaults,
+  })
+  const { control: versionControl, register: registerVersionField, handleSubmit: handleVersionSubmit, reset: resetVersionForm, setValue: setVersionFieldValue, setError: setVersionFieldError, formState: { errors: versionErrors } } = versionForm
+  const sheetNameField = useController({ control: versionControl, name: 'sheetName' })
+  const headerRowField = useController({ control: versionControl, name: 'headerRowNumber' })
+  const mappingField = useController({ control: versionControl, name: 'mapping' })
+  const customMappingsField = useController({ control: versionControl, name: 'customMappings' })
 
   useEffect(() => {
     let active = true
@@ -152,11 +181,8 @@ export default function FactoriesView({
 
   const openNewVersion = (template: InboundParseTemplateRow | 'new') => {
     setVersionModal(template)
-    setVersionName(template === 'new' ? '' : template.name)
     setVersionSample(null)
-    setVersionSheetName('')
-    setVersionHeaderRow(1)
-    setVersionMapping({ externalSku: '', quantity: '' })
+    resetVersionForm({ ...versionFormDefaults, name: template === 'new' ? '' : template.name })
     setMessage(null)
   }
 
@@ -164,28 +190,36 @@ export default function FactoriesView({
     try {
       const result = await inspectInboundTemplateSample(file)
       setVersionSample(result)
-      setVersionSheetName(result.sheets[0]?.name ?? '')
-      setVersionHeaderRow(1)
-      setVersionMapping({ externalSku: '', quantity: '' })
+      setVersionFieldValue('sheetName', result.sheets[0]?.name ?? '')
+      setVersionFieldValue('headerRowNumber', 1)
+      setVersionFieldValue('mapping', { externalSku: '', quantity: '' })
+      setVersionFieldValue('customMappings', [])
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '샘플 파일을 읽지 못했습니다.')
     }
   })
 
-  const saveVersion = () => {
-    const sheet = versionSample?.sheets.find((candidate) => candidate.name === versionSheetName)
-    if (!sheet || !versionName.trim() || !versionMapping.externalSku || !versionMapping.quantity || selectedFactoryId === null) return
+  const saveVersion = handleVersionSubmit((values) => {
+    const sheet = versionSample?.sheets.find((candidate) => candidate.name === values.sheetName)
+    if (!sheet || selectedFactoryId === null) {
+      setVersionFieldError('root', { message: '샘플 파일을 먼저 업로드하세요.' })
+      return
+    }
     const templateId = versionModal !== 'new' && versionModal ? versionModal.id : undefined
     startTransition(async () => {
       try {
         await createInboundTemplateVersion({
           templateId,
           supplierId: selectedFactoryId,
-          name: versionName,
+          name: values.name,
           sheetName: sheet.name,
-          headerRowNumber: versionHeaderRow,
-          headers: sheet.rows[versionHeaderRow - 1] ?? [],
-          mappings: versionMapping,
+          headerRowNumber: values.headerRowNumber,
+          headers: sheet.rows[values.headerRowNumber - 1] ?? [],
+          mappings: {
+            externalSku: values.mapping.externalSku,
+            quantity: values.mapping.quantity,
+            source: Object.fromEntries(values.customMappings.filter((row) => row.name.trim() && row.column).map((row) => [row.name.trim(), row.column])),
+          },
         })
         setVersionModal(null)
         setMessage('입고 파싱 템플릿 버전을 저장했습니다.')
@@ -193,10 +227,10 @@ export default function FactoriesView({
         setTemplates(rows)
         router.refresh()
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : '파싱 템플릿을 저장하지 못했습니다.')
+        setVersionFieldError('root', { message: error instanceof Error ? error.message : '파싱 템플릿을 저장하지 못했습니다.' })
       }
     })
-  }
+  })
 
   const toggleInboundTemplate = (template: InboundParseTemplateRow) => {
     if (selectedFactoryId === null) return
@@ -212,6 +246,19 @@ export default function FactoriesView({
       }
     })
   }
+
+  const inboundTemplateColumns: ColumnDef<InboundParseTemplateRow, unknown>[] = [
+    { id: 'name', header: '이름', enableSorting: false, cell: ({ row }) => <span className="font-medium text-[color:var(--foreground)]">{row.original.name}</span> },
+    { id: 'version', header: '최신 버전', enableSorting: false, cell: ({ row }) => <span className="tabular-nums text-[color:var(--muted-foreground)]">v{row.original.versionNumber}</span> },
+    { id: 'status', header: '상태', enableSorting: false, cell: ({ row }) => <StatusBadge tone={row.original.active ? 'success' : 'neutral'}>{row.original.active ? '사용 중' : '사용 중지'}</StatusBadge> },
+    {
+      id: 'action',
+      header: () => <span className="sr-only">작업</span>,
+      enableSorting: false,
+      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      cell: ({ row }) => <div className="flex justify-end gap-2"><Button type="button" variant="outline" size="sm" onClick={() => openNewVersion(row.original)}>새 버전 만들기</Button><Button type="button" variant="outline" size="sm" disabled={isPending} onClick={() => toggleInboundTemplate(row.original)}>{row.original.active ? '사용 중지' : '사용'}</Button></div>,
+    },
+  ]
 
   const filteredFactories = useMemo(() => {
     const query = search.toLowerCase().trim()
@@ -246,11 +293,11 @@ export default function FactoriesView({
     setSelectedFactoryId(factoryId)
   }
 
-  const submitFactory = () => {
+  const submitFactory = (values: FactoryFormValues) => {
+    setRegisterFormError(null)
     startTransition(async () => {
       try {
-        const created = await createFactory(draft)
-        setDraft({ name: '', contactName: '', phone: '', email: '', notes: '' })
+        const created = await createFactory(values)
         setIsRegisterOpen(false)
         setMessage('입고처를 등록했습니다. 이어서 파싱 템플릿을 등록하세요.')
         // 등록 폼에는 템플릿을 넣지 않는다(샘플 파일이 없을 수 있다). 대신 상세를 바로 열어
@@ -258,7 +305,7 @@ export default function FactoriesView({
         setSelectedFactoryId(created.id)
         router.refresh()
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : '입고처 등록에 실패했습니다.')
+        setRegisterFormError(error instanceof Error ? error.message : '입고처 등록에 실패했습니다.')
       }
     })
   }
@@ -275,12 +322,150 @@ export default function FactoriesView({
     })
   }
 
+  const factoryColumns: ColumnDef<FactoryData, unknown>[] = [
+    {
+      accessorKey: 'name',
+      header: '입고처',
+      enableHiding: false,
+      meta: {
+        headerClassName: 'w-[18rem]',
+        cellClassName: 'max-w-[18rem] font-medium text-[color:var(--foreground)]',
+      },
+      cell: ({ row }) => (
+        <>
+          <button
+            type="button"
+            onClick={() => openDetail(row.original.id)}
+            className="w-full truncate text-left font-medium text-[color:var(--foreground)] hover:underline"
+          >
+            {row.original.name}
+          </button>
+          {row.original.notes ? (
+            <p className="mt-1 line-clamp-2 text-xs text-[color:var(--muted-foreground)]">{row.original.notes}</p>
+          ) : null}
+        </>
+      ),
+    },
+    {
+      id: 'contact',
+      accessorFn: (row) => [row.contactName, row.phone, row.email].filter(Boolean).join(' · '),
+      header: '연락처',
+      meta: {
+        headerClassName: 'w-[18rem]',
+        cellClassName: 'max-w-[18rem] break-words',
+      },
+      cell: ({ getValue }) => (getValue<string>() || '연락처 정보 없음'),
+    },
+    {
+      accessorKey: 'arrivalCount',
+      header: '예정 입고',
+      meta: {
+        headerClassName: 'w-[7rem] text-right',
+        cellClassName: 'w-[7rem] text-right font-semibold tabular-nums text-[color:var(--foreground)]',
+      },
+      cell: ({ getValue }) => `${getValue<number>()}건`,
+    },
+    {
+      accessorKey: 'pendingQuantity',
+      header: '잔여',
+      meta: {
+        headerClassName: 'w-[7rem] text-right',
+        cellClassName: 'w-[7rem] text-right font-semibold tabular-nums text-[color:var(--foreground)]',
+      },
+      cell: ({ getValue }) => `${getValue<number>()}개`,
+    },
+    {
+      accessorKey: 'isActive',
+      header: '상태',
+      meta: {
+        headerClassName: 'w-[7rem]',
+        cellClassName: 'w-[7rem] align-middle',
+      },
+      cell: ({ getValue }) => (
+        <StatusBadge tone={getValue<boolean>() ? 'success' : 'neutral'} className="px-2.5 py-1">
+          {getValue<boolean>() ? '활성' : '비활성'}
+        </StatusBadge>
+      ),
+    },
+    {
+      id: 'actions',
+      header: () => <span className="sr-only">작업</span>,
+      enableSorting: false,
+      enableHiding: false,
+      meta: {
+        headerClassName: 'w-[6rem] text-right',
+        cellClassName: 'w-[6rem] text-right',
+      },
+      cell: ({ row }) => (
+        <Button type="button" variant="secondary" size="sm" onClick={() => openDetail(row.original.id)}>
+          상세
+        </Button>
+      ),
+    },
+  ]
+
   return (
     <div className={ui.shell}>
-      <PageHeader
-        title="입고처"
-        description="입고처 목록을 검색하고 상태를 걸러서 상세 정보와 등록 작업을 빠르게 처리합니다."
-        actions={
+      <Breadcrumb className="mb-3">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/">대시보드</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/sourcing">소싱</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>입고처</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+
+      <PageHeader title="입고처" description="입고처 목록을 검색하고 상태를 걸러서 상세 정보와 등록 작업을 빠르게 처리합니다." />
+
+      {schemaState.status === 'missing' && schemaState.message ? (
+        <Card variant="muted" className="mb-4 overflow-hidden">
+          <CardContent className="px-4 py-3 text-sm font-medium text-[color:var(--muted-foreground)]">{schemaState.message}</CardContent>
+        </Card>
+      ) : null}
+
+      {message ? (
+        <Card variant="muted" className="mb-4 overflow-hidden">
+          <CardContent className="px-4 py-3 text-sm text-[color:var(--muted-foreground)]">{message}</CardContent>
+        </Card>
+      ) : null}
+
+      <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter((value ?? 'all') as FactoryStatusFilter)} className="mb-3">
+        <TabsList aria-label="입고처 상태 필터">
+          <TabsTrigger value="all">전체</TabsTrigger>
+          <TabsTrigger value="active">활성</TabsTrigger>
+          <TabsTrigger value="inactive">비활성</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <DataTable
+        columns={factoryColumns}
+        rows={filteredFactories}
+        tableAriaLabel="입고처 목록"
+        emptyState="조건에 맞는 입고처가 없습니다."
+        getRowDataState={(factory) => (factory.id === selectedFactory?.id ? 'selected' : undefined)}
+        toolbarStart={
+          <div className="w-full sm:w-[18rem] lg:max-w-[22rem] lg:flex-1">
+            <label htmlFor="factory-search" className="sr-only">
+              입고처 검색
+            </label>
+            <Input
+              id="factory-search"
+              type="search"
+              placeholder="입고처명, 연락처, 메모 검색"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="ui-control-sm"
+            />
+          </div>
+        }
+        toolbarEnd={
           <Button
             type="button"
             onClick={() => {
@@ -289,122 +474,13 @@ export default function FactoriesView({
               }
             }}
             size="sm"
-            className="h-10 px-3"
+            className="h-9 px-3"
             disabled={schemaState.status === 'missing'}
           >
             입고처 등록
           </Button>
         }
       />
-
-      {schemaState.status === 'missing' && schemaState.message ? (
-        <Card variant="muted" className="mb-4 overflow-hidden">
-          <CardContent className="px-4 py-3 text-sm font-medium text-[color:var(--muted)]">{schemaState.message}</CardContent>
-        </Card>
-      ) : null}
-
-      {message ? (
-        <Card variant="muted" className="mb-4 overflow-hidden">
-          <CardContent className="px-4 py-3 text-sm text-[color:var(--muted)]">{message}</CardContent>
-        </Card>
-      ) : null}
-
-      <TableSurface
-        toolbar={
-          <FilterToolbar>
-            <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <div className="w-full sm:w-[18rem] lg:max-w-[22rem] lg:flex-1">
-                <label htmlFor="factory-search" className="sr-only">
-                  입고처 검색
-                </label>
-                <Input
-                  id="factory-search"
-                  type="search"
-                  placeholder="입고처명, 연락처, 메모 검색"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  className="ui-control-sm"
-                />
-              </div>
-
-              <SelectField
-                hideLabel
-                label="상태 필터"
-                value={statusFilter}
-                placeholder="전체 상태"
-                options={[
-                  { value: 'all', label: '전체 상태' },
-                  { value: 'active', label: '활성' },
-                  { value: 'inactive', label: '비활성' },
-                ]}
-                onValueChange={(value) => setStatusFilter((value ?? 'all') as FactoryStatusFilter)}
-              />
-            </div>
-
-            <div className={ui.dataMeta}>
-              <span className="tabular-nums">전체 {factories.length}</span>
-              <span aria-hidden>·</span>
-              <span className="tabular-nums">표시 {filteredFactories.length}</span>
-            </div>
-          </FilterToolbar>
-        }
-      >
-        <Table aria-label="입고처 목록">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[18rem]">입고처</TableHead>
-                  <TableHead className="w-[18rem]">연락처</TableHead>
-                  <TableHead className="w-[7rem] text-right">예정 입고</TableHead>
-                  <TableHead className="w-[7rem] text-right">잔여</TableHead>
-                  <TableHead className="w-[7rem]">상태</TableHead>
-                  <TableHead className="w-[6rem] text-right">작업</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredFactories.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="py-10 text-center text-sm text-[color:var(--muted-foreground)]">
-                      조건에 맞는 입고처가 없습니다.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredFactories.map((factory) => (
-                    <TableRow key={factory.id} data-state={factory.id === selectedFactory?.id ? 'selected' : undefined}>
-                      <TableCell className="max-w-[18rem] font-medium text-[color:var(--foreground)]">
-                        <button
-                          type="button"
-                          onClick={() => openDetail(factory.id)}
-                          className="w-full truncate text-left font-medium text-[color:var(--foreground)] hover:underline"
-                        >
-                          {factory.name}
-                        </button>
-                        {factory.notes ? <p className="mt-1 line-clamp-2 text-xs text-[color:var(--muted-foreground)]">{factory.notes}</p> : null}
-                      </TableCell>
-                      <TableCell className="max-w-[18rem] break-words">
-                        {[factory.contactName, factory.phone, factory.email].filter(Boolean).join(' · ') || '연락처 정보 없음'}
-                      </TableCell>
-                      <TableCell className="w-[7rem] text-right font-semibold tabular-nums text-[color:var(--foreground)]">
-                        {factory.arrivalCount}건
-                      </TableCell>
-                      <TableCell className="w-[7rem] text-right font-semibold tabular-nums text-[color:var(--foreground)]">
-                        {factory.pendingQuantity}개
-                      </TableCell>
-                      <TableCell className="w-[7rem] align-middle">
-                        <StatusBadge tone={factory.isActive ? 'success' : 'neutral'} className="px-2.5 py-1">
-                          {factory.isActive ? '활성' : '비활성'}
-                        </StatusBadge>
-                      </TableCell>
-                      <TableCell className="w-[6rem] text-right">
-                        <Button type="button" variant="secondary" size="sm" onClick={() => openDetail(factory.id)}>
-                          상세
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-      </TableSurface>
 
       <Modal
         open={selectedFactory !== null}
@@ -429,7 +505,7 @@ export default function FactoriesView({
           <div className="space-y-4">
             {schemaState.status === 'missing' && schemaState.message ? (
               <Card variant="muted" className="overflow-hidden">
-                <CardContent className="px-4 py-3 text-sm font-medium text-[color:var(--muted)]">{schemaState.message}</CardContent>
+                <CardContent className="px-4 py-3 text-sm font-medium text-[color:var(--muted-foreground)]">{schemaState.message}</CardContent>
               </Card>
             ) : null}
 
@@ -482,20 +558,13 @@ export default function FactoriesView({
                 <Button type="button" size="sm" onClick={() => openNewVersion('new')}>새 파싱 템플릿</Button>
               </div>
               {templateLoadError ? <p role="alert" className="text-sm font-medium text-[color:var(--warning-foreground)]">{templateLoadError}</p> : null}
-              <BasicDataTable
+              <DataTable<InboundParseTemplateRow>
                 bare
                 tableAriaLabel="파싱 템플릿"
-                columns={[{ key: 'name', label: '이름' }, { key: 'version', label: '최신 버전' }, { key: 'status', label: '상태' }, { key: 'action', label: <span className="sr-only">작업</span>, align: 'right' }]}
+                columns={inboundTemplateColumns}
                 rows={templates}
-                rowKey={(template) => template.id}
+                rowAriaLabel={(template) => template.name}
                 emptyState="등록된 입고 파싱 템플릿이 없습니다."
-                renderCell={(template, key) => key === 'name'
-                  ? <span className="font-medium text-[color:var(--foreground)]">{template.name}</span>
-                  : key === 'version'
-                    ? <span className="tabular-nums text-[color:var(--muted)]">v{template.versionNumber}</span>
-                    : key === 'status'
-                      ? <StatusBadge tone={template.active ? 'success' : 'neutral'}>{template.active ? '사용 중' : '사용 중지'}</StatusBadge>
-                      : <div className="flex justify-end gap-2"><Button type="button" variant="outline" size="sm" onClick={() => openNewVersion(template)}>새 버전 만들기</Button><Button type="button" variant="outline" size="sm" disabled={isPending} onClick={() => toggleInboundTemplate(template)}>{template.active ? '사용 중지' : '사용'}</Button></div>}
               />
             </div>
 
@@ -557,21 +626,36 @@ export default function FactoriesView({
         title={versionModal === 'new' ? '새 입고 파싱 템플릿' : `${versionModal ? versionModal.name : ''} 새 버전`}
         description="샘플 파일에서 시트·헤더 행과 외부 SKU, 수량 열을 선택해 새 버전으로 저장합니다."
         onOpenChange={(open) => { if (!open) setVersionModal(null) }}
-        footer={<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setVersionModal(null)}>닫기</Button><Button type="button" disabled={isPending || !versionSample || !versionName.trim() || !versionMapping.externalSku || !versionMapping.quantity} onClick={saveVersion}>버전 저장</Button></div>}
+        footer={<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setVersionModal(null)}>닫기</Button><Button type="button" disabled={isPending || !versionSample} onClick={saveVersion}>버전 저장</Button></div>}
       >
         <div className="space-y-4">
-          <label className="space-y-1"><span className={ui.label}>파싱 템플릿 이름</span><Input aria-label="파싱 템플릿 이름" value={versionName} onChange={(event) => setVersionName(event.target.value)} /></label>
+          {versionErrors.root?.message ? <p role="alert" className="text-sm text-[color:var(--danger-foreground)]">{versionErrors.root.message}</p> : null}
+          <label className="space-y-1">
+            <span className={ui.label}>파싱 템플릿 이름</span>
+            <Input aria-label="파싱 템플릿 이름" {...registerVersionField('name')} />
+            {versionErrors.name?.message ? <p role="alert" className="text-xs text-[color:var(--danger-foreground)]">{versionErrors.name.message}</p> : null}
+          </label>
           <div className="space-y-1"><span className={ui.label}>샘플 파일</span><FileDropInput ariaLabel="샘플 파일" accept=".xlsx,.xls,.csv" onFile={inspectVersionSample} /></div>
-          {versionSample ? <ParseTemplateBuilder<'externalSku' | 'quantity'>
-            roles={inboundRoles}
-            sample={versionSample}
-            sheetName={versionSheetName}
-            headerRowNumber={versionHeaderRow}
-            mapping={versionMapping}
-            onSheetChange={setVersionSheetName}
-            onHeaderRowChange={setVersionHeaderRow}
-            onMappingChange={setVersionMapping}
-          /> : null}
+          {versionSample ? (
+            <div className="space-y-1">
+              <ParseTemplateBuilder<'externalSku' | 'quantity'>
+                roles={inboundRoles}
+                sample={versionSample}
+                sheetName={sheetNameField.field.value}
+                headerRowNumber={headerRowField.field.value as number}
+                mapping={mappingField.field.value}
+                onSheetChange={sheetNameField.field.onChange}
+                onHeaderRowChange={headerRowField.field.onChange}
+                onMappingChange={mappingField.field.onChange}
+                customMappings={customMappingsField.field.value}
+                onCustomMappingsChange={customMappingsField.field.onChange}
+              />
+              {versionErrors.sheetName?.message ? <p role="alert" className="text-xs text-[color:var(--danger-foreground)]">{versionErrors.sheetName.message}</p> : null}
+              {versionErrors.headerRowNumber?.message ? <p role="alert" className="text-xs text-[color:var(--danger-foreground)]">{versionErrors.headerRowNumber.message}</p> : null}
+              {versionErrors.mapping?.externalSku?.message ? <p role="alert" className="text-xs text-[color:var(--danger-foreground)]">{versionErrors.mapping.externalSku.message}</p> : null}
+              {versionErrors.mapping?.quantity?.message ? <p role="alert" className="text-xs text-[color:var(--danger-foreground)]">{versionErrors.mapping.quantity.message}</p> : null}
+            </div>
+          ) : null}
         </div>
       </Modal>
 
@@ -579,72 +663,40 @@ export default function FactoriesView({
         open={isRegisterOpen}
         title="입고처 등록"
         description="새 입고처의 연락처와 메모를 등록합니다."
-        onOpenChange={setIsRegisterOpen}
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setIsRegisterOpen(false)}>
-              취소
-            </Button>
-            <Button
-              type="button"
-              onClick={submitFactory}
-              disabled={schemaState.status === 'missing' || isPending || draft.name.trim().length === 0}
-            >
-              등록
-            </Button>
-          </div>
-        }
+        onOpenChange={(open) => {
+          setIsRegisterOpen(open)
+          if (!open) setRegisterFormError(null)
+        }}
       >
         <div className="space-y-3">
           {schemaState.status === 'missing' && schemaState.message ? (
             <Card variant="muted" className="overflow-hidden">
-              <CardContent className="px-4 py-3 text-sm font-medium text-[color:var(--muted)]">{schemaState.message}</CardContent>
+              <CardContent className="px-4 py-3 text-sm font-medium text-[color:var(--muted-foreground)]">{schemaState.message}</CardContent>
             </Card>
           ) : null}
 
-          <div className="grid gap-3 md:grid-cols-2">
-          <div className="md:col-span-2">
-            <label className={ui.label}>입고처 이름</label>
-            <Input
-              value={draft.name}
-              onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
-              placeholder="예: 광주 봉제 협력사"
-            />
-          </div>
-          <div>
-            <label className={ui.label}>담당자</label>
-            <Input
-              value={draft.contactName}
-              onChange={(event) => setDraft((current) => ({ ...current, contactName: event.target.value }))}
-              placeholder="담당자 이름"
-            />
-          </div>
-          <div>
-            <label className={ui.label}>전화번호</label>
-            <Input
-              value={draft.phone}
-              onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))}
-              placeholder="010-0000-0000"
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className={ui.label}>이메일</label>
-            <Input
-              value={draft.email}
-              onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))}
-              placeholder="factory@example.com"
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className={ui.label}>메모</label>
-            <textarea
-              value={draft.notes}
-              onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))}
-              placeholder="납기 메모, 연락 가능 시간, 특이사항"
-              className={cx(ui.control, 'min-h-28 resize-y')}
-            />
-          </div>
-        </div>
+          {isRegisterOpen ? (
+            <AutoForm<FactoryFormValues>
+              schema={factoryFormProvider}
+              onSubmit={submitFactory}
+              uiComponents={autoFormUiComponents}
+              formComponents={autoFormFieldComponents}
+            >
+              {registerFormError ? (
+                <p role="alert" className="text-sm text-[color:var(--danger-foreground)]">
+                  {registerFormError}
+                </p>
+              ) : null}
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <Button type="button" variant="secondary" onClick={() => setIsRegisterOpen(false)}>
+                  취소
+                </Button>
+                <Button type="submit" disabled={schemaState.status === 'missing' || isPending}>
+                  등록
+                </Button>
+              </div>
+            </AutoForm>
+          ) : null}
         </div>
       </Modal>
     </div>

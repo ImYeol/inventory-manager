@@ -14,7 +14,7 @@ const viewMap: Record<string, OrderView> = {
   fulfilled: '발송 완료',
 }
 
-export default async function OrdersPage({ searchParams }: { searchParams?: Promise<{ view?: string }> } = {}) {
+export default async function OrdersPage({ searchParams }: { searchParams?: Promise<{ view?: string }> }) {
   const [orders, catalog, productWorkspace, trackingPresets] = await Promise.all([
     getOrdersWorkspaceData(),
     getCatalogData(),

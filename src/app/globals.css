@@ -1,4 +1,10 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+/*
+ ---break---
+ */
+@custom-variant dark (&:is(.dark *));
 
 /*
  * Visual foundation tokens.
@@ -25,21 +31,42 @@
   --hue-warning: #f59e0b;
   --hue-danger: #dc2626;
 
-  /* --- semantic: surface + text (warm neutral base) --- */
-  --background: #ffffff;
-  --foreground: var(--warm-900);
-  --muted: var(--warm-600);
-  --muted-foreground: var(--warm-500);
-  --surface: #ffffff;
-  --surface-muted: var(--warm-100);
-  --surface-strong: var(--warm-150);
-  --border: var(--warm-200);
-  --border-strong: var(--warm-300);
+  /* --- primitive: aubergine accent --- */
+  --aubergine-500: #4a154b;
+  --aubergine-600: #611f69;
+  --aubergine-400: #592466;
+  --canvas-cream: #f4ede4;
+  --canvas-lavender: #f9f0ff;
+  --link-blue: #1264a3;
+  --link-blue-hover: #3860be;
 
-  /* --- semantic: brand accent (amber, retained) --- */
-  --accent: #d97706;
-  --accent-foreground: #ffffff;
-  --focus-ring: rgba(217, 119, 6, 0.28);
+  /* --- semantic: surface + text ---
+     --muted/--muted-foreground/--border are shadcn preset canonical names
+     (values owned by the preset, no alias needed). --surface/--surface-muted/
+     --surface-strong/--border-strong are pre-existing semantic names this
+     codebase's components consume; kept as aliases onto preset canonical
+     tokens (ADR-037 expand strategy) instead of deleted. */
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --surface: var(--card);
+  --surface-muted: var(--muted);
+  --surface-strong: var(--secondary);
+  --border: oklch(0.922 0 0);
+  --border-strong: color-mix(in srgb, var(--border) 82%, black);
+
+  /* --- semantic: brand accent ---
+     Aliased onto the shadcn preset's --primary/--ring (indigo theme) instead
+     of the retired aubergine primitives. --accent here is this codebase's
+     legacy "brand accent" semantic name, not shadcn's own --accent (neutral
+     highlight) role — intentionally repurposed per ADR-037 so every
+     .ui-button-primary/.ui-badge/etc. consumer picks up the preset's brand
+     color without component edits. */
+  --accent: var(--primary);
+  --accent-press: color-mix(in srgb, var(--primary) 88%, black);
+  --accent-foreground: var(--primary-foreground);
+  --link: var(--primary);
+  --link-hover: color-mix(in srgb, var(--primary) 88%, black);
+  --focus-ring: color-mix(in srgb, var(--ring) 28%, transparent);
 
   /* --- semantic: status foreground text --- */
   --info-foreground: #1d4ed8;
@@ -54,17 +81,20 @@
   --space-4: 1rem;
   --space-5: 1.25rem;
   --space-6: 1.5rem;
+  --space-7: 1.75rem;
   --space-8: 2rem;
   --space-10: 2.5rem;
   --space-12: 3rem;
   --space-16: 4rem;
 
   /* --- radius scale --- */
-  --radius-xs: 0.375rem; /* 6px  - chips, shortcuts */
-  --radius-sm: 0.5rem;   /* 8px  - dense controls, menu items */
-  --radius-md: 0.625rem; /* 10px - controls, buttons */
-  --radius-lg: 1rem;     /* 16px - card, table shell, modal */
-  --radius-full: 9999px; /* pills, badges, tabs */
+  --radius-xs: 0.125rem;  /* 2px  - hairline tag, status pill */
+  --radius-sm: 0.25rem;   /* 4px  - form input */
+  --radius-md: 0.5rem;    /* 8px  - compact card chrome, dense control */
+  --radius-lg: 0.75rem;   /* 12px - mid-size card, secondary surface */
+  --radius-xl: 1rem;      /* 16px - card, table shell, modal */
+  --radius-xxl: 3rem;     /* 48px - stat badge backdrop */
+  --radius-full: 9999px;  /* pills, badges, tabs */
 
   /* --- control size / density tiers (heights) --- */
   --control-h-dense: 2rem;    /* 32px - dense toolbar buttons */
@@ -83,11 +113,16 @@
   --fw-medium: 500;
   --fw-semibold: 600;
 
-  /* --- elevation (role-based, warm shadow) --- */
-  --elevation-1: 0 1px 2px rgba(28, 25, 23, 0.05);
-  --elevation-2: 0 4px 12px rgba(28, 25, 23, 0.08);
-  --elevation-3: 0 16px 40px rgba(28, 25, 23, 0.10);
-  --elevation-4: 0 28px 70px rgba(28, 25, 23, 0.16);
+  /* --- gradient (pastel-mesh) --- */
+  --mesh-peach: #fff0e6;
+  --mesh-lavender: #e9d8ff;
+  --mesh-dusty-green: #dce8db;
+
+  /* --- elevation (role-based) --- */
+  --elevation-1: rgba(0, 0, 0, 0.1) 0 5px 20px 0;
+  --elevation-2: rgba(0, 0, 0, 0.1) 0 0 32px 0;
+  --elevation-3: rgba(0, 0, 0, 0.2) 0 1px 10px 0;
+  --elevation-4: 0 28px 70px rgba(74, 21, 75, 0.24), inset 0 0 0 1px var(--aubergine-600);
   --shadow: var(--elevation-1); /* legacy alias */
 
   /* --- motion (see docs/design/motion.md) --- */
@@ -99,9 +134,38 @@
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
 
-  /* --- typography families: local system stacks keep builds network-independent --- */
-  --font-sans-stack: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* --- typography families: Inter (ADR-037/next/font/google) first, local system
+     stacks kept as documented fallback so builds stay network-independent if the
+     font fails to load --- */
+  --font-sans-stack: var(--font-inter), "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono-stack: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.457 0.24 277.023);
+  --primary-foreground: oklch(0.962 0.018 272.314);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --destructive: oklch(0.577 0.245 27.325);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.879 0.169 91.605);
+  --chart-2: oklch(0.769 0.188 70.08);
+  --chart-3: oklch(0.666 0.179 58.318);
+  --chart-4: oklch(0.555 0.163 48.998);
+  --chart-5: oklch(0.473 0.137 46.201);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.511 0.262 276.966);
+  --sidebar-primary-foreground: oklch(0.962 0.018 272.314);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
 }
 
 @theme inline {
@@ -109,18 +173,58 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans-stack);
   --font-mono: var(--font-mono-stack);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 @layer base {
   html {
     background: var(--background);
     color: var(--foreground);
+    @apply font-sans;
   }
 
   body {
     min-height: 100vh;
     background:
-      radial-gradient(circle at top, rgba(255, 255, 255, 0.98), var(--warm-50) 42%, var(--warm-100) 92%),
+      radial-gradient(circle at 20% 50%, var(--mesh-peach) 0%, transparent 50%),
+      radial-gradient(circle at 80% 80%, var(--mesh-lavender) 0%, transparent 50%),
+      radial-gradient(circle at 40% 80%, var(--mesh-dusty-green) 0%, transparent 50%),
       var(--background);
     color: var(--foreground);
     font-family: var(--font-sans-stack);
@@ -128,10 +232,12 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
+    @apply bg-background text-foreground;
   }
 
   * {
     border-color: var(--border);
+    @apply border-border outline-ring/50;
   }
 
   button,
@@ -169,15 +275,13 @@
   .ui-surface,
   .ui-card {
     border: 1.5px solid var(--border-strong);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-xl);
     background: var(--surface);
     box-shadow: var(--elevation-1);
   }
 
   /* Scoped to .ui-card only (not the shared .surface/.ui-surface group): clips
-     .ui-card-header's background to the card's rounded corners. FixedSheet
-     (.ui-surface-strong) already clips itself via an explicit overflow-hidden
-     utility class in its own JSX and must not inherit this from the shared rule. */
+     .ui-card-header's background to the card's rounded corners. */
   .ui-card {
     overflow: hidden;
   }
@@ -200,7 +304,6 @@
     background: var(--surface-muted);
   }
 
-  .ui-surface-strong,
   .ui-card-strong {
     background: var(--surface-strong);
     border-color: var(--border-strong);
@@ -208,14 +311,9 @@
   }
 
   /* Elevation baseline (ADR-018 UI-system-check / docs/design/ui-guide.md §인지·그룹핑 원칙):
-     card = elevation-2, dropdown/overlay = elevation-3, modal/fixed-sheet = elevation-4. */
+     card = elevation-2, dropdown/overlay = elevation-3, modal = elevation-4. */
   .ui-card {
     box-shadow: var(--elevation-2);
-  }
-
-  /* FixedSheet is the only consumer of ui-surface-strong; it is a modal-tier fixed overlay. */
-  .ui-surface-strong {
-    box-shadow: var(--elevation-4);
   }
 
   .ui-label {
@@ -374,7 +472,7 @@
     align-items: center;
     justify-content: center;
     gap: var(--space-2);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-xl);
     border: 1px dashed var(--border-strong);
     background: var(--surface-muted);
     padding: var(--space-4);
@@ -396,9 +494,9 @@
     white-space: nowrap;
     flex-shrink: 0;
     gap: var(--space-2);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-full);
     border: 1px solid transparent;
-    padding: 0.7rem var(--space-4);
+    padding: 0.875rem 1.75rem;
     font-size: var(--text-md);
     font-weight: var(--fw-medium);
     transition:
@@ -497,33 +595,33 @@
     padding: 0;
     border-radius: 0;
     background: transparent;
-    color: var(--accent);
+    color: var(--link);
     text-decoration: underline;
     text-underline-offset: 0.2em;
   }
 
   .ui-button-link:hover {
-    color: color-mix(in srgb, var(--accent) 88%, black);
+    color: var(--link-hover);
   }
 
   .ui-button-sm {
     height: var(--control-h-md);
-    border-radius: var(--radius-sm);
-    padding-inline: var(--space-3);
+    border-radius: var(--radius-full);
+    padding: 0.5rem 1.125rem;
     font-size: var(--text-base);
   }
 
   .ui-button-lg {
     height: var(--control-h-lg);
-    border-radius: var(--radius-md);
-    padding-inline: var(--space-5);
+    border-radius: var(--radius-full);
+    padding: 1rem 1.875rem;
     font-size: var(--text-lg);
   }
 
   .ui-button-icon {
     height: var(--control-h);
     width: var(--control-h);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-full);
     padding: 0;
   }
 
@@ -640,7 +738,7 @@
 
   .ui-table-shell {
     border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-xl);
     overflow: hidden;
     background: white;
     box-shadow: var(--elevation-1);
@@ -662,7 +760,7 @@
 
   .ui-empty {
     border: 1px dashed var(--border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-xl);
     background: var(--surface-muted);
     color: var(--muted-foreground);
   }
@@ -674,7 +772,7 @@
     flex-direction: column;
     min-width: 0;
     border: 1.5px solid var(--border-strong);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-xl);
     overflow: hidden;
     background: var(--surface);
     box-shadow: var(--elevation-1);
@@ -822,7 +920,7 @@
     transform: translate(-50%, -50%);
     overflow: hidden;
     border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-xl);
     background: var(--surface);
     box-shadow: var(--elevation-4);
   }
@@ -875,4 +973,42 @@ input[type="number"]::-webkit-outer-spin-button {
 
 input[type="number"] {
   -moz-appearance: textfield;
+}
+
+/*
+ ---break---
+ */
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.398 0.195 277.366);
+  --primary-foreground: oklch(0.962 0.018 272.314);
+  --secondary: oklch(0.274 0.006 286.033);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.879 0.169 91.605);
+  --chart-2: oklch(0.769 0.188 70.08);
+  --chart-3: oklch(0.666 0.179 58.318);
+  --chart-4: oklch(0.555 0.163 48.998);
+  --chart-5: oklch(0.473 0.137 46.201);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.585 0.233 277.117);
+  --sidebar-primary-foreground: oklch(0.962 0.018 272.314);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
 }

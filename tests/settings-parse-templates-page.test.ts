@@ -19,7 +19,7 @@ afterEach(() => {
 
 describe('SettingsParseTemplatesPage', () => {
   it('redirects the dissolved settings parse-templates route to the owning supplier surface', async () => {
-    render(await SettingsParseTemplatesPage())
+    await SettingsParseTemplatesPage()
 
     expect(mocks.redirect).toHaveBeenCalledWith('/sourcing/factories')
   })

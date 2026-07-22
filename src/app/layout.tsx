@@ -1,5 +1,13 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
+import { Toaster } from "@/components/ui/sonner";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
 
 export const metadata: Metadata = {
   title: "재고관리 시스템",
@@ -12,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className="h-full antialiased">
+    <html lang="ko" className={`h-full antialiased ${inter.className} ${inter.variable}`}>
       <body className="min-h-screen bg-[color:var(--background)] text-[color:var(--foreground)]">
         <a
           href="#main-content"
@@ -21,6 +29,7 @@ export default function RootLayout({
           본문으로 건너뛰기
         </a>
         {children}
+        <Toaster />
       </body>
     </html>
   );

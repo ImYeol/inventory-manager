@@ -56,7 +56,7 @@ export function FileDropInput({
         if (file) handleFile(file)
       }}
     >
-      <FileUp aria-hidden="true" className="size-5 text-[color:var(--muted)]" />
+      <FileUp aria-hidden="true" className="size-5 text-[color:var(--muted-foreground)]" />
       <p className="text-sm font-medium text-[color:var(--foreground)]">{fileName ?? hint}</p>
       {description ? (
         <p className="text-xs text-[color:var(--muted-foreground)]">{description}</p>

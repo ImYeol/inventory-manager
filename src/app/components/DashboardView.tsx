@@ -1,10 +1,15 @@
 import Link from 'next/link'
 import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, PackageCheck } from 'lucide-react'
+import type { ColumnDef } from '@tanstack/react-table'
 import { StatusBadge } from '@/components/ui/badge-1'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { DataTable } from '@/components/ui/data-table'
 import type { OperationsDashboardData } from '@/lib/actions/dashboard'
 import { cx, ui } from './ui'
+
+type WarehouseSummary = OperationsDashboardData['warehouses'][number]
+type ExceptionSummary = OperationsDashboardData['exceptions'][number]
+type SourcingSummary = OperationsDashboardData['upcomingSourcing'][number]
 
 const metricItems = [
   { key: 'newOrders', label: '신규 주문', href: '/orders?view=new', icon: ArrowDownToLine },
@@ -18,19 +23,88 @@ const channelMeta = {
   naver: { label: '네이버', tone: 'success' as const },
 }
 
-function EmptyRow({ colSpan, children }: { colSpan: number; children: string }) {
-  return (
-    <TableRow>
-      <TableCell colSpan={colSpan} className="py-8 text-center text-sm text-[color:var(--muted-foreground)]">
-        {children}
-      </TableCell>
-    </TableRow>
-  )
-}
-
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric' }).format(new Date(`${value}T00:00:00`))
 }
+
+const warehouseColumns: ColumnDef<WarehouseSummary, unknown>[] = [
+  {
+    id: 'name',
+    header: '창고',
+    accessorFn: (warehouse) => warehouse.name,
+    cell: ({ getValue }) => <span className="font-medium">{getValue<string>()}</span>,
+  },
+  {
+    id: 'onHand',
+    header: '실재고',
+    accessorFn: (warehouse) => warehouse.onHand,
+    meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+  },
+  {
+    id: 'committed',
+    header: '예약',
+    accessorFn: (warehouse) => warehouse.committed,
+    meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+  },
+  {
+    id: 'available',
+    header: '가용',
+    accessorFn: (warehouse) => warehouse.available,
+    meta: { headerClassName: 'text-right', cellClassName: 'text-right font-semibold text-[color:var(--foreground)]' },
+  },
+]
+
+const exceptionColumns: ColumnDef<ExceptionSummary, unknown>[] = [
+  {
+    id: 'channel',
+    header: '채널',
+    enableSorting: false,
+    cell: ({ row }) => <StatusBadge tone={channelMeta[row.original.channel].tone}>{channelMeta[row.original.channel].label}</StatusBadge>,
+  },
+  {
+    id: 'externalOrderId',
+    header: '주문번호',
+    accessorFn: (item) => item.externalOrderId,
+    cell: ({ getValue }) => <span className="font-medium">{getValue<string>()}</span>,
+  },
+  {
+    id: 'customerName',
+    header: '수취인',
+    accessorFn: (item) => item.customerName,
+  },
+  {
+    id: 'reason',
+    header: '사유',
+    enableSorting: false,
+    cell: ({ row }) => <StatusBadge tone="warning">{row.original.reason}</StatusBadge>,
+  },
+]
+
+const sourcingColumns: ColumnDef<SourcingSummary, unknown>[] = [
+  {
+    id: 'expectedDate',
+    header: '도착 예정',
+    accessorFn: (item) => item.expectedDate,
+    cell: ({ getValue }) => <span className="font-medium">{formatDate(getValue<string>())}</span>,
+  },
+  {
+    id: 'factoryName',
+    header: '공장',
+    accessorFn: (item) => item.factoryName,
+  },
+  {
+    id: 'referenceCode',
+    header: '발주 참조',
+    accessorFn: (item) => item.referenceCode ?? '-',
+  },
+  {
+    id: 'remainingQuantity',
+    header: '미입고',
+    accessorFn: (item) => item.remainingQuantity,
+    meta: { headerClassName: 'text-right', cellClassName: 'text-right font-semibold text-[color:var(--foreground)]' },
+    cell: ({ getValue }) => `${getValue<number>()}개`,
+  },
+]
 
 export default function DashboardView({ metrics, flow, warehouses, exceptions, upcomingSourcing }: OperationsDashboardData) {
   const maxFlow = Math.max(...flow.flatMap((item) => [item.inbound, item.outbound]), 1)
@@ -94,14 +168,13 @@ export default function DashboardView({ metrics, flow, warehouses, exceptions, u
             <Link href="/inventory" className={cx(ui.buttonSecondary, 'h-8 px-3 text-xs')}>재고 보기</Link>
           </CardHeader>
           <CardContent contentLayout="continuous">
-            <Table aria-label="창고별 재고 상태">
-              <TableHeader><TableRow><TableHead>창고</TableHead><TableHead className="text-right">실재고</TableHead><TableHead className="text-right">예약</TableHead><TableHead className="text-right">가용</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {warehouses.length === 0 ? <EmptyRow colSpan={4}>등록된 창고가 없습니다.</EmptyRow> : warehouses.map((warehouse) => (
-                  <TableRow key={warehouse.id}><TableCell className="font-medium">{warehouse.name}</TableCell><TableCell className="text-right">{warehouse.onHand}</TableCell><TableCell className="text-right">{warehouse.committed}</TableCell><TableCell className="text-right font-semibold text-[color:var(--foreground)]">{warehouse.available}</TableCell></TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DataTable
+              bare
+              tableAriaLabel="창고별 재고 상태"
+              columns={warehouseColumns}
+              rows={warehouses}
+              emptyState="등록된 창고가 없습니다."
+            />
           </CardContent>
         </Card>
 
@@ -111,14 +184,13 @@ export default function DashboardView({ metrics, flow, warehouses, exceptions, u
             <Link href="/orders?view=exception" className={cx(ui.buttonSecondary, 'h-8 px-3 text-xs')}>주문 보기</Link>
           </CardHeader>
           <CardContent contentLayout="continuous">
-            <Table aria-label="처리해야 할 주문 예외">
-              <TableHeader><TableRow><TableHead>채널</TableHead><TableHead>주문번호</TableHead><TableHead>수취인</TableHead><TableHead>사유</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {exceptions.length === 0 ? <EmptyRow colSpan={4}>확인할 주문 예외가 없습니다.</EmptyRow> : exceptions.map((item) => (
-                  <TableRow key={item.id}><TableCell><StatusBadge tone={channelMeta[item.channel].tone}>{channelMeta[item.channel].label}</StatusBadge></TableCell><TableCell className="font-medium">{item.externalOrderId}</TableCell><TableCell>{item.customerName}</TableCell><TableCell><StatusBadge tone="warning">{item.reason}</StatusBadge></TableCell></TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DataTable
+              bare
+              tableAriaLabel="처리해야 할 주문 예외"
+              columns={exceptionColumns}
+              rows={exceptions}
+              emptyState="확인할 주문 예외가 없습니다."
+            />
           </CardContent>
         </Card>
       </div>
@@ -129,14 +201,13 @@ export default function DashboardView({ metrics, flow, warehouses, exceptions, u
           <Link href="/sourcing/arrivals" className={cx(ui.buttonSecondary, 'h-8 px-3 text-xs')}>소싱 보기</Link>
         </CardHeader>
         <CardContent contentLayout="continuous">
-          <Table aria-label="곧 도착할 소싱">
-            <TableHeader><TableRow><TableHead>도착 예정</TableHead><TableHead>공장</TableHead><TableHead>발주 참조</TableHead><TableHead className="text-right">미입고</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {upcomingSourcing.length === 0 ? <EmptyRow colSpan={4}>예정된 소싱 입고가 없습니다.</EmptyRow> : upcomingSourcing.map((item) => (
-                <TableRow key={item.id}><TableCell className="font-medium">{formatDate(item.expectedDate)}</TableCell><TableCell>{item.factoryName}</TableCell><TableCell>{item.referenceCode ?? '-'}</TableCell><TableCell className="text-right font-semibold text-[color:var(--foreground)]">{item.remainingQuantity}개</TableCell></TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            bare
+            tableAriaLabel="곧 도착할 소싱"
+            columns={sourcingColumns}
+            rows={upcomingSourcing}
+            emptyState="예정된 소싱 입고가 없습니다."
+          />
         </CardContent>
       </Card>
     </div>

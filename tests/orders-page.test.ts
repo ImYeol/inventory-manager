@@ -34,12 +34,14 @@ describe('OrdersPage', () => {
     expect(screen.getByRole('button', { name: '필터 초기화' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '주문 동기화' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '송장 등록' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '송장 등록' }))
-    expect(screen.getByRole('dialog', { name: '송장 업로드' })).toBeTruthy()
     expect(screen.getByRole('table', { name: '주문 목록' })).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: '채널' }).className).toContain('px-3')
     expect(screen.getByRole('columnheader', { name: '채널' }).className).toContain('py-2.5')
     expect(screen.getByText('조건에 맞는 주문이 없습니다.')).toBeTruthy()
+
+    // Sheet is a true modal (base-ui default: background is inert while open).
+    fireEvent.click(screen.getByRole('button', { name: '송장 등록' }))
+    expect(screen.getByRole('dialog', { name: '송장 업로드' })).toBeTruthy()
   })
 
   it('provides named product and warehouse selectors instead of raw IDs for exception rows', async () => {

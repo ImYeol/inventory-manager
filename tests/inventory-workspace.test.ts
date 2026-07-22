@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 const navigation = vi.hoisted(() => ({ refresh: vi.fn() }))
 
@@ -14,11 +14,13 @@ vi.mock('next/link', () => ({
     href,
     children,
     className,
+    'aria-label': ariaLabel,
   }: {
     href: string
     children: React.ReactNode
     className?: string
-  }) => React.createElement('a', { href, className }, children),
+    'aria-label'?: string
+  }) => React.createElement('a', { href, className, ...(ariaLabel && { 'aria-label': ariaLabel }) }, children),
 }))
 
 vi.mock('@/app/(protected)/inout/InOutForm', () => ({
@@ -143,11 +145,18 @@ describe('InventoryWorkspace', () => {
             quantity: 4,
             warehouseId: 1,
             warehouseName: '오금동',
+            sourceChannel: null,
+            referenceType: null,
+            referenceId: null,
+            memo: null,
             createdAt: '2026-04-19T00:00:00.000Z',
             modelName: 'LP01',
             sizeName: 'S',
             colorName: '네이비',
             colorRgb: '#111111',
+            canRevert: true,
+            revertDisabledReason: null,
+            revertSummary: null,
           },
         ],
       }),
@@ -193,17 +202,28 @@ describe('InventoryWorkspace', () => {
     expect(screen.getByRole('dialog', { name: '수동 입고' })).toBeTruthy()
     expect(screen.getByText('InOutForm:inbound:2:none')).toBeTruthy()
 
+    // Sheet is a true modal (base-ui default: background is inert while open),
+    // so switching to another quick-action mode closes the current sheet first.
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
     fireEvent.pointerDown(screen.getByRole('button', { name: '다른 재고 운영 action 더보기' }))
     let operationsMenu = screen.getByRole('menu')
     fireEvent.click(within(operationsMenu).getByText('수동 출고'))
     expect(screen.getByRole('dialog', { name: '수동 출고' })).toBeTruthy()
     expect(screen.getByText('InOutForm:manual-outbound:2:none')).toBeTruthy()
 
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
     fireEvent.pointerDown(screen.getByRole('button', { name: '다른 재고 운영 action 더보기' }))
     operationsMenu = screen.getByRole('menu')
     fireEvent.click(within(operationsMenu).getByText('실사 조정'))
     expect(screen.getByRole('dialog', { name: '실사 수량 조정' })).toBeTruthy()
     expect(screen.getByText('InOutForm:count-adjustment:2:none')).toBeTruthy()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 
     fireEvent.pointerDown(screen.getByRole('button', { name: '다른 재고 운영 action 더보기' }))
     operationsMenu = screen.getByRole('menu')
@@ -212,7 +232,7 @@ describe('InventoryWorkspace', () => {
     expect(screen.getByText('WarehouseTransferForm:none')).toBeTruthy()
   })
 
-  it('opens a mode-locked count-adjustment sheet pre-filled with the row variant and warehouse, and clears the prefill for toolbar-triggered actions', () => {
+  it('opens a mode-locked count-adjustment sheet pre-filled with the row variant and warehouse, and clears the prefill for toolbar-triggered actions', async () => {
     render(
       React.createElement(InventoryWorkspace, {
         warehouses: [
@@ -235,6 +255,11 @@ describe('InventoryWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: '조정' }))
     expect(screen.getByRole('dialog', { name: '실사 수량 조정' })).toBeTruthy()
     expect(screen.getByText('InOutForm:count-adjustment:1:1-11-21')).toBeTruthy()
+
+    // Sheet is a true modal (base-ui default: background is inert while open),
+    // so the toolbar action is reachable again only after the sheet closes.
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 
     fireEvent.click(screen.getByRole('button', { name: '수동 입고' }))
     expect(screen.getByRole('dialog', { name: '수동 입고' })).toBeTruthy()
@@ -274,7 +299,7 @@ describe('InventoryWorkspace', () => {
 
     expect(screen.getByText('오금동')).toBeTruthy()
     expect(screen.getAllByText('0').length).toBeGreaterThan(0)
-    expect(screen.getByRole('link', { name: '7' }).getAttribute('href')).toBe('/sourcing/arrivals')
+    expect(screen.getByRole('link', { name: '입고 예정 7개 보기' }).getAttribute('href')).toBe('/sourcing/arrivals')
   })
 
   it('summarizes explicit channel mappings in the SKU cell and distinguishes sync errors from unmapped SKUs', () => {
@@ -353,5 +378,32 @@ describe('InventoryWorkspace', () => {
 
     expect(screen.getByText('HistoryWarehouse:1')).toBeTruthy()
     expect(screen.getByText('HistorySearch:LP')).toBeTruthy()
+  })
+
+  it('renders incoming stock as a link to sourcing arrivals when incoming > 0', () => {
+    render(
+      React.createElement(InventoryWorkspace, {
+        warehouses: [
+          { id: 1, name: '오금동' },
+        ],
+        models: [
+          {
+            id: 1,
+            name: 'LP01',
+            sizes: [{ id: 11, name: 'S', sortOrder: 1, modelId: 1 }],
+            colors: [{ id: 21, name: '네이비', rgbCode: '#111111', textWhite: true, sortOrder: 1, modelId: 1 }],
+            inventory: [
+              { id: 101, modelId: 1, sizeId: 11, colorId: 21, warehouseId: 1, warehouseName: '오금동', quantity: 2 },
+            ],
+          },
+        ],
+        transactions: [],
+        incomingByVariant: { '1:11:21:1': 3 },
+      }),
+    )
+
+    const link = screen.getByRole('link', { name: '입고 예정 3개 보기' })
+    expect(link).toBeTruthy()
+    expect(link.getAttribute('href')).toBe('/sourcing/arrivals')
   })
 })

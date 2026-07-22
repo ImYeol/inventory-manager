@@ -579,7 +579,7 @@ export async function getProductWorkspaceData(): Promise<{
       optionName: row.option_name, sellerSku: row.seller_sku, listingStatus: row.listing_status as ProductWorkspaceChannelRef['listingStatus'],
       channelReported: row.channel_reported, lastSyncedAt: row.last_synced_at, lastSyncError: row.last_sync_error,
       syncTargetQuantity: row.sync_target_quantity, syncStatus: row.sync_status === 'required' || row.sync_status === 'failed' || row.sync_status === 'succeeded' ? row.sync_status : 'idle',
-      verificationStatus: row.verification_status === 'verified' ? 'verified' : 'unverified',
+      verificationStatus: (row.verification_status === 'verified' ? 'verified' : 'unverified') as ProductWorkspaceChannelRef['verificationStatus'],
       imageUrl: typeof attributes.imageUrl === 'string' ? attributes.imageUrl : null,
       price: typeof attributes.price === 'number' ? attributes.price : null,
     }
@@ -616,7 +616,7 @@ export async function getTransactionsWithRelations() {
         memo: null,
       })),
       error: fallbackRes.error,
-    }
+    } as typeof txRes
   }
 
   const [modelsRes, sizesRes, colorsRes, warehousesRes] = await Promise.all([

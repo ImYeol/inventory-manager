@@ -9,7 +9,6 @@ import { PageHeader } from '@/app/components/ui'
 import { StatusBadge } from '@/components/ui/badge-1'
 import { ChannelBadge } from '@/components/ui/channel-badge'
 import { Button } from '@/components/ui/button'
-import { BasicDataTable } from '@/components/ui/basic-data-table'
 import { FilterToolbar } from '@/components/ui/filter-toolbar'
 import { TableSurface } from '@/components/ui/table-surface'
 import { Input } from '@/components/ui/input'
@@ -22,7 +21,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Modal } from '@/components/ui/modal'
-import { FixedSheet } from '@/components/ui/fixed-sheet'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { StoreConnectionStatus } from '@/components/ui/store-connection-status'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -216,42 +215,6 @@ describe('shared action and status primitives', () => {
     expect(screen.getByTestId('muted-status').querySelector('[aria-hidden="true"]')?.className).toContain('bg-[color:var(--muted-foreground)]')
   })
 
-  it('supports row interaction on the basic data table without breaking cell rendering', () => {
-    const onRowClick = vi.fn()
-
-    render(
-      React.createElement(BasicDataTable<{ id: number; name: string; quantity: number }>, {
-        columns: [
-          { key: 'name', label: '상품' },
-          { key: 'quantity', label: '수량', align: 'right' as const },
-        ],
-        rows: [{ id: 1, name: 'LP01', quantity: 3 }],
-        rowKey: (row) => row.id,
-        renderCell: (row, columnKey) => (columnKey === 'name' ? row.name : row.quantity),
-        emptyState: '데이터가 없습니다.',
-        onRowClick,
-        rowAriaLabel: (row) => `${row.name} 상세`,
-        getRowClassName: () => 'row-class',
-      }),
-    )
-
-    const row = screen.getByText('LP01').closest('tr')
-    expect(row).toBeTruthy()
-    expect((row as HTMLTableRowElement).className).toContain('cursor-pointer')
-    expect((row as HTMLTableRowElement).className).toContain('row-class')
-    expect((row as HTMLTableRowElement).getAttribute('tabindex')).toBe('0')
-    expect((row as HTMLTableRowElement).getAttribute('aria-label')).toBe('LP01 상세')
-
-    fireEvent.click(row as HTMLTableRowElement)
-    fireEvent.keyDown(row as HTMLTableRowElement, { key: 'Enter', code: 'Enter' })
-
-    expect(onRowClick).toHaveBeenCalledTimes(2)
-    expect(onRowClick).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({ id: 1, name: 'LP01', quantity: 3 }),
-    )
-  })
-
   it('renders card variants with the shared surface border language', () => {
     render(
       React.createElement(
@@ -311,85 +274,54 @@ describe('shared action and status primitives', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
-  it('keeps fixed sheet content above its portal overlay and supports escape close', () => {
-    const onClose = vi.fn()
-
-    render(
-      React.createElement(
-        FixedSheet,
-        { open: true, title: '빠른 입고', description: '첫 입고와 기존 재고 증가를 처리합니다.', onClose },
-        '입고 편집 표',
+  const renderSheet = (props: { open: boolean; onOpenChange: (open: boolean) => void }, children: React.ReactNode) =>
+    React.createElement(Sheet, { open: props.open, onOpenChange: props.onOpenChange },
+      React.createElement(SheetContent, { side: 'right', className: 'sm:max-w-xl' },
+        React.createElement(SheetHeader, null,
+          React.createElement(SheetTitle, null, '빠른 입고'),
+          React.createElement(SheetDescription, null, '첫 입고와 기존 재고 증가를 처리합니다.'),
+        ),
+        children,
       ),
     )
 
-    const dialog = screen.getByRole('dialog', { name: '빠른 입고' })
-    const overlay = dialog.querySelector('[aria-hidden="true"]')
-    const sheet = screen.getByText('입고 편집 표').parentElement?.parentElement
+  it('portals sheet content to body with an accessible title/description and supports escape close', async () => {
+    const onOpenChange = vi.fn()
 
-    expect(dialog.parentElement).toBe(document.body)
+    render(renderSheet({ open: true, onOpenChange }, '입고 편집 표'))
+
+    const dialog = await screen.findByRole('dialog', { name: '빠른 입고' })
+
+    expect(document.body.contains(dialog)).toBe(true)
     expect(dialog.getAttribute('aria-describedby')).toBeTruthy()
-    expect(overlay?.tagName).toBe('DIV')
-    expect(overlay?.className).toContain('z-0')
-    expect(sheet?.className).toContain('z-10')
-    expect(sheet?.className).toContain('rounded-t-[var(--radius-lg)]')
-    expect(screen.getByRole('button', { name: '닫기' }).parentElement?.className).toContain('w-full')
-    expect(screen.getByRole('button', { name: '닫기' }).parentElement?.className).toContain('justify-between')
-    expect(screen.getByText('빠른 입고').parentElement?.className).toContain('min-w-0')
-    expect(screen.getByRole('button', { name: '닫기' }).className).toContain('shrink-0')
-    expect(document.body.style.overflow).toBe('hidden')
+    expect(screen.getByText('입고 편집 표')).toBeTruthy()
 
     fireEvent.keyDown(document, { key: 'Escape' })
 
-    expect(onClose).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalled())
+    expect(onOpenChange.mock.calls[0][0]).toBe(false)
   })
 
-  it('keeps focus inside the fixed sheet across rerenders', () => {
-    const { rerender } = render(
-      React.createElement(FixedSheet, { open: true, title: '입고 작업', onClose: vi.fn() },
-        React.createElement('div', null,
-          React.createElement('input', { 'aria-label': '입고 수량' }),
-          React.createElement('button', null, '저장'),
-        ),
-      ),
-    )
-    const quantity = screen.getByLabelText('입고 수량')
-    quantity.focus()
+  it('closes the sheet when the overlay is clicked', async () => {
+    const onOpenChange = vi.fn()
 
-    rerender(
-      React.createElement(FixedSheet, { open: true, title: '입고 작업', onClose: vi.fn() },
-        React.createElement('div', null,
-          React.createElement('input', { 'aria-label': '입고 수량' }),
-          React.createElement('button', null, '저장'),
-        ),
-      ),
-    )
+    render(renderSheet({ open: true, onOpenChange }, '입고 편집 표'))
+    await screen.findByRole('dialog', { name: '빠른 입고' })
 
-    expect(document.activeElement).toBe(screen.getByLabelText('입고 수량'))
-    screen.getByRole('button', { name: '저장' }).focus()
-    fireEvent.keyDown(document, { key: 'Tab' })
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: '닫기' }))
+    const overlay = document.querySelector('[data-slot="sheet-overlay"]') as HTMLElement
+    expect(overlay).toBeTruthy()
+    fireEvent.click(overlay)
+
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalled())
+    expect(onOpenChange.mock.calls[0][0]).toBe(false)
   })
 
-  it('focuses an actionable sheet control and wraps backward from the dialog boundary', async () => {
-    render(
-      React.createElement(FixedSheet, { open: true, title: '입고 작업', onClose: vi.fn() },
-        React.createElement('input', { 'aria-label': '입고 수량' }),
-      ),
-    )
-
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: '닫기' })))
-    const dialog = screen.getByRole('dialog', { name: '입고 작업' })
-    dialog.focus()
-    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
-    expect(document.activeElement).toBe(screen.getByLabelText('입고 수량'))
-  })
-
-  it('returns focus to the opening control after the fixed sheet closes', async () => {
+  it('returns focus to the opening control after the sheet closes', async () => {
     function Example() {
       const [open, setOpen] = React.useState(false)
       return React.createElement('div', null,
         React.createElement('button', { onClick: () => setOpen(true) }, '입고 열기'),
-        React.createElement(FixedSheet, { open, title: '입고 작업', onClose: () => setOpen(false) }, '입고 편집 표'),
+        renderSheet({ open, onOpenChange: setOpen }, React.createElement('input', { 'aria-label': '입고 수량' })),
       )
     }
 
@@ -397,7 +329,11 @@ describe('shared action and status primitives', () => {
     const trigger = screen.getByRole('button', { name: '입고 열기' })
     trigger.focus()
     fireEvent.click(trigger)
+
+    await screen.findByRole('dialog', { name: '빠른 입고' })
     fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     await waitFor(() => expect(document.activeElement).toBe(trigger))
   })
 

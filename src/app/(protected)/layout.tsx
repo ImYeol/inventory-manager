@@ -9,14 +9,13 @@ export default async function ProtectedLayout({
 }>) {
   const supabase = await createSupabaseServerClient()
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
 
-  if (!session) {
+  if (error || !user) {
     redirect('/login')
   }
-
-  const user = session.user
   const fullName =
     user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.user_metadata?.display_name ?? ''
   const displayName = fullName || user.email?.split('@')[0] || '사용자'

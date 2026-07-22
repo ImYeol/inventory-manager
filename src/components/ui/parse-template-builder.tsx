@@ -2,10 +2,14 @@
 
 import { useEffect, useRef } from 'react'
 import type * as XLSXType from 'xlsx'
-import { BasicDataTable } from './basic-data-table'
+import type { ColumnDef } from '@tanstack/react-table'
+import { Trash2 } from 'lucide-react'
+import { DataTable } from './data-table'
+import { Button } from './button'
 import { Input } from './input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select'
 import { ui } from '@/app/components/ui'
+import { readUploadedWorkbook } from '@/lib/parse-template-file'
 
 /**
  * Shared 파싱 템플릿 primitive: file -> sheet/header-row selection -> column-to-role
@@ -35,8 +39,15 @@ export type ParseTemplatePreset<RoleKey extends string = string> = {
 
 export type ParseTemplateSample = { sheets: Array<{ name: string; rows: string[][] }> }
 
+/** A user-named, ad-hoc extra column mapping beyond the domain's fixed `roles` — free text, not a managed/reusable field. */
+export type ParseTemplateCustomMapping = { key: string; name: string; column: string }
+
 const EMPTY_VALUE = '__parse_template_empty__'
 const DEFAULT_PREVIEW_ROW_COUNT = 5
+
+function customMappingKey() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
 
 function normalizeHeader(header: string) {
   return header.normalize('NFC').replace(/﻿/g, '').replace(/\s+/g, '').trim()
@@ -101,7 +112,7 @@ export function buildPreviewRows<RoleKey extends string>(
 /** Client-side adapter: reads every sheet's raw grid so the builder can switch sheets without re-reading the file. */
 export async function workbookToSample(file: File, maxRowsPerSheet = 200): Promise<ParseTemplateSample> {
   const XLSX: typeof XLSXType = await import('xlsx')
-  const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' })
+  const workbook = readUploadedWorkbook(XLSX, await file.arrayBuffer())
   return {
     sheets: workbook.SheetNames.map((name) => ({
       name,
@@ -132,6 +143,15 @@ export type ParseTemplateBuilderProps<RoleKey extends string> = {
   presetLabel?: string
   previewLabel?: string
   emptyPreviewState?: string
+  /**
+   * Free-text extra column mappings beyond the fixed `roles` (e.g. "박스번호" -> a
+   * chosen header). Ad-hoc per template version, not a managed/reusable field list.
+   * Omit to hide this section entirely.
+   */
+  customMappings?: ParseTemplateCustomMapping[]
+  onCustomMappingsChange?: (mappings: ParseTemplateCustomMapping[]) => void
+  customMappingsLabel?: string
+  addCustomMappingLabel?: string
 }
 
 export function ParseTemplateBuilder<RoleKey extends string>({
@@ -153,11 +173,21 @@ export function ParseTemplateBuilder<RoleKey extends string>({
   presetLabel = '파싱 템플릿 프리셋',
   previewLabel = '미리보기',
   emptyPreviewState = '파일을 올리면 실제 데이터 미리보기가 표시됩니다.',
+  customMappings,
+  onCustomMappingsChange,
+  customMappingsLabel = '추가 열 매핑',
+  addCustomMappingLabel = '열 매핑 추가',
 }: ParseTemplateBuilderProps<RoleKey>) {
   const sheetNames = sample ? sampleSheetNames(sample) : []
   const headers = sample ? extractHeaders(sample, sheetName, headerRowNumber) : []
   const dataRows = sample ? extractDataRows(sample, sheetName, headerRowNumber) : []
   const previewRows = buildPreviewRows(headers, dataRows, mapping, roles, previewRowCount)
+  const previewColumns: ColumnDef<Record<RoleKey, string>, unknown>[] = roles.map((role) => ({
+    id: role.key,
+    header: role.label,
+    enableSorting: false,
+    cell: ({ row }) => row.original[role.key],
+  }))
   const fingerprint = headers.length ? headerFingerprint(headers) : ''
   const headersKey = headers.join('|')
   const lastAutoMatchedKey = useRef<string | null>(null)
@@ -238,13 +268,65 @@ export function ParseTemplateBuilder<RoleKey extends string>({
         ))}
       </div>
 
+      {onCustomMappingsChange ? (
+        <div className="space-y-2">
+          <p className={ui.label}>{customMappingsLabel}</p>
+          {(customMappings ?? []).map((row) => (
+            <div key={row.key} className="flex items-end gap-2">
+              <label className="flex-1 space-y-1">
+                <span className="sr-only">열 이름</span>
+                <Input
+                  aria-label="열 이름"
+                  placeholder="예: 박스번호"
+                  value={row.name}
+                  onChange={(event) =>
+                    onCustomMappingsChange((customMappings ?? []).map((item) => (item.key === row.key ? { ...item, name: event.target.value } : item)))
+                  }
+                />
+              </label>
+              <label className="flex-1 space-y-1">
+                <span className="sr-only">{row.name || '열'} 매핑</span>
+                <Select
+                  value={row.column || EMPTY_VALUE}
+                  onValueChange={(value) =>
+                    onCustomMappingsChange((customMappings ?? []).map((item) => (item.key === row.key ? { ...item, column: value === EMPTY_VALUE ? '' : value } : item)))
+                  }
+                >
+                  <SelectTrigger aria-label={`${row.name || '열'} 매핑`}><SelectValue placeholder="열 선택" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={EMPTY_VALUE}>열 선택</SelectItem>
+                    {headers.map((header) => <SelectItem key={header} value={header}>{header}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="열 매핑 삭제"
+                onClick={() => onCustomMappingsChange((customMappings ?? []).filter((item) => item.key !== row.key))}
+              >
+                <Trash2 aria-hidden="true" />
+              </Button>
+            </div>
+          ))}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onCustomMappingsChange([...(customMappings ?? []), { key: customMappingKey(), name: '', column: '' }])}
+          >
+            {addCustomMappingLabel}
+          </Button>
+        </div>
+      ) : null}
+
       <div className="space-y-1">
         <p className={ui.label}>{previewLabel}</p>
-        <BasicDataTable
-          columns={roles.map((role) => ({ key: role.key, label: role.label }))}
-          rows={previewRows.map((row, index) => ({ index, row }))}
-          rowKey={(item) => item.index}
-          renderCell={(item, key) => item.row[key as RoleKey]}
+        <DataTable<Record<RoleKey, string>>
+          bare
+          columns={previewColumns}
+          rows={previewRows}
           emptyState={emptyPreviewState}
         />
       </div>

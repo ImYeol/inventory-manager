@@ -105,9 +105,8 @@ describe('elevation baseline (ADR-018 UI-system-check)', () => {
     expectElevation('ui-dropdown-menu-content', 3)
   })
 
-  it('keeps modal and fixed-sheet surfaces at elevation-4', () => {
+  it('keeps modal surfaces at elevation-4', () => {
     expectElevation('ui-modal', 4)
-    expectElevation('ui-surface-strong', 4)
   })
 
   it('gives .ui-card its own elevation-2 override rule after the shared surface/card baseline block', () => {

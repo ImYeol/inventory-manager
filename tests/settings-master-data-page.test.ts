@@ -20,7 +20,7 @@ afterEach(() => {
 
 describe('SettingsMasterDataPage', () => {
   it('redirects deprecated settings master-data route to products', async () => {
-    render(await SettingsMasterDataPage())
+    await SettingsMasterDataPage()
 
     expect(mocks.redirect).toHaveBeenCalledWith('/products')
   })

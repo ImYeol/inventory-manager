@@ -18,7 +18,7 @@ This is a single-context repository. Existing documents are authoritative; this 
 - Inbound import, mapping, allocation, and receipt flow: `docs/product/inbound-receiving.md`
 - Ownership, routes, and data boundaries: `docs/architecture/overview.md`
 - UI behavior and composition: `docs/design/ui-guide.md`
-- Visual tokens: `docs/design/tokens.md`; motion tokens: `docs/design/motion.md`
+- Visual system rationale: `docs/design/DESIGN.md`
 - Shared primitive reuse: `docs/design/components.md`
 - External Naver integration: `docs/integrations/naver-commerce-api.md`
 - Prior decisions: relevant entries in `docs/adr/`

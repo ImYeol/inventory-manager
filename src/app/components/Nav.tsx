@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import {
   Boxes,
   ChevronsUpDown,
@@ -13,9 +13,18 @@ import {
   PackageSearch,
   KeyRound,
   ClipboardList,
+  X,
 } from 'lucide-react'
 import { logout } from '@/app/login/actions'
 import { MenuLink, MenuSection } from '@/components/ui/menu'
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarProvider,
+  useSidebar,
+} from '@/components/ui/sidebar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -74,6 +83,29 @@ function NavLink({
   return <MenuLink href={item.href} label={item.label} icon={item.icon} active={isActive} compact={compact} onClick={onNavigate} />
 }
 
+function MobileCloseButton() {
+  const { isMobile, setOpenMobile } = useSidebar()
+
+  if (!isMobile) {
+    return null
+  }
+
+  return (
+    <div className="flex items-center justify-between px-4 pt-4">
+      <p className="text-sm font-semibold text-[color:var(--foreground)]">메뉴</p>
+      <button
+        type="button"
+        aria-label="메뉴 닫기"
+        onClick={() => setOpenMobile(false)}
+        className={cx(ui.buttonGhost, 'h-10 min-w-10 px-3')}
+      >
+        <X className="h-4 w-4" aria-hidden="true" />
+        <span className="sr-only">닫기</span>
+      </button>
+    </div>
+  )
+}
+
 function NavigationContent({
   pathname,
   user,
@@ -88,37 +120,42 @@ function NavigationContent({
 
   return (
     <>
-      <div className="border-b border-[color:var(--border)] px-4 py-4">
-        <div className="flex items-center gap-2.5">
-          <span
-            aria-hidden="true"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[color:var(--accent)] text-base font-bold text-white shadow-[var(--elevation-1)]"
-          >
-            S
-          </span>
-          <div className="min-w-0 leading-tight">
-            <h1 className="truncate text-base font-semibold tracking-tight text-[color:var(--foreground)]">Seleccase Inventory</h1>
+      <SidebarHeader className="gap-0 p-0">
+        <MobileCloseButton />
+        <div className="border-b border-[color:var(--border)] px-4 py-4">
+          <div className="flex items-center gap-2.5">
+            <span
+              aria-hidden="true"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[color:var(--accent)] text-base font-bold text-white shadow-[var(--elevation-1)]"
+            >
+              S
+            </span>
+            <div className="min-w-0 leading-tight">
+              <h1 className="truncate text-base font-semibold tracking-tight text-[color:var(--foreground)]">Seleccase Inventory</h1>
+            </div>
           </div>
         </div>
-      </div>
+      </SidebarHeader>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-3" aria-label="주요 메뉴">
-        {directItems.map((item) => (
-          <NavLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />
-        ))}
-        <MenuSection
-          title="소싱"
-          icon={<PackageSearch className="h-4 w-4" />}
-          open={sourcingOpen}
-          onToggle={() => setSourcingOpen((open) => !open)}
-        >
-          {sourcingItems.map((item) => (
-            <NavLink key={item.href} item={item} pathname={pathname} compact onNavigate={onNavigate} />
+      <SidebarContent className="gap-0 overflow-visible">
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-3" aria-label="주요 메뉴">
+          {directItems.map((item) => (
+            <NavLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />
           ))}
-        </MenuSection>
-      </nav>
+          <MenuSection
+            title="소싱"
+            icon={<PackageSearch className="h-4 w-4" />}
+            open={sourcingOpen}
+            onToggle={() => setSourcingOpen((open) => !open)}
+          >
+            {sourcingItems.map((item) => (
+              <NavLink key={item.href} item={item} pathname={pathname} compact onNavigate={onNavigate} />
+            ))}
+          </MenuSection>
+        </nav>
+      </SidebarContent>
 
-      <div className="mt-auto border-t border-[color:var(--border)] p-3">
+      <SidebarFooter className="gap-0 border-t border-[color:var(--border)] p-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -159,66 +196,77 @@ function NavigationContent({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      </SidebarFooter>
+    </>
+  )
+}
+
+function MobileTopbar({
+  pathname,
+  user,
+}: {
+  pathname: string
+  user?: NavProps['user']
+}) {
+  const { openMobile, setOpenMobile } = useSidebar()
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const wasOpenRef = useRef(false)
+
+  // Sidebar's mobile sheet has no bound trigger element (it is opened
+  // imperatively via setOpenMobile), so restore focus to the hamburger
+  // button ourselves when the drawer closes, matching the previous
+  // Radix-Dialog-based drawer's behavior.
+  useEffect(() => {
+    if (wasOpenRef.current && !openMobile) {
+      triggerRef.current?.focus()
+    }
+    wasOpenRef.current = openMobile
+  }, [openMobile])
+
+  return (
+    <div className={ui.mobileTopbar}>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-label="메뉴 열기"
+        onClick={() => setOpenMobile(true)}
+        className={cx(ui.buttonSecondary, 'h-11 min-w-11 gap-2 px-3')}
+      >
+        <Menu className="h-4 w-4" />
+        메뉴
+      </button>
+      <div className="min-w-0 px-3 text-center">
+        <p className="truncate text-sm font-semibold text-[color:var(--foreground)]">Seleccase Inventory</p>
       </div>
+      <span aria-hidden="true" className="h-11 min-w-11" />
+    </div>
+  )
+}
+
+function NavInner({ pathname, user }: { pathname: string; user?: NavProps['user'] }) {
+  const { setOpenMobile } = useSidebar()
+
+  return (
+    <>
+      <Sidebar collapsible="offcanvas" className="z-30 h-screen">
+        <NavigationContent pathname={pathname} user={user} onNavigate={() => setOpenMobile(false)} />
+      </Sidebar>
+
+      <MobileTopbar pathname={pathname} user={user} />
     </>
   )
 }
 
 export default function Nav({ user }: NavProps) {
   const pathname = usePathname()
-  const [mobileOpen, setMobileOpen] = useState(false)
 
+  // Self-contained: Nav owns its SidebarProvider so it keeps working as a
+  // drop-in `<Nav user={...} />` component (desktop sidebar is always fixed
+  // and permanently expanded here, so there is no need for SidebarInset to
+  // wrap the page content — the layout keeps its own md:ml-72 offset).
   return (
-    <>
-      <aside className={ui.desktopSidebar}>
-        <NavigationContent pathname={pathname} user={user} />
-      </aside>
-
-      <div className={ui.mobileTopbar}>
-        <button
-          type="button"
-          aria-label="메뉴 열기"
-          aria-expanded={mobileOpen}
-          onClick={() => setMobileOpen(true)}
-          className={cx(ui.buttonSecondary, 'h-11 min-w-11 gap-2 px-3')}
-        >
-          <Menu className="h-4 w-4" />
-          메뉴
-        </button>
-        <div className="min-w-0 px-3 text-center">
-          <p className="truncate text-sm font-semibold text-[color:var(--foreground)]">Seleccase Inventory</p>
-        </div>
-        <span aria-hidden="true" className="h-11 min-w-11" />
-      </div>
-
-      {mobileOpen ? (
-        <>
-          <button
-            type="button"
-            aria-label="모바일 메뉴 닫기"
-            onClick={() => setMobileOpen(false)}
-            className={ui.mobileDrawerScrim}
-          />
-          <div role="dialog" aria-modal="true" aria-label="모바일 메뉴" className={ui.mobileDrawer}>
-            <div className="flex items-center justify-between border-b border-[color:var(--border)] px-4 py-4">
-              <p className="text-sm font-semibold text-[color:var(--foreground)]">메뉴</p>
-              <button
-                type="button"
-                aria-label="메뉴 닫기"
-                onClick={() => setMobileOpen(false)}
-                className={cx(ui.buttonGhost, 'h-10 min-w-10 px-3')}
-              >
-                닫기
-              </button>
-            </div>
-            <NavigationContent
-              pathname={pathname}
-              user={user}
-              onNavigate={() => setMobileOpen(false)}
-            />
-          </div>
-        </>
-      ) : null}
-    </>
+    <SidebarProvider>
+      <NavInner pathname={pathname} user={user} />
+    </SidebarProvider>
   )
 }

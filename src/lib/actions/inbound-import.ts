@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getSupabaseWithUser } from '../db'
 import { getActiveInboundTemplates, getInboundTemplateVersion, getInboundTemplates } from '../data'
 import { parseInboundTemplateWorksheet } from '../inbound-import'
+import { readUploadedWorkbook } from '../parse-template-file'
 import { suggestExactSupplierSkuLinks } from '../supplier-sku'
 import { normalizeExternalShipmentNumber, sha256OriginalBytes } from '../inbound-import-review'
 import { classifyInboundReviewRows } from '../inbound-import-review'
@@ -24,7 +25,7 @@ export async function getInboundTemplatesForSupplier(supplierId: number) {
 /** Reads only enough sample structure for an operator to map a new template version. */
 export async function inspectInboundTemplateSample(file: File): Promise<InboundTemplateSample> {
   if (!file) throw new Error('샘플 파일을 선택해주세요.')
-  const workbook = XLSX.read(Buffer.from(await file.arrayBuffer()), { type: 'buffer' })
+  const workbook = readUploadedWorkbook(XLSX, await file.arrayBuffer())
   return {
     sheets: workbook.SheetNames.map((name) => ({
       name,
@@ -212,7 +213,7 @@ export async function previewInboundTemplateFile(input: { supplierId: number; te
   const template = await getInboundTemplateVersion(input.templateVersionId)
   if (!template.active) throw new Error('비활성 템플릿은 새 입고에 사용할 수 없습니다.')
   const bytes = Buffer.from(await input.file.arrayBuffer())
-  const workbook = XLSX.read(bytes, { type: 'buffer' })
+  const workbook = readUploadedWorkbook(XLSX, bytes)
   const worksheet = workbook.Sheets[template.sheetName]
   if (!worksheet) throw new Error('선택한 템플릿의 시트가 일치하지 않습니다.')
   const values = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, defval: '' })

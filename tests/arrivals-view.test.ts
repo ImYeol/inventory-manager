@@ -28,7 +28,7 @@ vi.mock('@/lib/actions', () => ({
   moveFactoryArrivalRemaindersToWarehouse: mocks.moveFactoryArrivalRemaindersToWarehouse,
 }))
 
-import ArrivalsView from '@/app/(protected)/sourcing/arrivals/ArrivalsView'
+import ArrivalsView, { deriveArrivalStages } from '@/app/(protected)/sourcing/arrivals/ArrivalsView'
 
 beforeEach(() => {
   Object.values(mocks).forEach((mock) => mock.mockReset())
@@ -250,6 +250,7 @@ describe('ArrivalsView', () => {
 
   it('keeps split allocation, shortage follow-up, and full-line correction reachable', async () => {
     mocks.replaceFactoryArrivalAllocations.mockResolvedValue({ success: true })
+    mocks.moveFactoryArrivalRemaindersToWarehouse.mockResolvedValue({ success: true })
     mocks.closeFactoryArrivalShortage.mockResolvedValue({ success: true })
     mocks.recordFactoryArrivalFollowUp.mockResolvedValue({ success: true })
     mocks.reverseFactoryReceiptLine.mockResolvedValue({ success: true })
@@ -270,19 +271,23 @@ describe('ArrivalsView', () => {
     fireEvent.change(screen.getByLabelText('LP01 배정 변경 사유'), { target: { value: '창고 계획 변경' } })
     fireEvent.click(screen.getByRole('button', { name: '배정 저장' }))
     await waitFor(() => expect(mocks.replaceFactoryArrivalAllocations).toHaveBeenCalledWith({ arrivalId: 101, itemId: 201, reason: '창고 계획 변경', allocations: [{ warehouseId: 11, quantity: 20 }, { warehouseId: 12, quantity: 10 }] }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
     fireEvent.click(screen.getByRole('button', { name: '배정 작업 열기' }))
     fireEvent.change(screen.getByLabelText('입고 #101 전체 이동 사유'), { target: { value: '대부분 오금동 입고' } })
     fireEvent.click(screen.getByRole('button', { name: '남은 수량 이동' }))
     await waitFor(() => expect(mocks.moveFactoryArrivalRemaindersToWarehouse).toHaveBeenCalledWith({ arrivalId: 101, warehouseId: 11, reason: '대부분 오금동 입고' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
     fireEvent.click(screen.getByRole('button', { name: '부족 작업 열기' }))
     fireEvent.change(screen.getByLabelText('오금동 부족 수량'), { target: { value: '1' } }); fireEvent.change(screen.getByLabelText('오금동 부족 사유'), { target: { value: '추가 미발송' } }); fireEvent.click(screen.getAllByRole('button', { name: '부족 종료' })[0])
     await waitFor(() => expect(mocks.closeFactoryArrivalShortage).toHaveBeenCalledWith({ allocationId: 301, quantity: 1, reason: '추가 미발송' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
     fireEvent.click(screen.getByRole('button', { name: '후속 입고 작업 열기' }))
     fireEvent.change(screen.getByLabelText('부족 #401 후속 업무일'), { target: { value: '2026-04-25' } }); fireEvent.change(screen.getByLabelText('부족 #401 후속 수량'), { target: { value: '1' } }); fireEvent.change(screen.getByLabelText('부족 #401 후속 사유'), { target: { value: '늦은 박스' } }); fireEvent.click(screen.getByRole('button', { name: '후속 입고' }))
     await waitFor(() => expect(mocks.recordFactoryArrivalFollowUp).toHaveBeenCalledWith(expect.objectContaining({ closureId: 401, warehouseId: 11, quantity: 1, reason: '늦은 박스', receiptBusinessDate: '2026-04-25' })))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
     fireEvent.click(screen.getByRole('button', { name: '정정 작업 열기' }))
     fireEvent.change(screen.getByLabelText('입고 기록 #501 정정 사유'), { target: { value: '다른 상품' } }); fireEvent.click(screen.getByRole('button', { name: '전체 반전' }))
@@ -375,5 +380,52 @@ describe('ArrivalsView', () => {
     fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
     fireEvent.click(screen.getByRole('button', { name: '입고 반영 작업 열기' }))
     expect(screen.getByRole('button', { name: '입고 반영' }).getAttribute('disabled')).not.toBeNull()
+  })
+
+  it('derives allocation/receipt/variance stage status from the arrival record, without a shortage-closure stage when none exist', () => {
+    const arrival = {
+      id: 101, factoryName: '광주 협력사', expectedDate: '2026-04-21', status: 'READY', sourceChannel: 'manual', memo: null,
+      totalOrderedQuantity: 10, remainingQuantity: 10, shortageClosures: [], receiptLines: [],
+      items: [{ id: 201, modelName: 'LP01', sizeName: 'S', colorName: '네이비', colorRgb: '#111111', orderedQuantity: 10, receivedQuantity: 0, remainingQuantity: 10,
+        allocations: [{ id: 301, warehouseId: 11, warehouseName: '오금동', allocatedQuantity: 5, normallyReceivedQuantity: 0, shortageClosedQuantity: 0, remainingQuantity: 5 }] }],
+    } as Parameters<typeof deriveArrivalStages>[0]
+    const stages = deriveArrivalStages(arrival)
+    expect(stages.map((stage) => stage.key)).toEqual(['allocation', 'receipt'])
+    expect(stages[0]).toMatchObject({ status: 'current', description: '5 / 10개 배정' })
+    expect(stages[1]).toMatchObject({ status: 'pending', description: '0 / 10개 입고' })
+  })
+
+  it('marks a partially received arrival with an open shortage closure as in-progress on receipt and variance', () => {
+    const arrival = {
+      id: 102, factoryName: '광주 협력사', expectedDate: '2026-04-21', status: 'PARTIAL', sourceChannel: 'csv', memo: null,
+      totalOrderedQuantity: 30, remainingQuantity: 23,
+      shortageClosures: [{ id: 401, allocationId: 301, quantity: 2, reason: '미발송', closedAt: '2026-04-22' }],
+      receiptLines: [],
+      items: [{ id: 201, modelName: 'LP01', sizeName: 'S', colorName: '네이비', colorRgb: '#111111', orderedQuantity: 30, receivedQuantity: 5, remainingQuantity: 23,
+        allocations: [
+          { id: 301, warehouseId: 11, warehouseName: '오금동', allocatedQuantity: 20, normallyReceivedQuantity: 5, shortageClosedQuantity: 2, remainingQuantity: 13 },
+          { id: 302, warehouseId: 12, warehouseName: '대자동', allocatedQuantity: 10, normallyReceivedQuantity: 0, shortageClosedQuantity: 0, remainingQuantity: 10 },
+        ] }],
+    } as Parameters<typeof deriveArrivalStages>[0]
+    const stages = deriveArrivalStages(arrival)
+    expect(stages.map((stage) => stage.key)).toEqual(['allocation', 'receipt', 'variance'])
+    expect(stages[0].status).toBe('complete')
+    expect(stages[1]).toMatchObject({ status: 'current', description: '5 / 30개 입고' })
+    expect(stages[2]).toMatchObject({ status: 'current', description: '부족 종료 1건' })
+  })
+
+  it('shows the progress timeline in the detail sheet', async () => {
+    render(React.createElement(ArrivalsView, {
+      schemaState: { status: 'ready', message: null }, factories: [], warehouses: [{ id: 11, name: '오금동' }], models: [],
+      arrivals: [{ id: 101, factoryName: '광주 협력사', expectedDate: '2026-04-21', status: 'READY', sourceChannel: 'manual', memo: null, totalOrderedQuantity: 5, remainingQuantity: 5, shortageClosures: [], receiptLines: [],
+        items: [{ id: 201, modelName: 'LP01', sizeName: 'S', colorName: '네이비', colorRgb: '#111111', orderedQuantity: 5, receivedQuantity: 0, remainingQuantity: 5,
+          allocations: [{ id: 301, warehouseId: 11, warehouseName: '오금동', allocatedQuantity: 5, normallyReceivedQuantity: 0, shortageClosedQuantity: 0, remainingQuantity: 5 }] }] }],
+    }))
+    fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
+    const timeline = await screen.findByRole('list', { name: '입고 진행 단계' })
+    expect(timeline.textContent).toContain('창고 배정')
+    expect(timeline.textContent).toContain('5 / 5개 배정')
+    expect(timeline.textContent).toContain('입고 반영')
+    expect(screen.queryByText('차이 종료')).toBeNull()
   })
 })

@@ -1,7 +1,8 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { BasicDataTable } from '@/components/ui/basic-data-table'
+import type { ColumnDef } from '@tanstack/react-table'
+import { DataTable } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
 import { FileDropInput } from '@/components/ui/file-drop-input'
 import { Input } from '@/components/ui/input'
@@ -54,6 +55,25 @@ export default function TrackingImportWorkspace({ initialPresets = [] }: Props) 
     const dataRows = sample ? extractDataRows(sample, sheetName, headerRowNumber) : []
     return normalizeTrackingRows(rowsAsRecords(headers, dataRows), mapping)
   }, [sample, sheetName, headerRowNumber, mapping])
+
+  const previewColumns: ColumnDef<TrackingRow | TrackingPreviewRow, unknown>[] = useMemo(() => [
+    { id: 'row', header: '행', enableSorting: false, cell: ({ row }) => row.original.rowNumber },
+    { id: 'order', header: '주문번호', enableSorting: false, cell: ({ row }) => row.original.orderNumber || '-' },
+    { id: 'tracking', header: '운송장번호', enableSorting: false, cell: ({ row }) => row.original.trackingNumber || '-' },
+    { id: 'recipient', header: '수취인', enableSorting: false, cell: ({ row }) => row.original.recipientName || '-' },
+    {
+      id: 'status',
+      header: '검증',
+      enableSorting: false,
+      cell: ({ row }) => {
+        const item = row.original
+        if ('matchStatus' in item) {
+          return { MATCHED: '발송 가능', MISSING: '주문 없음', AMBIGUOUS: '복수 후보', DUPLICATE: '중복', TRACKING_MISSING: '운송장번호 필요' }[item.matchStatus]
+        }
+        return item.trackingNumber ? '검증 대기' : '운송장번호 필요'
+      },
+    },
+  ], [])
 
   function resetPreview() {
     setPreview(null)
@@ -174,7 +194,7 @@ export default function TrackingImportWorkspace({ initialPresets = [] }: Props) 
       </div>
     </TableSurface> : null}
     <TableSurface toolbar={<div className="flex w-full items-center justify-between gap-2"><div className="flex items-center gap-2"><span className="text-sm font-medium">분류 미리보기</span>{result ? <span role="status" className="text-xs text-[color:var(--muted-foreground)]">{result}</span> : null}</div><div className="flex gap-2"><Button type="button" variant="secondary" disabled={isPending || !filename || !mapping.trackingNumber || !rows.some((row) => row.trackingNumber)} onClick={validateRows}>검증</Button><Button type="button" disabled={isPending || !(preview ?? []).some((row) => row.dispatchable)} onClick={dispatchRows}>발송</Button></div></div>}>
-      <BasicDataTable bare columns={[{ key: 'row', label: '행' }, { key: 'order', label: '주문번호' }, { key: 'tracking', label: '운송장번호' }, { key: 'recipient', label: '수취인' }, { key: 'status', label: '검증' }]} rows={preview ?? rows} rowKey={(row) => row.rowNumber} emptyState="파일을 선택하면 정규화된 행을 미리봅니다." renderCell={(row: TrackingRow | TrackingPreviewRow, key) => key === 'row' ? row.rowNumber : key === 'order' ? row.orderNumber || '-' : key === 'tracking' ? row.trackingNumber || '-' : key === 'recipient' ? row.recipientName || '-' : 'matchStatus' in row ? ({ MATCHED: '발송 가능', MISSING: '주문 없음', AMBIGUOUS: '복수 후보', DUPLICATE: '중복', TRACKING_MISSING: '운송장번호 필요' }[row.matchStatus]) : row.trackingNumber ? '검증 대기' : '운송장번호 필요'} />
+      <DataTable<TrackingRow | TrackingPreviewRow> bare columns={previewColumns} rows={preview ?? rows} rowAriaLabel={(row) => `${row.rowNumber}행`} emptyState="파일을 선택하면 정규화된 행을 미리봅니다." />
     </TableSurface>
   </div>
 }

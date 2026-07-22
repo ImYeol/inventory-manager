@@ -23,7 +23,7 @@ export function StoreConnectionStatus({
       aria-label={label}
       className={cn(
         'inline-flex items-center gap-1.5 text-xs font-semibold text-[color:var(--foreground)]',
-        !configured && disconnectedTone === 'muted' && 'text-[color:var(--muted)]',
+        !configured && disconnectedTone === 'muted' && 'text-[color:var(--muted-foreground)]',
         framed && !compact && 'rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-2.5 py-1',
         compact && 'gap-0',
       )}

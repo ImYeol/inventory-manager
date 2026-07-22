@@ -1,16 +1,16 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import type { ColumnDef } from '@tanstack/react-table'
 import { StatusBadge, type BadgeTone } from '@/components/ui/badge-1'
-import { BasicDataTable } from '@/components/ui/basic-data-table'
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
 import { ChannelBadge } from '@/components/ui/channel-badge'
-import { FilterToolbar } from '@/components/ui/filter-toolbar'
-import { FixedSheet } from '@/components/ui/fixed-sheet'
+import { DataTable } from '@/components/ui/data-table'
 import { Input } from '@/components/ui/input'
 import { ProductVariantCombobox, type ProductVariantOption } from '@/components/ui/product-variant-combobox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { TableSurface } from '@/components/ui/table-surface'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ActionToolbar, ToolbarButtonAction } from '@/components/ui/toolbar'
 import { assignOrderLine, syncOrders } from '@/lib/actions/order-sync'
@@ -102,10 +102,10 @@ export default function OrdersWorkspace({
   }
 
   const updateAssignment = (lineId: number, patch: Partial<Assignment>) => {
-    setAssignments((current) => ({
-      ...current,
-      [lineId]: { variantId: null, warehouseId: '', ...current[lineId], ...patch },
-    }))
+    setAssignments((current) => {
+      const base: Assignment = current[lineId] ?? { variantId: null, warehouseId: '' }
+      return { ...current, [lineId]: { ...base, ...patch } }
+    })
   }
 
   const assign = (line: OrderLine) => {
@@ -126,25 +126,108 @@ export default function OrdersWorkspace({
     })
   }
 
-  const columns = [
-    { key: 'channel', label: '채널' },
-    { key: 'order', label: '주문번호 / 상품' },
-    { key: 'quantity', label: '수량', align: 'right' as const },
-    { key: 'warehouse', label: '배정 창고' },
-    { key: 'status', label: '주문 / 발송 상태' },
-    { key: 'orderedAt', label: '주문일' },
+  const orderColumns: ColumnDef<OrderRow, unknown>[] = [
+    {
+      id: 'channel',
+      header: '채널',
+      enableSorting: false,
+      enableHiding: false,
+      cell: ({ row }) => <ChannelBadge channel={row.original.channel} listingStatus="active" compact />,
+    },
+    {
+      id: 'order',
+      accessorFn: (order) => order.external_order_id,
+      header: '주문번호 / 상품',
+      enableHiding: false,
+      cell: ({ row }) => {
+        const line = row.original.channel_order_lines[0]
+        return (
+          <div>
+            <p className="font-medium text-[color:var(--foreground)]">{row.original.external_order_id}</p>
+            <p>{line?.product_variants?.seller_sku ?? '매핑 필요'}</p>
+          </div>
+        )
+      },
+    },
+    {
+      id: 'quantity',
+      accessorFn: (order) => order.channel_order_lines[0]?.quantity ?? 0,
+      header: '수량',
+      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      cell: ({ getValue }) => getValue<number>(),
+    },
+    {
+      id: 'warehouse',
+      header: '배정 창고',
+      enableSorting: false,
+      cell: ({ row }) => {
+        const order = row.original
+        const line = order.channel_order_lines[0]
+        const currentStatus = line ? lineStatuses[line.id] ?? line.line_status : order.order_status
+        const assignedWarehouse = warehouses.find((warehouse) => warehouse.id === line?.inventory_reservations[0]?.warehouse_id)
+        if (!line || !isException(currentStatus)) return assignedWarehouse?.name ?? '-'
+        const selection = assignments[line.id] ?? { variantId: null, warehouseId: '' }
+        return (
+          <div className="flex min-w-[18rem] items-center gap-2">
+            <ProductVariantCombobox variants={variants} value={selection.variantId} onValueChange={(variantId) => updateAssignment(line.id, { variantId })} aria-label="상품 옵션 선택" className="w-36" />
+            <Select value={selection.warehouseId} onValueChange={(warehouseId) => updateAssignment(line.id, { warehouseId })}>
+              <SelectTrigger aria-label="배정 창고 선택" className="w-32 ui-control-sm"><SelectValue placeholder="창고" /></SelectTrigger>
+              <SelectContent>{warehouses.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouse.name}</SelectItem>)}</SelectContent>
+            </Select>
+            <Button type="button" variant="secondary" size="sm" disabled={isPending} onClick={() => assign(line)}>배정</Button>
+          </div>
+        )
+      },
+    },
+    {
+      id: 'status',
+      accessorFn: (order) => {
+        const line = order.channel_order_lines[0]
+        return line ? lineStatuses[line.id] ?? line.line_status : order.order_status
+      },
+      header: '주문 / 발송 상태',
+      cell: ({ getValue }) => {
+        const status = orderStatus(getValue<string>())
+        return <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+      },
+    },
+    {
+      id: 'orderedAt',
+      accessorFn: (order) => order.ordered_at,
+      header: '주문일',
+      cell: ({ getValue }) => {
+        const value = getValue<string | null>()
+        return value ? new Date(value).toLocaleDateString('ko-KR') : '-'
+      },
+    },
   ]
 
   return (
     <div className="space-y-3">
+      <Breadcrumb className="mb-1">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/">대시보드</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>주문</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+
       <Tabs value={view} onValueChange={(value) => setView(value as OrderView)}>
         <TabsList aria-label="주문 보기">
           {views.map((item) => <TabsTrigger key={item} value={item}>{item}</TabsTrigger>)}
         </TabsList>
       </Tabs>
 
-      <TableSurface toolbar={
-        <FilterToolbar className="sm:!flex-nowrap">
+      <DataTable
+        columns={orderColumns}
+        rows={rows}
+        tableAriaLabel="주문 목록"
+        emptyState="조건에 맞는 주문이 없습니다."
+        toolbarStart={
           <div className="flex min-w-0 items-center gap-2">
             <Input type="search" aria-label="주문 검색" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="주문번호 또는 SKU" className="w-56 ui-control-sm" />
             <Select value={channel} onValueChange={(value) => setChannel(value as typeof channel)}>
@@ -156,8 +239,9 @@ export default function OrdersWorkspace({
               </SelectContent>
             </Select>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="ui-data-meta" aria-live="polite">{rows.length}건</span>
+        }
+        toolbarEnd={
+          <>
             <Button type="button" variant="ghost" size="sm" onClick={resetFilters}>필터 초기화</Button>
             <ActionToolbar>
               <ToolbarButtonAction disabled={isPending} onClick={() => startTransition(async () => {
@@ -170,51 +254,20 @@ export default function OrdersWorkspace({
               })}>주문 동기화</ToolbarButtonAction>
               <ToolbarButtonAction onClick={() => setIsTrackingImportOpen(true)}>송장 등록</ToolbarButtonAction>
             </ActionToolbar>
-          </div>
-        </FilterToolbar>
-      }>
-        <BasicDataTable
-          bare
-          tableAriaLabel="주문 목록"
-          columns={columns}
-          rows={rows}
-          rowKey={(order) => order.id}
-          emptyState="조건에 맞는 주문이 없습니다."
-          renderCell={(order, key) => {
-            const line = order.channel_order_lines[0]
-            const currentStatus = line ? lineStatuses[line.id] ?? line.line_status : order.order_status
-            const assignedWarehouse = warehouses.find((warehouse) => warehouse.id === line?.inventory_reservations[0]?.warehouse_id)
-
-            if (key === 'channel') return <ChannelBadge channel={order.channel} listingStatus="active" compact />
-            if (key === 'order') return <div><p className="font-medium text-[color:var(--foreground)]">{order.external_order_id}</p><p>{line?.product_variants?.seller_sku ?? '매핑 필요'}</p></div>
-            if (key === 'quantity') return line?.quantity ?? 0
-            if (key === 'warehouse') {
-              if (!line || !isException(currentStatus)) return assignedWarehouse?.name ?? '-'
-              const selection = assignments[line.id] ?? { variantId: null, warehouseId: '' }
-              return (
-                <div className="flex min-w-[18rem] items-center gap-2">
-                  <ProductVariantCombobox variants={variants} value={selection.variantId} onValueChange={(variantId) => updateAssignment(line.id, { variantId })} aria-label="상품 옵션 선택" className="w-36" />
-                  <Select value={selection.warehouseId} onValueChange={(warehouseId) => updateAssignment(line.id, { warehouseId })}>
-                    <SelectTrigger aria-label="배정 창고 선택" className="w-32 ui-control-sm"><SelectValue placeholder="창고" /></SelectTrigger>
-                    <SelectContent>{warehouses.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouse.name}</SelectItem>)}</SelectContent>
-                  </Select>
-                  <Button type="button" variant="secondary" size="sm" disabled={isPending} onClick={() => assign(line)}>배정</Button>
-                </div>
-              )
-            }
-            if (key === 'status') {
-              const status = orderStatus(currentStatus)
-              return <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
-            }
-            if (key === 'orderedAt') return order.ordered_at ? new Date(order.ordered_at).toLocaleDateString('ko-KR') : '-'
-            return null
-          }}
-        />
-      </TableSurface>
+          </>
+        }
+      />
       <p aria-live="polite" className="text-sm text-[color:var(--muted-foreground)]">{message}</p>
-      <FixedSheet open={isTrackingImportOpen} title="송장 업로드" onClose={() => setIsTrackingImportOpen(false)}>
-        <TrackingImportWorkspace initialPresets={trackingPresets} />
-      </FixedSheet>
+      <Sheet open={isTrackingImportOpen} onOpenChange={setIsTrackingImportOpen}>
+        <SheetContent side="right" className="sm:max-w-2xl">
+          <SheetHeader>
+            <SheetTitle>송장 업로드</SheetTitle>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
+            <TrackingImportWorkspace initialPresets={trackingPresets} />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 # UI Guide
 
 ## Source Of Truth
-- UI/UX 원칙과 shared primitive 규칙의 source of truth는 이 문서다. 시각 토큰 값과 스케일의 source of truth는 [DESIGN.md](./tokens.md), 모션의 source of truth는 [MOTION.md](./motion.md)다.
+- UI/UX 원칙과 shared primitive 규칙의 source of truth는 이 문서다. 시각 토큰·모션의 근거 문서는 [DESIGN.md](./DESIGN.md)이며, 값 자체의 SoT는 `src/app/globals.css`와 `components.json`이다.
 - 토큰은 `src/app/globals.css`에, page-level preset은 `src/app/components/ui.tsx`에, shared primitive는 `src/components/ui`에 둔다.
 
 ## 컴포넌트 경로 규칙
@@ -92,23 +92,7 @@
   - `meta cluster`: reset, result count, compact status
 
 ## 디자인 토큰
-값과 스케일의 SoT는 [DESIGN.md](./tokens.md), 모션은 [MOTION.md](./motion.md)다. 아래 목록은 token 이름만 유지하며 구체적 값은 DESIGN.md를 참조한다.
-
-- `--background`
-- `--foreground`
-- `--surface`
-- `--surface-muted`
-- `--surface-strong`
-- `--border`
-- `--border-strong`
-- `--accent`
-- `--accent-foreground`
-- `--focus-ring`
-- `--shadow`
-
-### Theme Direction
-- Base: warm neutral / Accent: action-first amber / Status: semantic (green/amber/red/blue)
-- 금지: purple-heavy SaaS gradient, glassmorphism, decorative glow
+값과 근거의 SoT는 [DESIGN.md](./DESIGN.md)다. 이 문서는 토큰 값을 반복하지 않는다.
 
 ## Shared Primitive
 공용 UI는 아래 계층으로 수렴시킨다.
@@ -124,7 +108,6 @@ src/components/ui/
 ├── dropdown-menu.tsx
 ├── editable-table.tsx
 ├── filter-toolbar.tsx
-├── fixed-sheet.tsx
 ├── input.tsx
 ├── inventory-data-table.tsx
 ├── inventory-table-toolbar.tsx
@@ -319,9 +302,10 @@ src/components/ui/
   - 타입 선택 토글
   - 설명만 하는 카드
 
-### FixedSheet
-- 긴 입력 overlay는 `FixedSheet`를 사용한다. portal, body scroll lock, Escape close, overlay click close, 고유한 dialog title id를 기본 계약으로 가진다.
-- overlay는 content보다 낮은 z-index, sheet content는 그보다 높은 z-index를 가져 backdrop blur가 입력 표면에 적용되지 않게 한다.
+### Sheet
+- 목록 컨텍스트를 유지한 채 여는 상세/작업 공간은 `Sheet`(`@/components/ui/sheet`, `side="right"`)를 사용한다. `SheetTitle` 필수, Escape·overlay 클릭으로 닫기, 닫힘 후 트리거로 포커스 반환은 base-ui Dialog 기본 동작을 그대로 쓰고 커스텀 focus 코드를 추가하지 않는다.
+- 폭은 콘텐츠 밀도에 맞춰 `className`으로 override한다(`sm:max-w-xl` ~ `sm:max-w-2xl`).
+- 파괴적 확인이나 짧은 폼은 `Modal`(중앙)을 그대로 쓴다. FixedSheet는 티켓 #27에서 삭제됐다(ADR-004A superseded, ADR-037 흐름).
 
 ### CSV / 이력
 - 목록/입고/출고와 한 화면에 둘 때 UX가 무너지면 재고 운영 하위 페이지로 올린다.
@@ -378,14 +362,10 @@ src/components/ui/
 - 상태 badge는 아이콘 + label + border를 가진 compact view여야 한다.
 
 ## 타이포그래피와 밀도
-- body/control text는 14px 이상 유지한다.
-- 테이블 헤더는 과도하게 작게 만들지 않는다.
-- 긴 설명문 대신 짧은 라벨과 배지를 우선한다.
-- 넓은 빈 여백보다 table viewport를 우선한다.
+- 크기·밀도 값의 SoT는 [DESIGN.md](./DESIGN.md)다. 긴 설명문 대신 짧은 라벨과 배지를, 넓은 빈 여백보다 table viewport를 우선한다.
 
 ## Sizing / Density 계약
-- control/button/tab/badge는 [DESIGN.md](./tokens.md)의 정의된 size tier만 사용한다.
-- 임의 height를 추가하지 않는다.
+- control/button/tab/badge는 정의된 size tier만 사용하고 임의 height를 추가하지 않는다([DESIGN.md](./DESIGN.md) 참고).
 
 ## 버튼과 드롭다운
 - 반복 액션은 icon + text를 기본으로 한다.
@@ -407,56 +387,12 @@ src/components/ui/
 - `globals.css`에서 `.a, .b, .c { ... }` 형태로 셀렉터를 묶어 쓰는 규칙(예: `.surface, .ui-surface, .ui-card`)에 새 속성을 추가할 때는 그 속성이 목록의 모든 셀렉터에 적용돼도 안전한지 먼저 확인한다. 한 컴포넌트(`Card`)의 버그를 고치려고 공유 셀렉터 그룹에 속성을 추가하면, 같은 그룹을 쓰는 다른 컴포넌트(`FixedSheet`의 `.ui-surface-strong` 등)에도 의도치 않게 그 속성이 퍼진다. 고쳐야 할 속성은 실제로 필요한 가장 좁은 셀렉터(`.ui-card` 단독 규칙)에 추가하고, 그룹 규칙에는 정말 모든 멤버가 공유해야 하는 속성만 남긴다.
 
 ## 인지·그룹핑 원칙
-
-새 화면이 flat·무계층 baseline으로 회귀하지 않도록, 아래 원칙을 모든 화면 설계·리뷰에 적용한다. 이 원칙은 [ADR-025](../adr/0025-visual-token-hierarchy.md)의 토큰 계층을 인지 차원으로 확장한 것이며, [ADR-018](../adr/0018-ui-system-checks.md) UI-system-check가 `tests/design-contracts.test.ts`, `tests/ui-token-presets.test.ts`, `tests/shared-primitives-tokens.test.ts`로 강제한다.
-
-### 1. 근접성 (Proximity)
-- 같은 그룹에 속한 control 사이 간격은 그룹 간 간격보다 항상 작아야 한다.
-- 그룹 내부는 `--space-1`~`--space-2`, 그룹 사이는 `--space-4` 이상을 기본 리듬으로 삼는다.
-- 하나의 spacing 값으로 모든 간격을 통일하지 않는다. 간격 차이 자체가 그룹 경계를 표현한다.
-
-### 2. 공통 영역 (Common Region)
-- 관련 control은 하나의 region(카드, 클러스터, toolbar segment) 안에 담는다.
-- 관련 없는 control을 구분 없이 한 줄에 flat하게 나열하지 않는다(예: 서로 다른 목적의 select를 경계 없이 한 줄에 배치).
-- region 경계는 `Card`, `FilterToolbar`의 cluster, `actionGroupDense` 같은 shared primitive/preset으로 표현하고, page-local wrapper div로 새로 만들지 않는다(ADR-019).
-
-### 3. 시각 계층 (Visual Hierarchy: size / weight / contrast)
-- 제목, 섹션 라벨, 본문, 메타 텍스트는 크기·굵기·대비로 구분되어야 하며 같은 크기·굵기를 반복하지 않는다.
-- 타입 강조 tier:
-
-| tier | 용도 | 토큰 |
-| --- | --- | --- |
-| heading | page/section 제목 | `--text-lg` 이상 + `--fw-semibold` |
-| section-label | 카드/그룹 소제목 | `--text-xs`/`--text-sm` + `--fw-semibold` |
-| body | 본문/표 셀 | `--text-base`/`--text-md` + `--fw-regular` |
-| meta | 보조 설명, 타임스탬프 | `--text-xs` + `--fw-regular`, `--muted-foreground` |
-
-### 4. 강조 예산 (Emphasis Budget)
-- 하나의 surface(카드/toolbar/시트)에서 강하게 강조된 요소는 1~2개로 제한한다(filled primary 버튼 1개, 강조 배지 1개 수준).
-- 강조를 늘리고 싶다면 기존 강조 요소를 먼저 낮출 수 있는지 검토한다. 전부 강조하면 아무것도 강조되지 않는다.
-- [Button 크기 역할 계층](./components.md#button-크기-역할-계층)이 강조 예산의 1차 도구다: 주 동작=`default`, 보조=`sm`, 부가=`ghost`.
-
-### 5. Elevation 계층 (Surface depth)
-- surface 종류별 elevation baseline은 [DESIGN.md](./tokens.md#elevation)가 SoT다: `card = --elevation-2`, `dropdown/overlay = --elevation-3`, `modal/fixed-sheet = --elevation-4`.
-- 새 표면을 추가할 때 임의 shadow를 만들지 않고 이 baseline 중 하나를 고른다.
-
-### 외부 근거
-- [NN/g Visual Hierarchy](https://www.nngroup.com/articles/visual-hierarchy-ux-definition/)
-- [NN/g Common Region](https://www.nngroup.com/articles/common-region/)
-- [NN/g 5 Principles of Visual Design](https://www.nngroup.com/articles/principles-visual-design/)
-- [IxDF Visual Hierarchy](https://ixdf.org/literature/topics/visual-hierarchy)
-- [Gestalt Common Region](https://www.gestaltprinciples.com/principles/common-region)
+근접성·공통 영역·시각 계층·강조 예산·elevation 계층 원칙은 [DESIGN.md 인지·그룹핑 원칙](./DESIGN.md#인지그룹핑-원칙)이 SoT다. [ADR-018](../adr/0018-ui-system-checks.md) UI-system-check가 `tests/design-contracts.test.ts`, `tests/ui-token-presets.test.ts`, `tests/shared-primitives-tokens.test.ts`로 강제한다.
 
 ## 모션
-- duration, easing, reduced-motion의 SoT는 [MOTION.md](./motion.md)다.
-- 허용:
-  - dropdown 열림/닫힘
-  - table row 초기 진입
-  - dialog/sheet 진입
-- 금지:
-  - 과한 spring
-  - 반복 pulse/glow
-  - 핵심 데이터 위를 덮는 장식용 전환
+- duration, easing, reduced-motion 원칙의 SoT는 [DESIGN.md](./DESIGN.md#motion)다.
+- 허용: dropdown 열림/닫힘, table row 초기 진입, dialog/sheet 진입.
+- 금지: 과한 spring, 반복 pulse/glow, 핵심 데이터 위를 덮는 장식용 전환.
 
 ## Accessibility
 - status는 색만으로 전달하지 않는다.

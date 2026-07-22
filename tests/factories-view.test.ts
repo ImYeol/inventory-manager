@@ -36,11 +36,6 @@ beforeEach(() => {
   mocks.getInboundTemplatesForSupplier.mockResolvedValue([])
 })
 
-async function chooseSelectOption(label: string, optionName: string) {
-  fireEvent.click(screen.getByRole('combobox', { name: label }))
-  fireEvent.click(await screen.findByRole('option', { name: optionName }))
-}
-
 describe('FactoriesView', () => {
   it('shows the toolbar, filters the table, and opens the detail modal', async () => {
     mocks.setFactoryActive.mockResolvedValue({ success: true })
@@ -101,7 +96,7 @@ describe('FactoriesView', () => {
     expect(screen.getByRole('row', { name: /부산 협력사/ })).toBeTruthy()
     expect(screen.queryByRole('row', { name: /광주 협력사/ })).toBeNull()
 
-    await chooseSelectOption('상태 필터', '비활성')
+    fireEvent.click(screen.getByRole('tab', { name: '비활성' }))
     expect(screen.getByRole('row', { name: /부산 협력사/ })).toBeTruthy()
     expect(screen.queryByRole('row', { name: /광주 협력사/ })).toBeNull()
 
@@ -211,5 +206,193 @@ describe('FactoriesView', () => {
     fireEvent.click(versionForm.getByRole('button', { name: '버전 저장' }))
 
     await waitFor(() => expect(mocks.createInboundTemplateVersion).toHaveBeenCalledWith(expect.objectContaining({ supplierId: 1, name: '새 템플릿' })))
+  })
+
+  it('keeps both the detail modal and the stacked parse-template modal open when a nested Select is interacted with', async () => {
+    mocks.getInboundTemplatesForSupplier.mockResolvedValue([])
+    mocks.inspectInboundTemplateSample.mockResolvedValue({ sheets: [{ name: '입고', rows: [['외부 SKU', '수량'], ['EXT-1', '3']] }] })
+
+    render(
+      React.createElement(FactoriesView, {
+        schemaState: { status: 'ready', message: null },
+        factories: [
+          { id: 1, name: '광주 협력사', contactName: null, phone: null, email: null, notes: null, isActive: true, arrivalCount: 0, pendingQuantity: 0 },
+        ],
+        factorySourcingItems: {},
+      }),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '상세' }))
+    const detailDialog = await screen.findByRole('dialog', { name: '광주 협력사' })
+    fireEvent.click(screen.getByRole('button', { name: '새 파싱 템플릿' }))
+    const versionDialog = await screen.findByRole('dialog', { name: '새 입고 파싱 템플릿' })
+    const versionForm = within(versionDialog)
+    const file = new File(['contents'], 'sample.xlsx')
+    fireEvent.change(versionForm.getByLabelText('샘플 파일'), { target: { files: [file] } })
+    await waitFor(() => expect(mocks.inspectInboundTemplateSample).toHaveBeenCalledWith(file))
+
+    // Documents the contract: interacting with a Select nested in the
+    // topmost of two stacked (sibling, non-modal) Modals must not dismiss
+    // either dialog via Radix's outside-pointerdown/focus detection.
+    // Radix registers that listener via a real `setTimeout(0)`, so let it flush.
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    const quantityTrigger = versionForm.getByRole('combobox', { name: '수량 열' })
+    fireEvent.pointerDown(quantityTrigger)
+    fireEvent.click(quantityTrigger)
+    const option = await screen.findByRole('option', { name: '수량' })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    fireEvent.pointerDown(option)
+    fireEvent.click(option)
+
+    expect(screen.getByRole('dialog', { name: '광주 협력사' })).toBe(detailDialog)
+    expect(screen.getByRole('dialog', { name: '새 입고 파싱 템플릿' })).toBe(versionDialog)
+  })
+
+  it('shows a required error when version form name field is empty and submitted', async () => {
+    mocks.getInboundTemplatesForSupplier.mockResolvedValue([])
+    mocks.inspectInboundTemplateSample.mockResolvedValue({ sheets: [{ name: '입고', rows: [['외부 SKU', '수량'], ['EXT-1', '3']] }] })
+
+    render(
+      React.createElement(FactoriesView, {
+        schemaState: { status: 'ready', message: null },
+        factories: [
+          { id: 1, name: '광주 협력사', contactName: null, phone: null, email: null, notes: null, isActive: true, arrivalCount: 0, pendingQuantity: 0 },
+        ],
+        factorySourcingItems: {},
+      }),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '상세' }))
+    await screen.findByRole('dialog', { name: '광주 협력사' })
+    fireEvent.click(screen.getByRole('button', { name: '새 파싱 템플릿' }))
+    const versionDialog = await screen.findByRole('dialog', { name: '새 입고 파싱 템플릿' })
+    const versionForm = within(versionDialog)
+
+    // Upload a file to enable the save button and set up form state
+    const file = new File(['contents'], 'sample.xlsx')
+    fireEvent.change(versionForm.getByLabelText('샘플 파일'), { target: { files: [file] } })
+    await waitFor(() => expect(mocks.inspectInboundTemplateSample).toHaveBeenCalledWith(file))
+
+    // Set sheet, header row, and mapping to valid values (required for submission)
+    fireEvent.click(versionForm.getByRole('combobox', { name: '외부 SKU 열' }))
+    fireEvent.click(await screen.findByRole('option', { name: '외부 SKU' }))
+    fireEvent.click(versionForm.getByRole('combobox', { name: '수량 열' }))
+    fireEvent.click(await screen.findByRole('option', { name: '수량' }))
+
+    // Leave name field empty (it has default value '') and try to submit
+    fireEvent.click(versionForm.getByRole('button', { name: '버전 저장' }))
+
+    // Verify error message appears - look for alert role
+    await waitFor(() => {
+      const alerts = within(versionDialog).queryAllByRole('alert')
+      const hasNameError = alerts.some((alert) => alert.textContent?.includes('파싱 템플릿 이름을 입력하세요.'))
+      expect(hasNameError).toBe(true)
+    })
+
+    // Verify save action was not called
+    expect(mocks.createInboundTemplateVersion).not.toHaveBeenCalled()
+  })
+
+  it('clears error when name is entered after validation error (immediate validation)', async () => {
+    mocks.getInboundTemplatesForSupplier.mockResolvedValue([])
+    mocks.inspectInboundTemplateSample.mockResolvedValue({ sheets: [{ name: '입고', rows: [['외부 SKU', '수량'], ['EXT-1', '3']] }] })
+
+    render(
+      React.createElement(FactoriesView, {
+        schemaState: { status: 'ready', message: null },
+        factories: [
+          { id: 1, name: '광주 협력사', contactName: null, phone: null, email: null, notes: null, isActive: true, arrivalCount: 0, pendingQuantity: 0 },
+        ],
+        factorySourcingItems: {},
+      }),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '상세' }))
+    await screen.findByRole('dialog', { name: '광주 협력사' })
+    fireEvent.click(screen.getByRole('button', { name: '새 파싱 템플릿' }))
+    const versionDialog = await screen.findByRole('dialog', { name: '새 입고 파싱 템플릿' })
+    const versionForm = within(versionDialog)
+
+    // Upload a file
+    const file = new File(['contents'], 'sample.xlsx')
+    fireEvent.change(versionForm.getByLabelText('샘플 파일'), { target: { files: [file] } })
+    await waitFor(() => expect(mocks.inspectInboundTemplateSample).toHaveBeenCalledWith(file))
+
+    // Set mapping to valid values
+    fireEvent.click(versionForm.getByRole('combobox', { name: '외부 SKU 열' }))
+    fireEvent.click(await screen.findByRole('option', { name: '외부 SKU' }))
+    fireEvent.click(versionForm.getByRole('combobox', { name: '수량 열' }))
+    fireEvent.click(await screen.findByRole('option', { name: '수량' }))
+
+    // Try to submit with empty name
+    fireEvent.click(versionForm.getByRole('button', { name: '버전 저장' }))
+
+    // Verify error appears
+    await waitFor(() => {
+      const alerts = within(versionDialog).queryAllByRole('alert')
+      const hasNameError = alerts.some((alert) => alert.textContent?.includes('파싱 템플릿 이름을 입력하세요.'))
+      expect(hasNameError).toBe(true)
+    })
+
+    // Enter a name
+    fireEvent.change(versionForm.getByLabelText('파싱 템플릿 이름'), { target: { value: '새 템플릿' } })
+
+    // Verify error disappears
+    await waitFor(() => {
+      const alerts = within(versionDialog).queryAllByRole('alert')
+      const hasNameError = alerts.some((alert) => alert.textContent?.includes('파싱 템플릿 이름을 입력하세요.'))
+      expect(hasNameError).toBe(false)
+    })
+  })
+
+  it('shows error when headerRowNumber is 0 or negative', async () => {
+    mocks.getInboundTemplatesForSupplier.mockResolvedValue([])
+    mocks.inspectInboundTemplateSample.mockResolvedValue({ sheets: [{ name: '입고', rows: [['외부 SKU', '수량'], ['EXT-1', '3']] }] })
+
+    render(
+      React.createElement(FactoriesView, {
+        schemaState: { status: 'ready', message: null },
+        factories: [
+          { id: 1, name: '광주 협력사', contactName: null, phone: null, email: null, notes: null, isActive: true, arrivalCount: 0, pendingQuantity: 0 },
+        ],
+        factorySourcingItems: {},
+      }),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '상세' }))
+    await screen.findByRole('dialog', { name: '광주 협력사' })
+    fireEvent.click(screen.getByRole('button', { name: '새 파싱 템플릿' }))
+    const versionDialog = await screen.findByRole('dialog', { name: '새 입고 파싱 템플릿' })
+    const versionForm = within(versionDialog)
+
+    // Fill name field
+    fireEvent.change(versionForm.getByLabelText('파싱 템플릿 이름'), { target: { value: '새 템플릿' } })
+
+    // Upload a file
+    const file = new File(['contents'], 'sample.xlsx')
+    fireEvent.change(versionForm.getByLabelText('샘플 파일'), { target: { files: [file] } })
+    await waitFor(() => expect(mocks.inspectInboundTemplateSample).toHaveBeenCalledWith(file))
+
+    // Set mappings to valid values
+    fireEvent.click(versionForm.getByRole('combobox', { name: '외부 SKU 열' }))
+    fireEvent.click(await screen.findByRole('option', { name: '외부 SKU' }))
+    fireEvent.click(versionForm.getByRole('combobox', { name: '수량 열' }))
+    fireEvent.click(await screen.findByRole('option', { name: '수량' }))
+
+    // Change headerRowNumber to negative value (component allows negative but validation should reject)
+    fireEvent.change(versionForm.getByLabelText('헤더 행'), { target: { value: '-1' } })
+
+    // Try to submit
+    fireEvent.click(versionForm.getByRole('button', { name: '버전 저장' }))
+
+    // Verify error message appears
+    await waitFor(() => {
+      const alerts = within(versionDialog).queryAllByRole('alert')
+      const hasHeaderError = alerts.some((alert) => alert.textContent?.includes('헤더 행은 1 이상이어야 합니다.'))
+      expect(hasHeaderError).toBe(true)
+    })
+
+    // Verify save action was not called
+    expect(mocks.createInboundTemplateVersion).not.toHaveBeenCalled()
   })
 })

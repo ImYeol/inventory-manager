@@ -9,10 +9,10 @@ describe('inbound import review contract', () => {
 
   it('keeps repeated source rows ordered and blocks invalid or unmapped exact identifiers', () => {
     expect(classifyInboundReviewRows([
-      { sourceRowNumber: 4, externalSku: 'SKU-1', quantity: 2, validationError: null, productVariantId: 8 },
-      { sourceRowNumber: 5, externalSku: 'SKU-1', quantity: 3, validationError: null, productVariantId: 8 },
-      { sourceRowNumber: 6, externalSku: 'sku-1', quantity: 1, validationError: null, productVariantId: null },
-      { sourceRowNumber: 7, externalSku: 'SKU-2', quantity: 0, validationError: null, productVariantId: 9 },
+      { sourceRowNumber: 4, quantity: 2, validationError: null, productVariantId: 8 },
+      { sourceRowNumber: 5, quantity: 3, validationError: null, productVariantId: 8 },
+      { sourceRowNumber: 6, quantity: 1, validationError: null, productVariantId: null },
+      { sourceRowNumber: 7, quantity: 0, validationError: null, productVariantId: 9 },
     ])).toEqual({ valid: false, blockers: [6, 7], rows: [4, 5, 6, 7] })
   })
 

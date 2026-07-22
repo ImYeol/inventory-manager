@@ -44,7 +44,7 @@ export const ui = {
   toolbarAction: 'ui-button ui-button-secondary ui-button-sm whitespace-nowrap',
   actionGroupDense: 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap',
   statusPillDense:
-    'inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-0.5 text-[11px] font-semibold text-[color:var(--muted)]',
+    'inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-0.5 text-[11px] font-semibold text-[color:var(--muted-foreground)]',
   buttonDense: 'h-8 rounded-xl px-2.5 text-xs',
   iconButton: 'ui-button ui-button-secondary ui-button-icon shrink-0',
   badge: 'ui-badge',
@@ -72,9 +72,9 @@ export const ui = {
   number: 'font-mono tabular-nums',
   helpText: 'text-xs text-[color:var(--muted-foreground)]',
   navSectionButton:
-    'group flex w-full items-center justify-between gap-2 rounded-2xl border border-transparent px-3 py-2.5 text-left text-sm font-medium text-[color:var(--muted)] transition-colors hover:border-[color:var(--border)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)]',
+    'group flex w-full items-center justify-between gap-2 rounded-2xl border border-transparent px-3 py-2.5 text-left text-sm font-medium text-[color:var(--muted-foreground)] transition-colors hover:border-[color:var(--border)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)]',
   navItem:
-    'group flex items-center gap-2 rounded-2xl border border-transparent px-3 py-2.5 text-sm font-medium text-[color:var(--muted)] transition-colors hover:border-[color:var(--border)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)]',
+    'group flex items-center gap-2 rounded-2xl border border-transparent px-3 py-2.5 text-sm font-medium text-[color:var(--muted-foreground)] transition-colors hover:border-[color:var(--border)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)]',
   navItemActive:
     'border-[color:var(--border-strong)] bg-[color:var(--surface-muted)] text-[color:var(--foreground)] shadow-[var(--elevation-1)]',
   navSubItem:

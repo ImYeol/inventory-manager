@@ -302,7 +302,7 @@ shipping_preview_rows
 - `@/*` alias가 있으므로 shadcn-style shared primitive 경로는 root `/components/ui`가 아니라 `src/components/ui`가 맞다.
 - `components.json`이 아직 없어도 경로 기준은 바꾸지 않는다.
 - UI 구현은 shared theme, component, primitive, design token을 우선 재사용한다.
-- 토큰 계층의 소유권은 primitive/semantic=`src/app/globals.css`, component preset bridge=`src/app/components/ui.tsx`, shared primitive=`src/components/ui/*`다. UI 검토 대상 문서에는 `docs/design/tokens.md`와 `docs/design/motion.md`를 포함한다.
+- 토큰 계층의 소유권은 primitive/semantic=`src/app/globals.css`, component preset bridge=`src/app/components/ui.tsx`, shared primitive=`src/components/ui/*`다. UI 검토 대상 문서에는 `docs/design/DESIGN.md`를 포함한다.
 - 새 컴포넌트가 필요하면 먼저 existing shared source로 수렴할 수 있는지 검토하고, 검토 결과는 `docs/design/ui-guide.md`와 hooks 검사 규칙과 맞춰 본다.
 - page-level UI에서 임의의 색상/보더/배경 inline style을 직접 넣지 않는다. 필요한 시맨틱은 `src/app/components/ui.tsx`, `src/app/globals.css`, `src/components/ui/*`에 variant나 token으로 올린다.
 - hooks는 UI 변경 명령 payload의 `command`와 `cmd`를 모두 해석해 docs 동반 검토를 확인한다.

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
+import '@testing-library/jest-dom'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
   pathname: '/',
@@ -31,12 +32,36 @@ vi.mock('@/app/login/actions', () => ({
 
 import Nav from '@/app/components/Nav'
 
+const DESKTOP_WIDTH = 1024
+const MOBILE_WIDTH = 480
+
+function setViewportWidth(width: number) {
+  Object.defineProperty(window, 'innerWidth', {
+    writable: true,
+    configurable: true,
+    value: width,
+  })
+
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: width < 768,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })) as unknown as typeof window.matchMedia
+}
+
 beforeEach(() => {
   mocks.pathname = '/'
+  setViewportWidth(DESKTOP_WIDTH)
 })
 
 afterEach(() => {
   cleanup()
+  vi.restoreAllMocks()
 })
 
 describe('Nav', () => {
@@ -59,12 +84,14 @@ describe('Nav', () => {
     expect(within(screen.getByRole('navigation', { name: '주요 메뉴' })).queryByRole('link', { name: '설정' })).toBeNull()
   })
 
-  it('opens the mobile drawer and renders the same information architecture', () => {
+  it('opens the mobile drawer and renders the same information architecture', async () => {
+    setViewportWidth(MOBILE_WIDTH)
     render(React.createElement(Nav))
 
     fireEvent.click(screen.getByRole('button', { name: '메뉴 열기' }))
 
-    expect(screen.getByRole('dialog', { name: '모바일 메뉴' })).toBeTruthy()
+    const drawer = await screen.findByRole('dialog', { name: '모바일 메뉴' })
+    expect(drawer).toBeTruthy()
     const mobileMenu = within(screen.getByRole('dialog', { name: '모바일 메뉴' }))
     const destinations = [
       ['대시보드', '/'],
@@ -94,16 +121,21 @@ describe('Nav', () => {
     expect(arrivalsLink.getAttribute('aria-current')).toBe('page')
   })
 
-  it('shows the logged-in user profile summary when user data is provided', () => {
+  it('shows the logged-in user profile summary when user data is provided', async () => {
+    setViewportWidth(MOBILE_WIDTH)
     render(React.createElement(Nav, { user: { name: '홍길동', email: 'hong@example.com' } }))
 
     fireEvent.click(screen.getByRole('button', { name: '메뉴 열기' }))
+    await screen.findByRole('dialog', { name: '모바일 메뉴' })
+
+    // Open the profile dropdown menu to show both profile locations (sidebar footer + dropdown content)
+    fireEvent.pointerDown(screen.getAllByRole('button', { name: /홍길동/ })[0], { button: 0, ctrlKey: false })
 
     expect(screen.getAllByText('홍길동')).toHaveLength(2)
     expect(screen.getAllByText('hong@example.com')).toHaveLength(2)
   })
 
-  it('keeps the API settings deep link in the account menu on desktop and mobile without a separate parse-template entry', () => {
+  it('keeps the API settings deep link in the account menu on desktop and mobile without a separate parse-template entry', async () => {
     render(React.createElement(Nav, { user: { name: '홍길동', email: 'hong@example.com' } }))
 
     fireEvent.pointerDown(screen.getAllByRole('button', { name: /홍길동/ })[0], { button: 0, ctrlKey: false })
@@ -112,9 +144,10 @@ describe('Nav', () => {
     expect(screen.getByText('로그아웃')).toBeTruthy()
 
     cleanup()
+    setViewportWidth(MOBILE_WIDTH)
     render(React.createElement(Nav, { user: { name: '홍길동', email: 'hong@example.com' } }))
     fireEvent.click(screen.getByRole('button', { name: '메뉴 열기' }))
-    const mobileMenu = within(screen.getByRole('dialog', { name: '모바일 메뉴' }))
+    const mobileMenu = within(await screen.findByRole('dialog', { name: '모바일 메뉴' }))
     fireEvent.pointerDown(mobileMenu.getByRole('button', { name: /홍길동/ }), { button: 0, ctrlKey: false })
     expect(screen.getAllByRole('menuitem', { name: 'API 설정' }).some((item) => item.getAttribute('href') === '/settings?section=store-connections')).toBe(true)
     expect(screen.queryAllByRole('menuitem', { name: '파싱 템플릿' })).toHaveLength(0)
