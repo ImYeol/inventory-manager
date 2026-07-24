@@ -3,16 +3,15 @@
 import { useMemo, useState, useTransition } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { StatusBadge, type BadgeTone } from '@/components/ui/badge-1'
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
 import { ChannelBadge } from '@/components/ui/channel-badge'
 import { DataTable } from '@/components/ui/data-table'
+import { ResponsiveFilterControls } from '@/components/ui/filter-toolbar'
 import { Input } from '@/components/ui/input'
 import { ProductVariantCombobox, type ProductVariantOption } from '@/components/ui/product-variant-combobox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { DialogTitle, WorkDialog, WorkDialogBody, WorkDialogContent, WorkDialogFooter, WorkDialogHeader } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ActionToolbar, ToolbarButtonAction } from '@/components/ui/toolbar'
 import { assignOrderLine, syncOrders } from '@/lib/actions/order-sync'
 import type { SavedTrackingPreset } from '@/lib/actions/tracking-import'
 import TrackingImportWorkspace from './tracking-import/tracking-import-workspace'
@@ -132,6 +131,7 @@ export default function OrdersWorkspace({
       header: '채널',
       enableSorting: false,
       enableHiding: false,
+      meta: { role: 'status', minWidth: 'status', align: 'center', priority: 'high' },
       cell: ({ row }) => <ChannelBadge channel={row.original.channel} listingStatus="active" compact />,
     },
     {
@@ -139,6 +139,7 @@ export default function OrdersWorkspace({
       accessorFn: (order) => order.external_order_id,
       header: '주문번호 / 상품',
       enableHiding: false,
+      meta: { role: 'identity', minWidth: 'identity', truncate: 'primary', priority: 'high' },
       cell: ({ row }) => {
         const line = row.original.channel_order_lines[0]
         return (
@@ -153,13 +154,14 @@ export default function OrdersWorkspace({
       id: 'quantity',
       accessorFn: (order) => order.channel_order_lines[0]?.quantity ?? 0,
       header: '수량',
-      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      meta: { role: 'numeric', minWidth: 'numeric', align: 'right', priority: 'high' },
       cell: ({ getValue }) => getValue<number>(),
     },
     {
       id: 'warehouse',
       header: '배정 창고',
       enableSorting: false,
+      meta: { role: 'text', minWidth: 'identity', priority: 'medium' },
       cell: ({ row }) => {
         const order = row.original
         const line = order.channel_order_lines[0]
@@ -186,6 +188,7 @@ export default function OrdersWorkspace({
         return line ? lineStatuses[line.id] ?? line.line_status : order.order_status
       },
       header: '주문 / 발송 상태',
+      meta: { role: 'status', minWidth: 'status', align: 'center', priority: 'high' },
       cell: ({ getValue }) => {
         const status = orderStatus(getValue<string>())
         return <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
@@ -195,6 +198,7 @@ export default function OrdersWorkspace({
       id: 'orderedAt',
       accessorFn: (order) => order.ordered_at,
       header: '주문일',
+      meta: { role: 'text', minWidth: 'status', priority: 'low' },
       cell: ({ getValue }) => {
         const value = getValue<string | null>()
         return value ? new Date(value).toLocaleDateString('ko-KR') : '-'
@@ -204,18 +208,6 @@ export default function OrdersWorkspace({
 
   return (
     <div className="space-y-3">
-      <Breadcrumb className="mb-1">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/">대시보드</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>주문</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
       <Tabs value={view} onValueChange={(value) => setView(value as OrderView)}>
         <TabsList aria-label="주문 보기">
           {views.map((item) => <TabsTrigger key={item} value={item}>{item}</TabsTrigger>)}
@@ -226,48 +218,55 @@ export default function OrdersWorkspace({
         columns={orderColumns}
         rows={rows}
         tableAriaLabel="주문 목록"
+        dataEmptyState="등록된 주문이 없습니다."
+        filteredEmptyState="조건에 맞는 주문이 없습니다."
+        emptyStateKind={search || channel !== 'all' ? 'filtered' : 'dataset'}
+        onResetFilters={resetFilters}
         emptyState="조건에 맞는 주문이 없습니다."
-        toolbarStart={
-          <div className="flex min-w-0 items-center gap-2">
-            <Input type="search" aria-label="주문 검색" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="주문번호 또는 SKU" className="w-56 ui-control-sm" />
+        queryStart={
+          <>
+            <Input type="search" aria-label="주문 검색" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="주문번호 또는 SKU" className="min-w-0 flex-1 ui-control-sm" />
+            <ResponsiveFilterControls>
             <Select value={channel} onValueChange={(value) => setChannel(value as typeof channel)}>
-              <SelectTrigger aria-label="채널 선택" className="w-32 ui-control-sm"><SelectValue placeholder="채널" /></SelectTrigger>
+              <SelectTrigger aria-label="채널 선택" className="ui-control-sm"><SelectValue placeholder="채널" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">전체 채널</SelectItem>
                 <SelectItem value="naver">네이버</SelectItem>
                 <SelectItem value="coupang">쿠팡</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+            </ResponsiveFilterControls>
+          </>
         }
-        toolbarEnd={
-          <>
-            <Button type="button" variant="ghost" size="sm" onClick={resetFilters}>필터 초기화</Button>
-            <ActionToolbar>
-              <ToolbarButtonAction disabled={isPending} onClick={() => startTransition(async () => {
+        actionStart={<span className="shrink-0 text-sm text-[color:var(--muted-foreground)]">{rows.length}건</span>}
+        actionEnd={
+            <div className="flex min-w-0 shrink-0 items-center gap-2">
+              <Button type="button" variant="secondary" size="sm" disabled={isPending} onClick={() => startTransition(async () => {
                 try {
                   const result = await syncOrders()
                   setMessage(`주문 동기화 완료: ${result.orders}건`)
                 } catch {
                   setMessage('주문 동기화에 실패했습니다.')
                 }
-              })}>주문 동기화</ToolbarButtonAction>
-              <ToolbarButtonAction onClick={() => setIsTrackingImportOpen(true)}>송장 등록</ToolbarButtonAction>
-            </ActionToolbar>
-          </>
+              })}>주문 동기화</Button>
+              <Button type="button" variant="secondary" size="sm" onClick={() => setIsTrackingImportOpen(true)}>송장 등록</Button>
+            </div>
         }
       />
       <p aria-live="polite" className="text-sm text-[color:var(--muted-foreground)]">{message}</p>
-      <Sheet open={isTrackingImportOpen} onOpenChange={setIsTrackingImportOpen}>
-        <SheetContent side="right" className="sm:max-w-2xl">
-          <SheetHeader>
-            <SheetTitle>송장 업로드</SheetTitle>
-          </SheetHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
+      <WorkDialog open={isTrackingImportOpen} onOpenChange={setIsTrackingImportOpen}>
+        <WorkDialogContent>
+          <WorkDialogHeader>
+            <DialogTitle>송장 업로드</DialogTitle>
+          </WorkDialogHeader>
+          <WorkDialogBody>
             <TrackingImportWorkspace initialPresets={trackingPresets} />
-          </div>
-        </SheetContent>
-      </Sheet>
+          </WorkDialogBody>
+          <WorkDialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsTrackingImportOpen(false)}>닫기</Button>
+          </WorkDialogFooter>
+        </WorkDialogContent>
+      </WorkDialog>
     </div>
   )
 }

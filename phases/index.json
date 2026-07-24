@@ -163,6 +163,15 @@
     {
       "dir": "aubergine-rebrand-and-primitive-hardening",
       "status": "in_progress"
+    },
+    {
+      "dir": "unified-data-layout-system",
+      "status": "completed",
+      "completed_at": "2026-07-23T06:34:00+09:00"
+    },
+    {
+      "dir": "data-action-row-correction",
+      "status": "in_progress"
     }
   ]
 }

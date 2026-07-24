@@ -46,6 +46,7 @@ describe('HistoryPage', () => {
       }),
     )
     expect(screen.getByRole('heading', { name: '이력 조회' })).toBeTruthy()
+    expect(screen.getByRole('navigation')).toBeTruthy()
     expect(screen.getByTestId('history-view')).toBeTruthy()
   })
 })

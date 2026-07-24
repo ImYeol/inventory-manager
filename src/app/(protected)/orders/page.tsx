@@ -1,4 +1,5 @@
 import { PageHeader, ui } from '../../components/ui'
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { getOrdersWorkspaceData } from '@/lib/actions/order-sync'
 import { listTrackingPresets } from '@/lib/actions/tracking-import'
 import { getCatalogData, getProductWorkspaceData } from '@/lib/data'
@@ -36,7 +37,18 @@ export default async function OrdersPage({ searchParams }: { searchParams?: Prom
 
   return (
     <div className={ui.shell}>
-      <PageHeader title="주문" />
+      <Breadcrumb className="mb-3">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/">대시보드</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>주문</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+      <PageHeader title="주문" description="주문 조회, 예약 상태 확인, 송장 등록/반영을 한곳에서 처리합니다." />
       <OrdersWorkspace orders={orders as never} variants={variants} warehouses={catalog.warehouses} initialView={view} trackingPresets={trackingPresets} />
     </div>
   )

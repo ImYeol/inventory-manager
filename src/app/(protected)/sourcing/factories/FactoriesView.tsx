@@ -22,12 +22,21 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/data-table'
+import { ResponsiveFilterControls } from '@/components/ui/filter-toolbar'
 import { FileDropInput } from '@/components/ui/file-drop-input'
 import { Input } from '@/components/ui/input'
-import { Modal } from '@/components/ui/modal'
 import { ParseTemplateBuilder } from '@/components/ui/parse-template-builder'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  DialogDescription,
+  DialogTitle,
+  WorkDialog,
+  WorkDialogBody,
+  WorkDialogContent,
+  WorkDialogFooter,
+  WorkDialogHeader,
+} from '@/components/ui/dialog'
+import { TruncatedText } from '@/components/ui/truncated-text'
 import { PageHeader, cx, ui } from '@/app/components/ui'
 import { autoFormUiComponents } from '@/components/ui/autoform/ui-components'
 import { autoFormFieldComponents } from '@/components/ui/autoform/form-components'
@@ -248,7 +257,7 @@ export default function FactoriesView({
   }
 
   const inboundTemplateColumns: ColumnDef<InboundParseTemplateRow, unknown>[] = [
-    { id: 'name', header: '이름', enableSorting: false, cell: ({ row }) => <span className="font-medium text-[color:var(--foreground)]">{row.original.name}</span> },
+    { id: 'name', header: '이름', enableSorting: false, cell: ({ row }) => <TruncatedText value={row.original.name} variant="primary"><span className="font-medium text-[color:var(--foreground)]">{row.original.name}</span></TruncatedText> },
     { id: 'version', header: '최신 버전', enableSorting: false, cell: ({ row }) => <span className="tabular-nums text-[color:var(--muted-foreground)]">v{row.original.versionNumber}</span> },
     { id: 'status', header: '상태', enableSorting: false, cell: ({ row }) => <StatusBadge tone={row.original.active ? 'success' : 'neutral'}>{row.original.active ? '사용 중' : '사용 중지'}</StatusBadge> },
     {
@@ -333,12 +342,8 @@ export default function FactoriesView({
       },
       cell: ({ row }) => (
         <>
-          <button
-            type="button"
-            onClick={() => openDetail(row.original.id)}
-            className="w-full truncate text-left font-medium text-[color:var(--foreground)] hover:underline"
-          >
-            {row.original.name}
+          <button type="button" onClick={() => openDetail(row.original.id)} className="block min-w-0 max-w-full text-left hover:underline">
+            <TruncatedText value={row.original.name} variant="primary"><span className="font-medium text-[color:var(--foreground)]">{row.original.name}</span></TruncatedText>
           </button>
           {row.original.notes ? (
             <p className="mt-1 line-clamp-2 text-xs text-[color:var(--muted-foreground)]">{row.original.notes}</p>
@@ -404,6 +409,16 @@ export default function FactoriesView({
     },
   ]
 
+  const sourcingColumns: ColumnDef<FactorySourcingItem, unknown>[] = [
+    { accessorKey: 'expectedDate', header: '예정일', meta: { minWidth: '8rem' } },
+    { accessorKey: 'modelName', header: '상품', meta: { role: 'identity', truncate: 'primary' }, cell: ({ row }) => <TruncatedText value={row.original.modelName} variant="primary">{row.original.modelName}</TruncatedText> },
+    { id: 'option', accessorFn: (row) => `${row.colorName} / ${row.sizeName}`, header: '옵션', meta: { minWidth: '10rem', truncate: 'secondary' } },
+    { accessorKey: 'status', header: '상태', meta: { role: 'status' }, cell: ({ row }) => <StatusBadge tone={getArrivalStatusTone(row.original.status)} className="px-2.5 py-1">{row.original.status}</StatusBadge> },
+    { accessorKey: 'orderedQuantity', header: '주문', meta: { role: 'numeric', align: 'right' } },
+    { accessorKey: 'receivedQuantity', header: '받은', meta: { role: 'numeric', align: 'right' } },
+    { accessorKey: 'remainingQuantity', header: '잔여', meta: { role: 'numeric', align: 'right' } },
+  ]
+
   return (
     <div className={ui.shell}>
       <Breadcrumb className="mb-3">
@@ -436,71 +451,50 @@ export default function FactoriesView({
         </Card>
       ) : null}
 
-      <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter((value ?? 'all') as FactoryStatusFilter)} className="mb-3">
-        <TabsList aria-label="입고처 상태 필터">
-          <TabsTrigger value="all">전체</TabsTrigger>
-          <TabsTrigger value="active">활성</TabsTrigger>
-          <TabsTrigger value="inactive">비활성</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
       <DataTable
         columns={factoryColumns}
         rows={filteredFactories}
         tableAriaLabel="입고처 목록"
         emptyState="조건에 맞는 입고처가 없습니다."
         getRowDataState={(factory) => (factory.id === selectedFactory?.id ? 'selected' : undefined)}
-        toolbarStart={
-          <div className="w-full sm:w-[18rem] lg:max-w-[22rem] lg:flex-1">
-            <label htmlFor="factory-search" className="sr-only">
-              입고처 검색
-            </label>
-            <Input
-              id="factory-search"
-              type="search"
-              placeholder="입고처명, 연락처, 메모 검색"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              className="ui-control-sm"
-            />
-          </div>
+        queryStart={
+          <>
+            <div data-slot="data-query-start" data-testid="factories-query-row" className="flex min-w-0 flex-1 items-center gap-2">
+              <label htmlFor="factory-search" className="sr-only">입고처 검색</label>
+              <Input id="factory-search" type="search" placeholder="입고처명, 연락처, 메모 검색" value={search} onChange={(event) => setSearch(event.target.value)} className="ui-control-sm min-w-0 flex-1" />
+              <ResponsiveFilterControls>
+                <div data-testid="factories-status-filter">
+                <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter((value ?? 'all') as FactoryStatusFilter)}>
+                  <TabsList aria-label="입고처 상태 필터">
+                    <TabsTrigger value="all">전체</TabsTrigger>
+                    <TabsTrigger value="active">활성</TabsTrigger>
+                    <TabsTrigger value="inactive">비활성</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                </div>
+              </ResponsiveFilterControls>
+            </div>
+          </>
         }
-        toolbarEnd={
-          <Button
-            type="button"
-            onClick={() => {
-              if (schemaState.status === 'ready') {
-                setIsRegisterOpen(true)
-              }
-            }}
-            size="sm"
-            className="h-9 px-3"
-            disabled={schemaState.status === 'missing'}
-          >
-            입고처 등록
-          </Button>
-        }
+        actionStart={<span data-testid="factories-action-row" className="text-sm text-[color:var(--muted-foreground)]">총 {filteredFactories.length}개</span>}
+        actionEnd={<Button type="button" onClick={() => { if (schemaState.status === 'ready') setIsRegisterOpen(true) }} size="sm" disabled={schemaState.status === 'missing'}>입고처 등록</Button>}
       />
 
-      <Modal
+      <WorkDialog
+        modal={false}
         open={selectedFactory !== null}
-        title={selectedFactory?.name ?? '입고처 상세'}
-        description={selectedFactory ? '입고처 정보와 열려 있는 상품 소싱 내역을 확인합니다.' : undefined}
         onOpenChange={(open) => {
-          if (!open) {
+          if (!open && versionModal === null) {
             setSelectedFactoryId(null)
           }
         }}
-        footer={
-          selectedFactory ? (
-            <div className="flex items-center justify-end gap-2">
-              <Button type="button" variant="secondary" onClick={() => toggleFactory(selectedFactory.id, !selectedFactory.isActive)}>
-                {selectedFactory.isActive ? '비활성화' : '다시 활성화'}
-              </Button>
-            </div>
-          ) : null
-        }
       >
+        <WorkDialogContent>
+          <WorkDialogHeader>
+            <DialogTitle>{selectedFactory?.name ?? '입고처 상세'}</DialogTitle>
+            <DialogDescription>입고처 정보와 열려 있는 상품 소싱 내역을 확인합니다.</DialogDescription>
+          </WorkDialogHeader>
+          <WorkDialogBody>
         {selectedFactory ? (
           <div className="space-y-4">
             {schemaState.status === 'missing' && schemaState.message ? (
@@ -574,60 +568,35 @@ export default function FactoriesView({
                 <span className={cx(ui.pillMuted, 'tabular-nums')}>열림 {selectedFactorySourcingItems.length}건</span>
               </div>
 
-              <div className={ui.tableShell}>
-                <div className="overflow-x-auto">
-                  <Table aria-label="상품 소싱 내역">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[8rem]">예정일</TableHead>
-                        <TableHead>상품</TableHead>
-                        <TableHead className="w-[10rem]">옵션</TableHead>
-                        <TableHead className="w-[7rem]">상태</TableHead>
-                        <TableHead className="w-[6rem] text-right">주문</TableHead>
-                        <TableHead className="w-[6rem] text-right">받은</TableHead>
-                        <TableHead className="w-[6rem] text-right">잔여</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedFactorySourcingItems.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={7} className="py-8 text-center text-sm text-[color:var(--muted-foreground)]">
-                            열려 있는 소싱 내역이 없습니다.
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        selectedFactorySourcingItems.map((item, index) => (
-                          <TableRow key={`${item.expectedDate}-${item.modelName}-${item.sizeName}-${item.colorName}-${index}`}>
-                            <TableCell className="font-medium text-[color:var(--foreground)]">{item.expectedDate}</TableCell>
-                            <TableCell className="font-medium text-[color:var(--foreground)]">{item.modelName}</TableCell>
-                            <TableCell>{item.colorName} / {item.sizeName}</TableCell>
-                            <TableCell>
-                              <StatusBadge tone={getArrivalStatusTone(item.status)} className="px-2.5 py-1">
-                                {item.status}
-                              </StatusBadge>
-                            </TableCell>
-                            <TableCell className="text-right font-medium tabular-nums text-[color:var(--foreground)]">{item.orderedQuantity}</TableCell>
-                            <TableCell className="text-right font-medium tabular-nums text-[color:var(--foreground)]">{item.receivedQuantity}</TableCell>
-                            <TableCell className="text-right font-semibold tabular-nums text-[color:var(--foreground)]">{item.remainingQuantity}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
+              <DataTable<FactorySourcingItem>
+                bare
+                tableAriaLabel="상품 소싱 내역"
+                columns={sourcingColumns}
+                rows={selectedFactorySourcingItems}
+                rowAriaLabel={(item) => `${item.expectedDate} ${item.modelName}`}
+                emptyState="열려 있는 소싱 내역이 없습니다."
+              />
             </div>
           </div>
         ) : null}
-      </Modal>
+          </WorkDialogBody>
+          <WorkDialogFooter>
+            {selectedFactory ? <Button type="button" variant="secondary" onClick={() => toggleFactory(selectedFactory.id, !selectedFactory.isActive)}>{selectedFactory.isActive ? '비활성화' : '다시 활성화'}</Button> : null}
+          </WorkDialogFooter>
+        </WorkDialogContent>
+      </WorkDialog>
 
-      <Modal
+      <WorkDialog
+        modal={false}
         open={versionModal !== null}
-        title={versionModal === 'new' ? '새 입고 파싱 템플릿' : `${versionModal ? versionModal.name : ''} 새 버전`}
-        description="샘플 파일에서 시트·헤더 행과 외부 SKU, 수량 열을 선택해 새 버전으로 저장합니다."
         onOpenChange={(open) => { if (!open) setVersionModal(null) }}
-        footer={<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setVersionModal(null)}>닫기</Button><Button type="button" disabled={isPending || !versionSample} onClick={saveVersion}>버전 저장</Button></div>}
       >
+        <WorkDialogContent>
+          <WorkDialogHeader>
+            <DialogTitle>{versionModal === 'new' ? '새 입고 파싱 템플릿' : `${versionModal ? versionModal.name : ''} 새 버전`}</DialogTitle>
+            <DialogDescription>샘플 파일에서 시트·헤더 행과 외부 SKU, 수량 열을 선택해 새 버전으로 저장합니다.</DialogDescription>
+          </WorkDialogHeader>
+          <WorkDialogBody>
         <div className="space-y-4">
           {versionErrors.root?.message ? <p role="alert" className="text-sm text-[color:var(--danger-foreground)]">{versionErrors.root.message}</p> : null}
           <label className="space-y-1">
@@ -657,17 +626,28 @@ export default function FactoriesView({
             </div>
           ) : null}
         </div>
-      </Modal>
+          </WorkDialogBody>
+          <WorkDialogFooter>
+            <Button type="button" variant="secondary" onClick={() => setVersionModal(null)}>닫기</Button>
+            <Button type="button" disabled={isPending || !versionSample} onClick={saveVersion}>버전 저장</Button>
+          </WorkDialogFooter>
+        </WorkDialogContent>
+      </WorkDialog>
 
-      <Modal
+      <WorkDialog
+        modal={false}
         open={isRegisterOpen}
-        title="입고처 등록"
-        description="새 입고처의 연락처와 메모를 등록합니다."
         onOpenChange={(open) => {
           setIsRegisterOpen(open)
           if (!open) setRegisterFormError(null)
         }}
       >
+        <WorkDialogContent>
+          <WorkDialogHeader>
+            <DialogTitle>입고처 등록</DialogTitle>
+            <DialogDescription>새 입고처의 연락처와 메모를 등록합니다.</DialogDescription>
+          </WorkDialogHeader>
+          <WorkDialogBody>
         <div className="space-y-3">
           {schemaState.status === 'missing' && schemaState.message ? (
             <Card variant="muted" className="overflow-hidden">
@@ -698,7 +678,9 @@ export default function FactoriesView({
             </AutoForm>
           ) : null}
         </div>
-      </Modal>
+          </WorkDialogBody>
+        </WorkDialogContent>
+      </WorkDialog>
     </div>
   )
 }

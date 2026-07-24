@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { attachInternalSkuToInboundDraftRow, receiveManualInboundDraftRows } from '@/lib/actions'
 import { createInternalProduct } from '@/lib/actions/internal-product'
 import { Button } from '@/components/ui/button'
+import { DialogDescription, DialogTitle, WorkDialog, WorkDialogBody, WorkDialogContent, WorkDialogFooter, WorkDialogHeader } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Modal } from '@/components/ui/modal'
 import { cx, ui } from '@/app/components/ui'
 
 export type ManualInboundDraftRow = {
@@ -99,19 +99,28 @@ export default function ManualInboundDraftRows({ rows }: { rows: ManualInboundDr
           )
         })}
       </div>
-      <Modal
+      <WorkDialog
         open={target !== null}
-        title="내부 SKU 생성"
-        description={target ? `${target.externalSku} 행에 새 내부 SKU를 만들고 연결합니다.` : undefined}
         onOpenChange={(open) => { if (!open && !isPending) setTarget(null) }}
-        footer={<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setTarget(null)} disabled={isPending}>취소</Button><Button type="button" onClick={createAndAttach} disabled={isPending || !product.name.trim() || !product.skuPrefix.trim()}>생성 후 연결</Button></div>}
       >
-        <div className="space-y-4">
-          <label className="space-y-1"><span className={ui.label}>상품명</span><Input value={product.name} onChange={(event) => setProduct((current) => ({ ...current, name: event.target.value }))} /></label>
-          <label className="space-y-1"><span className={ui.label}>SKU prefix</span><Input value={product.skuPrefix} onChange={(event) => setProduct((current) => ({ ...current, skuPrefix: event.target.value }))} /></label>
-          {error ? <p className="text-sm font-medium text-[color:var(--danger-foreground)]">{error}</p> : null}
-        </div>
-      </Modal>
+        <WorkDialogContent>
+          <WorkDialogHeader>
+            <DialogTitle>내부 SKU 생성</DialogTitle>
+            {target ? <DialogDescription>{target.externalSku} 행에 새 내부 SKU를 만들고 연결합니다.</DialogDescription> : null}
+          </WorkDialogHeader>
+          <WorkDialogBody>
+            <div className="flex flex-col gap-4">
+              <label className="flex flex-col gap-1"><span className={ui.label}>상품명</span><Input value={product.name} onChange={(event) => setProduct((current) => ({ ...current, name: event.target.value }))} /></label>
+              <label className="flex flex-col gap-1"><span className={ui.label}>SKU prefix</span><Input value={product.skuPrefix} onChange={(event) => setProduct((current) => ({ ...current, skuPrefix: event.target.value }))} /></label>
+              {error ? <p role="alert" className="text-sm font-medium text-[color:var(--danger-foreground)]">{error}</p> : null}
+            </div>
+          </WorkDialogBody>
+          <WorkDialogFooter>
+            <Button type="button" variant="secondary" onClick={() => setTarget(null)} disabled={isPending}>취소</Button>
+            <Button type="button" onClick={createAndAttach} disabled={isPending || !product.name.trim() || !product.skuPrefix.trim()}>생성 후 연결</Button>
+          </WorkDialogFooter>
+        </WorkDialogContent>
+      </WorkDialog>
     </section>
   )
 }

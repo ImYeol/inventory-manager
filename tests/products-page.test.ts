@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
+import fs from 'node:fs'
+import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 
@@ -84,5 +86,29 @@ describe('ProductsPage', () => {
     )
     expect(screen.getByTestId('master-data-manager')).toBeTruthy()
     expect(screen.getByRole('heading', { name: '상품 관리' })).toBeTruthy()
+  })
+
+  it('adopts the standalone products layout contract at the page and workspace boundaries', () => {
+    const pageSource = fs.readFileSync(path.resolve(process.cwd(), 'src/app/(protected)/products/page.tsx'), 'utf8')
+    const workspaceSource = fs.readFileSync(path.resolve(process.cwd(), 'src/app/(protected)/master-data/MasterDataManager.tsx'), 'utf8')
+
+    expect(pageSource.indexOf('<Breadcrumb')).toBeGreaterThanOrEqual(0)
+    expect(pageSource.indexOf('<Breadcrumb')).toBeLessThan(pageSource.indexOf('<PageHeader'))
+    expect(workspaceSource).toContain("ResponsiveFilterControls } from '@/components/ui/filter-toolbar'")
+    expect(workspaceSource).toContain('queryStart=')
+    expect(workspaceSource).toContain('actionAlignment="end"')
+    expect(workspaceSource).not.toContain('filteredVariants.length}개 SKU')
+    expect(workspaceSource).toContain('actionEnd={<Button type="button" variant="secondary" size="sm"')
+    expect(workspaceSource).not.toContain('QueryResetButton')
+    expect(workspaceSource).toContain("minWidth: 'identity'")
+    expect(workspaceSource).toContain("minWidth: 'numeric'")
+    expect(workspaceSource).toContain("minWidth: 'status'")
+    expect(workspaceSource).toContain('truncate:')
+    expect(workspaceSource).toContain('dataEmptyState=')
+    expect(workspaceSource).toContain('filteredEmptyState=')
+    expect(workspaceSource).not.toContain('<TableSurface')
+    expect(workspaceSource).toContain('value="product"')
+    expect(workspaceSource).toContain('value="warehouse"')
+    expect(workspaceSource).toContain('value="supplier-audit"')
   })
 })

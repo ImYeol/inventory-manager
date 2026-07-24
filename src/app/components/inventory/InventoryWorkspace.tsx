@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import HistoryView, { type HistoryFilterState } from '@/app/(protected)/history/HistoryView'
 import type { HistoryTransaction } from '@/lib/data'
@@ -20,12 +20,20 @@ import { StatusBadge } from '@/components/ui/badge-1'
 import { Button } from '@/components/ui/button'
 import { ChannelBadge, type ChannelListingStatus } from '@/components/ui/channel-badge'
 import { DataTable } from '@/components/ui/data-table'
-import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
+import { IndependentActionGroup, ResponsiveFilterControls } from '@/components/ui/filter-toolbar'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { SplitButton } from '@/components/ui/split-button'
+import {
+  DialogDescription,
+  DialogTitle,
+  WorkDialog,
+  WorkDialogBody,
+  WorkDialogContent,
+  WorkDialogFooter,
+  WorkDialogHeader,
+} from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { TruncatedText } from '@/components/ui/truncated-text'
 
 type InventoryItem = {
   id: number
@@ -86,7 +94,11 @@ type ChannelProductRefSummary = {
 type InventoryOverviewRow = {
   key: string
   modelName: string
-  skuOption: ReactNode
+  skuLabel: string
+  colorRgb: string
+  naverCount: number
+  coupangCount: number
+  syncErrorRefs: ChannelProductRefSummary[]
   warehouseName: string
   onHand: number
   committed: number
@@ -208,29 +220,11 @@ export default function InventoryWorkspace({
               return {
                 key: `${variantId}:${warehouse.id}`,
                 modelName: model.name,
-                skuOption: (
-                  <div className="space-y-1 text-[color:var(--muted-foreground)]">
-                    <div className="flex items-center gap-2">
-                    <span
-                      className="inline-block h-3.5 w-3.5 rounded-full border border-[color:var(--border)]"
-                      style={{ backgroundColor: color.rgbCode }}
-                    />
-                    <span>
-                      {`${model.name}-${color.name}-${size.name}`} · {color.name} / {size.name}
-                    </span>
-                    </div>
-                    {channelRefs.length > 0 ? (
-                      <div className="flex flex-wrap items-center gap-1 text-xs text-[color:var(--muted-foreground)]">
-                        <span>{`네이버 ${naverCount} · 쿠팡 ${coupangCount}`}</span>
-                        {syncErrorRefs.map((ref) => (
-                          <ChannelBadge key={ref.id} channel={ref.channel} listingStatus="sync-error" compact />
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-[color:var(--muted-foreground)]">매핑 없음</span>
-                    )}
-                  </div>
-                ),
+                skuLabel: `${model.name}-${color.name}-${size.name} · ${color.name} / ${size.name}`,
+                colorRgb: color.rgbCode,
+                naverCount,
+                coupangCount,
+                syncErrorRefs,
                 warehouseName: warehouse.name,
                 warehouseId: warehouse.id,
                 onHand,
@@ -268,43 +262,74 @@ export default function InventoryWorkspace({
       accessorKey: 'modelName',
       header: '상품',
       meta: {
-        headerClassName: 'w-[10rem]',
+        role: 'identity',
+        minWidth: 'identity',
         cellClassName: 'font-medium text-[color:var(--foreground)]',
       },
+      cell: ({ row }) => (
+        <TruncatedText value={row.original.modelName} variant="primary">
+          {row.original.modelName}
+        </TruncatedText>
+      ),
     },
     {
       id: 'skuOption',
       header: 'SKU / 옵션',
       enableSorting: false,
-      cell: ({ row }) => row.original.skuOption,
+      meta: { role: 'identity', minWidth: 'identity', cellClassName: 'text-[color:var(--muted-foreground)]' },
+      cell: ({ row }) => (
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <span
+              aria-hidden="true"
+              className="inline-block size-3.5 shrink-0 rounded-full border border-[color:var(--border)]"
+              style={{ backgroundColor: row.original.colorRgb }}
+            />
+            <TruncatedText value={row.original.skuLabel} variant="secondary">
+              {row.original.skuLabel}
+            </TruncatedText>
+          </div>
+          {row.original.naverCount + row.original.coupangCount > 0 ? (
+            <div className="flex min-w-0 items-center gap-1 text-xs text-[color:var(--muted-foreground)]">
+              <span className="shrink-0">{`네이버 ${row.original.naverCount} · 쿠팡 ${row.original.coupangCount}`}</span>
+              {row.original.syncErrorRefs.map((ref) => (
+                <ChannelBadge key={ref.id} channel={ref.channel} listingStatus="sync-error" compact />
+              ))}
+            </div>
+          ) : (
+            <span className="text-xs text-[color:var(--muted-foreground)]">매핑 없음</span>
+          )}
+        </div>
+      ),
     },
     {
       accessorKey: 'warehouseName',
       header: '창고',
-      meta: { headerClassName: 'w-[8rem]' },
+      meta: { role: 'text', minWidth: '8rem' },
     },
     {
       accessorKey: 'onHand',
       header: '현재 재고',
       meta: {
-        headerClassName: 'w-[6rem] text-right',
-        cellClassName: 'text-right font-semibold tabular-nums text-[color:var(--foreground)]',
+        role: 'numeric',
+        minWidth: 'numeric',
+        cellClassName: 'font-semibold tabular-nums text-[color:var(--foreground)]',
       },
     },
     {
       accessorKey: 'committed',
       header: '예약 재고',
-      meta: { headerClassName: 'w-[6rem] text-right', cellClassName: 'text-right tabular-nums' },
+      meta: { role: 'numeric', minWidth: 'numeric', cellClassName: 'tabular-nums' },
     },
     {
       accessorKey: 'available',
       header: '출고 가능',
-      meta: { headerClassName: 'w-[6rem] text-right', cellClassName: 'text-right tabular-nums' },
+      meta: { role: 'numeric', minWidth: 'numeric', cellClassName: 'tabular-nums' },
     },
     {
       accessorKey: 'incoming',
       header: '입고 예정',
-      meta: { headerClassName: 'w-[6rem] text-right', cellClassName: 'text-right tabular-nums' },
+      meta: { role: 'numeric', minWidth: 'numeric', cellClassName: 'tabular-nums' },
       cell: ({ row }) => {
         const { incoming, incomingHref } = row.original
         return incomingHref && incoming > 0 ? (
@@ -323,6 +348,7 @@ export default function InventoryWorkspace({
     {
       id: 'status',
       header: '상태',
+      meta: { role: 'status', minWidth: 'status' },
       cell: ({ row }) => (
         <StatusBadge tone={row.original.status.variant}>{row.original.status.label}</StatusBadge>
       ),
@@ -332,7 +358,7 @@ export default function InventoryWorkspace({
       header: () => <span className="sr-only">행 작업</span>,
       enableSorting: false,
       enableHiding: false,
-      meta: { headerClassName: 'w-[5rem] text-right', cellClassName: 'text-right' },
+      meta: { role: 'action', minWidth: '5rem' },
       cell: ({ row }) =>
         row.original.onAdjust ? (
           <Button type="button" variant="ghost" size="sm" onClick={row.original.onAdjust}>
@@ -378,10 +404,18 @@ export default function InventoryWorkspace({
             columns={inventoryColumns}
             rows={filteredRows}
             tableAriaLabel="재고 목록"
-            emptyState="조회 조건에 맞는 재고가 없습니다."
-            toolbarStart={
-              <div className="flex min-w-0 flex-1 flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
-                <div className="w-full sm:w-[15rem] lg:max-w-[16rem] lg:flex-1">
+            emptyState="재고 데이터가 없습니다."
+            dataEmptyState="등록된 재고 데이터가 없습니다."
+            filteredEmptyState="조회 조건에 맞는 재고가 없습니다."
+            emptyStateKind={search || selectedWarehouseId !== 'all' || statusFilter !== 'all' ? 'filtered' : 'dataset'}
+            onResetFilters={() => {
+              setSearch('')
+              setSelectedWarehouseId('all')
+              setStatusFilter('all')
+            }}
+            queryStart={
+              <>
+                <div className="min-w-0 flex-1">
                   <label htmlFor="inventory-search" className="sr-only">
                     상품명 검색
                   </label>
@@ -394,85 +428,63 @@ export default function InventoryWorkspace({
                     className="ui-control-sm"
                   />
                 </div>
-
-                <div className="w-full sm:w-[11rem]">
-                  <label htmlFor="inventory-warehouse" className="sr-only">
-                    창고 선택
-                  </label>
-                  <Select
-                    value={selectedWarehouseId === 'all' ? 'all' : String(selectedWarehouseId)}
-                    onValueChange={(value) => setSelectedWarehouseId(value == null || value === 'all' ? 'all' : Number(value))}
-                  >
-                    <SelectTrigger id="inventory-warehouse" className={ui.controlSm}>
-                      <SelectValue placeholder="전체 창고" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">전체 창고</SelectItem>
-                      {warehouses.map((warehouse) => (
-                        <SelectItem key={warehouse.id} value={String(warehouse.id)}>
-                          {warehouse.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="w-full sm:w-[9.5rem]">
-                  <label htmlFor="inventory-status" className="sr-only">
-                    상태 필터
-                  </label>
-                  <Select
-                    value={statusFilter}
-                    onValueChange={(value) => setStatusFilter((value ?? 'all') as typeof statusFilter)}
-                  >
-                    <SelectTrigger id="inventory-status" className={ui.controlSm}>
-                      <SelectValue placeholder="전체 상태" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">전체 상태</SelectItem>
-                      <SelectItem value="normal">정상</SelectItem>
-                      <SelectItem value="warning">주의</SelectItem>
-                      <SelectItem value="danger">품절</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+                <ResponsiveFilterControls>
+                  <div className="shrink-0">
+                    <label htmlFor="inventory-warehouse" className="sr-only">창고 선택</label>
+                    <Select
+                      value={selectedWarehouseId === 'all' ? 'all' : String(selectedWarehouseId)}
+                      onValueChange={(value) => setSelectedWarehouseId(value == null || value === 'all' ? 'all' : Number(value))}
+                    >
+                      <SelectTrigger id="inventory-warehouse" className={ui.controlSm}><SelectValue placeholder="전체 창고" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">전체 창고</SelectItem>
+                        {warehouses.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouse.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="shrink-0">
+                    <label htmlFor="inventory-status" className="sr-only">상태 필터</label>
+                    <Select value={statusFilter} onValueChange={(value) => setStatusFilter((value ?? 'all') as typeof statusFilter)}>
+                      <SelectTrigger id="inventory-status" className={ui.controlSm}><SelectValue placeholder="전체 상태" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">전체 상태</SelectItem>
+                        <SelectItem value="normal">정상</SelectItem>
+                        <SelectItem value="warning">주의</SelectItem>
+                        <SelectItem value="danger">품절</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </ResponsiveFilterControls>
+              </>
             }
-            toolbarEnd={
-              <SplitButton
-                label="수동 입고"
-                onClick={() => {
-                  setRowQuickAction(null)
-                  setOverlayMode('inbound')
-                }}
-                menuLabel="다른 재고 운영 action 더보기"
-                variant="success"
-              >
-                <DropdownMenuItem
-                  onSelect={() => {
+            actionAlignment="start"
+            actionStart={
+                <IndependentActionGroup aria-label="재고 운영 작업">
+                  <Button type="button" variant="outline" size="sm" onClick={() => {
+                    setRowQuickAction(null)
+                    setOverlayMode('inbound')
+                  }}>
+                    수동 입고
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => {
                     setRowQuickAction(null)
                     setOverlayMode('manual-outbound')
-                  }}
-                >
-                  수동 출고
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => {
+                  }}>
+                    수동 출고
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => {
                     setRowQuickAction(null)
                     setOverlayMode('count-adjustment')
-                  }}
-                >
-                  실사 조정
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => {
+                  }}>
+                    실사 조정
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => {
                     setRowQuickAction(null)
                     setOverlayMode('transfer')
-                  }}
-                >
-                  창고 이동
-                </DropdownMenuItem>
-              </SplitButton>
+                  }}>
+                    창고 이동
+                  </Button>
+                </IndependentActionGroup>
             }
           />
         </TabsContent>
@@ -489,24 +501,25 @@ export default function InventoryWorkspace({
         </TabsContent>
       </Tabs>
 
-      <Sheet open={overlayMode !== null} onOpenChange={(open) => { if (!open) closeOverlay() }}>
-        <SheetContent side="right" className="sm:max-w-xl">
-          <SheetHeader>
-            <SheetTitle>{overlayMode === 'inbound' ? '수동 입고' : overlayMode === 'manual-outbound' ? '수동 출고' : overlayMode === 'transfer' ? '창고 이동' : '실사 수량 조정'}</SheetTitle>
-            <SheetDescription>
+      <WorkDialog open={overlayMode !== null} onOpenChange={(open) => { if (!open) closeOverlay() }}>
+        <WorkDialogContent>
+          <WorkDialogHeader>
+            <DialogTitle>{overlayMode === 'inbound' ? '수동 입고' : overlayMode === 'manual-outbound' ? '수동 출고' : overlayMode === 'transfer' ? '창고 이동' : '실사 수량 조정'}</DialogTitle>
+            <DialogDescription>
               {overlayMode === 'inbound'
                 ? '소싱 입고 예정과 별개로 확인된 수량을 현재 재고에 직접 반영합니다.'
                 : overlayMode === 'manual-outbound'
                   ? '주문 발송과 별도로 현재 보유 재고를 차감합니다. 사유는 이력에 기록됩니다.'
                   : overlayMode === 'transfer' ? '출발 재고를 차감하고 도착 창고에 같은 수량을 원자적으로 반영합니다.' : '실사 수량을 기준으로 현재 재고와의 차이를 이력에 기록합니다.'}
-            </SheetDescription>
-          </SheetHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
+            </DialogDescription>
+          </WorkDialogHeader>
+          <WorkDialogBody>
             {overlayMode === 'transfer' ? <WarehouseTransferForm
               models={normalizedModels}
               warehouses={warehouses}
               initialWarehouseId={activeWarehouseId}
               initialVariant={rowQuickAction ?? undefined}
+              formId="inventory-transfer-form"
               onSubmitted={closeOverlay}
             /> : <InOutForm
               models={normalizedModels}
@@ -515,11 +528,18 @@ export default function InventoryWorkspace({
               initialWarehouseId={activeWarehouseId ?? warehouses[0]?.id}
               lockedWarehouseId={activeWarehouseId ?? null}
               initialVariant={rowQuickAction ?? undefined}
+              formId="inventory-operation-form"
               onSubmitted={closeOverlay}
             />}
-          </div>
-        </SheetContent>
-      </Sheet>
+          </WorkDialogBody>
+          <WorkDialogFooter>
+            <Button type="button" variant="outline" onClick={closeOverlay}>취소</Button>
+            <Button type="submit" form={overlayMode === 'transfer' ? 'inventory-transfer-form' : 'inventory-operation-form'}>
+              {overlayMode === 'transfer' ? '이동 확정' : `${overlayMode === 'inbound' ? '입고' : overlayMode === 'manual-outbound' ? '출고' : '실사 조정'} 등록`}
+            </Button>
+          </WorkDialogFooter>
+        </WorkDialogContent>
+      </WorkDialog>
     </div>
   )
 }

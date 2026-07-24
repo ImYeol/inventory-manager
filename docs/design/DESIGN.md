@@ -7,7 +7,8 @@ font: Inter
 radius: default
 icon: lucide
 sourceOfTruth:
-  values: src/app/globals.css
+  values: docs/design/tokens.md
+  currentImplementation: src/app/globals.css
   componentDefaults: components.json
 deviations:
   - id: dense-table-density
@@ -24,7 +25,7 @@ deviations:
 
 # Design System
 
-이 문서는 Seleccase Inventory 시각 시스템의 canonical 근거 문서다. **값의 SoT는 shadcn preset이 생성하는 `src/app/globals.css`와 `components.json`**이며, 이 문서는 값을 반복하지 않는다. 위 YAML은 preset 구성과 확정된 일탈만 기록한다.
+이 문서는 Seleccase Inventory 시각 시스템의 방향과 근거를 설명한다. semantic 값과 migration target의 SoT는 `docs/design/tokens.md`, 현재 구현은 `src/app/globals.css`와 `components.json`이다. 위 YAML은 preset 구성과 확정된 일탈만 기록한다.
 
 ## Visual Theme & Atmosphere
 
@@ -32,7 +33,7 @@ deviations:
 
 ## Color Palette & Roles
 
-색상은 shadcn semantic 토큰(`--primary`, `--secondary`, `--muted`, `--accent`, `--destructive`, `--border`, `--ring` 등)의 역할로만 참조한다. hex 값은 이 문서에 적지 않는다 — SoT는 `globals.css`다.
+색상은 shadcn semantic 토큰(`--primary`, `--secondary`, `--muted`, `--accent`, `--destructive`, `--border`, `--ring` 등)의 역할로만 참조한다. hex 값은 이 문서에 적지 않는다 — semantic token SoT는 [tokens.md](./tokens.md)다. `globals.css`는 현재 구현일 뿐 SoT가 아니다.
 
 - `--primary`/`--ring`: theme `indigo` 기준 action-first accent.
 - `--muted`/`--muted-foreground`: 낮은 강조 배경과 보조 텍스트.
@@ -42,7 +43,7 @@ deviations:
 
 ## Typography
 
-Google Fonts **Inter**(`next/font/google`)를 display/UI 공통 폰트로 쓴다. 로컬 시스템 폰트 스택은 폴백으로 유지한다. 크기 스케일 값은 `globals.css`가 SoT다.
+Google Fonts **Inter**(`next/font/google`)를 display/UI 공통 폰트로 쓴다. 로컬 시스템 폰트 스택은 폴백으로 유지한다. 크기 스케일의 semantic 계약은 [tokens.md](./tokens.md)가 소유하고, `globals.css`는 현재 구현이다.
 
 ## Density Doctrine
 

@@ -82,6 +82,17 @@ describe('Nav', () => {
     expect(screen.queryByRole('link', { name: '분석' })).toBeNull()
     expect(screen.queryByRole('link', { name: '스토어 연결' })).toBeNull()
     expect(within(screen.getByRole('navigation', { name: '주요 메뉴' })).queryByRole('link', { name: '설정' })).toBeNull()
+    expect(screen.getByTestId('sidebar-provider')).toHaveClass('fixed', 'inset-0')
+    expect(screen.getByRole('button', { name: '소싱' })).not.toHaveClass('border-[color:var(--border-strong)]')
+  })
+
+  it('does not mark the sourcing section active outside sourcing routes', () => {
+    mocks.pathname = '/products'
+
+    render(React.createElement(Nav))
+
+    expect(screen.getByRole('link', { name: '상품 관리' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: '소싱' })).not.toHaveClass('border-[color:var(--border-strong)]')
   })
 
   it('opens the mobile drawer and renders the same information architecture', async () => {

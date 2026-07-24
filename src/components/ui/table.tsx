@@ -37,7 +37,7 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
   ({ className, ...props }, ref) => (
     <tr
       ref={ref}
-      className={cn('border-b border-[color:var(--border)] transition-colors hover:bg-[color:var(--surface-muted)] data-[state=selected]:bg-[color:var(--surface-muted)]', className)}
+      className={cn('h-11 border-b border-[color:var(--border)] transition-colors hover:bg-[color:var(--surface-muted)] data-[state=selected]:bg-[color:var(--surface-muted)]', className)}
       {...props}
     />
   ),
@@ -50,7 +50,7 @@ const TableHead = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <th
     ref={ref}
-    className={cn('h-11 px-3 py-2.5 text-left align-middle [&:has([role=checkbox])]:pr-0', className)}
+    className={cn('h-10 whitespace-nowrap px-4 py-2 text-left align-middle [&:has([role=checkbox])]:pr-0', className)}
     {...props}
   />
 ))
@@ -62,7 +62,7 @@ const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
-    className={cn('px-3 py-2.5 align-middle text-sm text-[color:var(--muted-foreground)] [&:has([role=checkbox])]:pr-0', className)}
+    className={cn('h-11 min-h-11 px-4 py-2 align-middle text-sm text-[color:var(--muted-foreground)] [&:has([role=checkbox])]:pr-0', className)}
     {...props}
   />
 ))

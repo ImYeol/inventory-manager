@@ -135,6 +135,9 @@ describe('HistoryView', () => {
     const basicFilters = screen.getByRole('group', { name: '기본 필터' })
     const queryFilters = screen.getByRole('group', { name: '조회 필터' })
     const metaGroup = screen.getByRole('group', { name: '필터 메타' })
+    expect(screen.getByTestId('history-query-row')).toBeTruthy()
+    expect(screen.getByTestId('history-action-row')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '컬럼' })).toBeTruthy()
 
     expect(within(basicFilters).getByRole('combobox', { name: '창고' })).toBeTruthy()
     expect(within(basicFilters).getByRole('combobox', { name: '구분' })).toBeTruthy()
@@ -143,19 +146,19 @@ describe('HistoryView', () => {
     expect(within(queryFilters).getByLabelText('종료일')).toBeTruthy()
     expect(within(metaGroup).getByText('조회 4건')).toBeTruthy()
     expect(within(metaGroup).queryByRole('button', { name: '필터 초기화' })).toBeNull()
-    expect(screen.getByTestId('history-search-field').className).not.toContain('flex-1')
+    expect(screen.getByTestId('history-search-field').className).toContain('flex-1')
 
     const table = screen.getByRole('table')
     expect(within(table).getByRole('button', { name: '되돌리기' })).toBeTruthy()
     expect(within(table).getByText('CSV 반영')).toBeTruthy()
-    expect(within(table).getAllByText('예정입고 반영')).toHaveLength(2)
-    expect(within(table).getByText('이력 되돌리기')).toBeTruthy()
+    expect(within(table).getByText(/예정입고 반영 · 공장 예정입고 #17/)).toBeTruthy()
+    expect(within(table).getByText(/이력 되돌리기/)).toBeTruthy()
 
     fireEvent.change(screen.getByLabelText('모델명 검색'), { target: { value: 'LP01' } })
     await openComboboxAndPick('구분', '입고')
 
     expect(within(metaGroup).getByText('조회 1건')).toBeTruthy()
-    expect(within(metaGroup).getByRole('button', { name: '필터 초기화' })).toBeTruthy()
+    expect(within(metaGroup).queryByRole('button', { name: '필터 초기화' })).toBeNull()
     expect(within(screen.getByRole('table')).getByText('LP01')).toBeTruthy()
     expect(within(screen.getByRole('table')).queryByText('LP02')).toBeNull()
   })
@@ -254,6 +257,7 @@ describe('HistoryView', () => {
     fireEvent.click(within(screen.getByRole('table')).getByRole('button', { name: '되돌리기' }))
 
     const dialog = screen.getByRole('dialog', { name: '이력 되돌리기 확인' })
+    expect(dialog.getAttribute('data-slot')).toBe('work-dialog-content')
     expect(within(dialog).getByText('LP01')).toBeTruthy()
     expect(within(dialog).getByText('직전 재고값으로 재고조정 이력이 추가됩니다.')).toBeTruthy()
 

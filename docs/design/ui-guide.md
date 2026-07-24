@@ -1,8 +1,8 @@
 # UI Guide
 
 ## Source Of Truth
-- UI/UX 원칙과 shared primitive 규칙의 source of truth는 이 문서다. 시각 토큰·모션의 근거 문서는 [DESIGN.md](./DESIGN.md)이며, 값 자체의 SoT는 `src/app/globals.css`와 `components.json`이다.
-- 토큰은 `src/app/globals.css`에, page-level preset은 `src/app/components/ui.tsx`에, shared primitive는 `src/components/ui`에 둔다.
+- UI/UX 원칙과 shared primitive 규칙의 source of truth는 이 문서다. semantic 시각 토큰은 [tokens.md](./tokens.md), 모션은 [motion.md](./motion.md), 방향·예외는 [DESIGN.md](./DESIGN.md), 현재 구현은 `src/app/globals.css`와 `components.json`이다.
+- semantic token 계약은 [tokens.md](./tokens.md)에, 현재 CSS 구현은 `src/app/globals.css`에, page-level preset은 `src/app/components/ui.tsx`에, shared primitive는 `src/components/ui`에 둔다. `globals.css`는 semantic token SoT가 아니다.
 
 ## 컴포넌트 경로 규칙
 - 이 저장소의 shadcn-style 기본 경로는 root `/components/ui`가 아니라 `src/components/ui`다.
@@ -92,7 +92,7 @@
   - `meta cluster`: reset, result count, compact status
 
 ## 디자인 토큰
-값과 근거의 SoT는 [DESIGN.md](./DESIGN.md)다. 이 문서는 토큰 값을 반복하지 않는다.
+semantic 값의 SoT는 [tokens.md](./tokens.md)다. 방향과 예외는 [DESIGN.md](./DESIGN.md)가 설명하며, 이 문서는 토큰 값을 반복하지 않는다.
 
 ## Shared Primitive
 공용 UI는 아래 계층으로 수렴시킨다.
@@ -100,7 +100,6 @@
 ```text
 src/components/ui/
 ├── badge-1.tsx
-├── basic-data-table.tsx
 ├── channel-badge.tsx
 ├── button.tsx
 ├── card.tsx
@@ -109,8 +108,6 @@ src/components/ui/
 ├── editable-table.tsx
 ├── filter-toolbar.tsx
 ├── input.tsx
-├── inventory-data-table.tsx
-├── inventory-table-toolbar.tsx
 ├── menu.tsx
 ├── modal.tsx
 ├── select.tsx
@@ -126,17 +123,17 @@ src/components/ui/
 
 ### Required Behavior
 - `table-surface`
-  - filter toolbar + table을 하나의 이음새 없는 bordered surface로 묶는다
-  - `toolbar` strip → divider → table body → optional `footer` 구조
-  - 조회 화면은 filter 박스와 table shell을 별도 카드 2개로 쌓지 않고 이 primitive 하나로 수렴한다
-  - child table은 자체 border를 갖지 않는다 (`InventoryDataTable`은 shell 없이, `BasicDataTable`은 `bare`로 렌더)
-- `inventory-data-table`
+  - 실제 table header/body/footer만 하나의 bordered surface로 묶는다
+  - 조회 controls는 TableSurface 바깥 page background에 둔다
+  - `header` → table body → optional `footer` 구조
+  - child table은 자체 border를 갖지 않는다. `DataTable`은 standalone에서 shell 없이 `TableSurface` 안에, embedded에서는 `bare`로 렌더한다.
+- `data-table`
   - dense rows
   - configurable visible columns
   - subtle row motion
-  - shell 없이 `TableSurface` 안에서 렌더된다
+  - standalone에서는 controls 밖의 `TableSurface` 안에서, embedded에서는 `bare`로 렌더된다
 - `filter-toolbar`
-  - `TableSurface` toolbar slot 안의 layout (좌측 filter cluster + 우측 meta cluster)
+  - TableSurface 밖 Query Row/Action Row의 layout (좌측 query/meta cluster + 우측 business actions)
   - compact search / dropdown / reset / count meta
   - bordered 박스가 아니라 layout만 담당한다
 - `editable-table`
@@ -277,7 +274,7 @@ src/components/ui/
 - 상품명, 옵션, 창고, 현재 재고, 최근 입고, 최근 출고, 상태를 우선한다.
 - 컬럼 숨김/표시를 지원한다.
 - 행 애니메이션은 짧은 fade/slide-in 정도만 허용한다.
-- 목록 표는 filter/action toolbar와 `TableSurface` 하나로 묶여 이음새 없이 이어져야 하고, 위에 별도 summary section을 하나 더 끼워 넣지 않는다.
+- 목록 표는 controls와 분리된 `TableSurface`를 primary surface로 두며, 위에 별도 summary section을 하나 더 끼워 넣지 않는다.
 
 ### 이력 표
 - 목록과 같은 필터 감각을 유지하되, 변동 시각과 출처 메타를 더 먼저 보여준다.
@@ -302,10 +299,17 @@ src/components/ui/
   - 타입 선택 토글
   - 설명만 하는 카드
 
-### Sheet
-- 목록 컨텍스트를 유지한 채 여는 상세/작업 공간은 `Sheet`(`@/components/ui/sheet`, `side="right"`)를 사용한다. `SheetTitle` 필수, Escape·overlay 클릭으로 닫기, 닫힘 후 트리거로 포커스 반환은 base-ui Dialog 기본 동작을 그대로 쓰고 커스텀 focus 코드를 추가하지 않는다.
-- 폭은 콘텐츠 밀도에 맞춰 `className`으로 override한다(`sm:max-w-xl` ~ `sm:max-w-2xl`).
-- 파괴적 확인이나 짧은 폼은 `Modal`(중앙)을 그대로 쓴다. FixedSheet는 티켓 #27에서 삭제됐다(ADR-004A superseded, ADR-037 흐름).
+### Sheet and Dialog
+- `Sheet`는 목록 맥락의 간단한 읽기 전용 상세 또는 가벼운 보조 disclosure에만 사용한다. `SheetTitle`을 제공하고 Escape·overlay click·focus restore를 보존한다.
+- dense input/work table은 Sheet에 넣지 않는다. desktop에서는 wide `Dialog`, mobile에서는 full-screen `Dialog`로 작업을 완결한다.
+- 짧은 확인/폼은 중앙 `Dialog`/`Modal`을 사용한다. Sheet를 dense work surface의 대체 drawer로 사용하지 않는다.
+
+### Dialog/Modal 세부 규칙
+- `WorkDialog`(base-ui `Dialog`)와 `Modal`(Radix `Dialog`) 두 시스템 모두 닫기 버튼은 `absolute top-4 right-4`에 위치한 `variant="ghost" size="icon" h-10 w-10` 버튼 + `h-4 w-4` X 아이콘으로 통일한다. 배경 chip(`bg-secondary`) 등 시스템별 변형을 추가하지 않는다.
+- 등록/작업 모달은 스크롤 없이 본문이 보이는 것을 우선한다. `WorkDialogContent`는 `sm:max-h-[min(96dvh,980px)]`, `Modal`(`.ui-modal`)은 `max-height: min(94vh, 60rem)`를 상한으로 쓴다. 더 낮추지 않는다.
+- toolbar row(`data-action-row`, `data-query-row`, `IndependentActionGroup` 등)는 좁은 화면 안전망으로 `overflow-x-auto`를 유지하되 네이티브 스크롤바는 항상 숨긴다(`scrollbar-width: none` + `::-webkit-scrollbar{display:none}`). 스크롤바가 나타났다 사라지며 버튼을 밀어내는 레이아웃 점프를 만들지 않기 위함이다.
+- 필터 초기화(`QueryResetButton`) 같은 상시 노출형 리셋 버튼은 각 페이지 toolbar에 넣지 않는다. 검색/입력창 자체를 지우는 동작으로 충분하며, `DataTable`의 필터링-빈 결과 empty state 안 리셋 액션(`onResetFilters`)은 이 규칙과 무관하게 유지한다.
+- 같은 `IndependentActionGroup`/버튼 그룹 안의 버튼들은 강조가 필요한 특별한 이유가 없으면 동일한 `variant`(기본 `outline`)를 쓴다. 그룹 내 한 버튼만 `success`/`default` 등으로 튀게 하지 않는다.
 
 ### CSV / 이력
 - 목록/입고/출고와 한 화면에 둘 때 UX가 무너지면 재고 운영 하위 페이지로 올린다.
@@ -316,8 +320,8 @@ src/components/ui/
 - 소싱 화면의 primary surface는 table/workspace다.
 - 입고처와 입고 예정은 카드형 요약보다 필터 가능한 table/workspace로 먼저 구성한다.
 - register/detail 같은 짧은 editing flow는 modal로 보조하고, surface 자체를 card summary로 대체하지 않는다.
-- header 다음에 `toolbar -> section title -> table/list`가 바로 이어져야 한다.
-- filter toolbar와 table은 `TableSurface` 하나로 묶어 이음새 없는 단일 surface로 읽히게 한다. filter 박스와 table shell을 별도 카드 2개로 쌓지 않는다.
+- 소싱 화면도 canonical hierarchy인 `Breadcrumb → title/description → tabs → controls → table/list`를 따른다. 내부 section label이 필요하면 table/list 내부의 optional label로만 두며, controls와 primary table 사이에 별도 title을 삽입하거나 page title을 반복하지 않는다.
+- filter toolbar와 table은 별도 역할이다. controls는 page background에, table은 `TableSurface`에 둔다. filter 박스와 table shell을 각각 카드로 중첩하지 않는다.
 - table/list를 설명용 wrapper card로 한 번 더 감싸지 않는다. shell이 필요하면 `TableSurface` 하나만 둔다.
 
 ## 주문 / 송장 패턴
@@ -362,7 +366,7 @@ src/components/ui/
 - 상태 badge는 아이콘 + label + border를 가진 compact view여야 한다.
 
 ## 타이포그래피와 밀도
-- 크기·밀도 값의 SoT는 [DESIGN.md](./DESIGN.md)다. 긴 설명문 대신 짧은 라벨과 배지를, 넓은 빈 여백보다 table viewport를 우선한다.
+- 크기·밀도 값의 SoT는 [tokens.md](./tokens.md)다. 긴 설명문 대신 짧은 라벨과 배지를, 넓은 빈 여백보다 table viewport를 우선한다.
 
 ## Sizing / Density 계약
 - control/button/tab/badge는 정의된 size tier만 사용하고 임의 height를 추가하지 않는다([DESIGN.md](./DESIGN.md) 참고).
@@ -384,13 +388,13 @@ src/components/ui/
 - hollow corner, segmented seam, 이질적인 border split이 보이면 card variant가 아니라 shared primitive 구조를 다시 봐야 한다.
 - page-local border patch로 임시 봉합하지 말고 shared card/surface primitive의 variant와 padding/token을 고쳐서 해결한다.
 - Card의 divider/body 관계는 [card composition contract](../../design-system/contracts/card.composition.json)가 정의한다. 이 문서는 의도를 설명하고, contract는 component composition을 정의하며, code와 harness가 이를 검증한다.
-- `globals.css`에서 `.a, .b, .c { ... }` 형태로 셀렉터를 묶어 쓰는 규칙(예: `.surface, .ui-surface, .ui-card`)에 새 속성을 추가할 때는 그 속성이 목록의 모든 셀렉터에 적용돼도 안전한지 먼저 확인한다. 한 컴포넌트(`Card`)의 버그를 고치려고 공유 셀렉터 그룹에 속성을 추가하면, 같은 그룹을 쓰는 다른 컴포넌트(`FixedSheet`의 `.ui-surface-strong` 등)에도 의도치 않게 그 속성이 퍼진다. 고쳐야 할 속성은 실제로 필요한 가장 좁은 셀렉터(`.ui-card` 단독 규칙)에 추가하고, 그룹 규칙에는 정말 모든 멤버가 공유해야 하는 속성만 남긴다.
+- `globals.css`에서 `.a, .b, .c { ... }` 형태로 셀렉터를 묶어 쓰는 규칙(예: `.surface, .ui-surface, .ui-card`)에 새 속성을 추가할 때는 그 속성이 목록의 모든 셀렉터에 적용돼도 안전한지 먼저 확인한다. 한 컴포넌트(`Card`)의 버그를 고치려고 공유 셀렉터 그룹에 속성을 추가하면, 같은 그룹을 쓰는 다른 컴포넌트(`Dialog`의 `.ui-surface-strong` 등)에도 의도치 않게 그 속성이 퍼진다. 고쳐야 할 속성은 실제로 필요한 가장 좁은 셀렉터(`.ui-card` 단독 규칙)에 추가하고, 그룹 규칙에는 정말 모든 멤버가 공유해야 하는 속성만 남긴다.
 
 ## 인지·그룹핑 원칙
 근접성·공통 영역·시각 계층·강조 예산·elevation 계층 원칙은 [DESIGN.md 인지·그룹핑 원칙](./DESIGN.md#인지그룹핑-원칙)이 SoT다. [ADR-018](../adr/0018-ui-system-checks.md) UI-system-check가 `tests/design-contracts.test.ts`, `tests/ui-token-presets.test.ts`, `tests/shared-primitives-tokens.test.ts`로 강제한다.
 
 ## 모션
-- duration, easing, reduced-motion 원칙의 SoT는 [DESIGN.md](./DESIGN.md#motion)다.
+- duration, easing, reduced-motion 원칙의 SoT는 [motion.md](./motion.md)다.
 - 허용: dropdown 열림/닫힘, table row 초기 진입, dialog/sheet 진입.
 - 금지: 과한 spring, 반복 pulse/glow, 핵심 데이터 위를 덮는 장식용 전환.
 

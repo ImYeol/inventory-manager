@@ -89,12 +89,22 @@
 
   /* --- radius scale --- */
   --radius-xs: 0.125rem;  /* 2px  - hairline tag, status pill */
-  --radius-sm: 0.25rem;   /* 4px  - form input */
-  --radius-md: 0.5rem;    /* 8px  - compact card chrome, dense control */
-  --radius-lg: 0.75rem;   /* 12px - mid-size card, secondary surface */
-  --radius-xl: 1rem;      /* 16px - card, table shell, modal */
+  --radius-control: 0.5rem; /* 8px - inputs, selects, buttons */
+  --radius-surface: 0.625rem; /* 10px - data/table surfaces */
+  --radius-card: 0.75rem; /* 12px - cards */
+  --radius-overlay: 0.875rem; /* 14px - dialogs and task overlays */
+  --radius-sm: var(--radius-control);
+  --radius-md: var(--radius-control);
+  --radius-lg: var(--radius-card);
+  --radius-xl: var(--radius-overlay);
   --radius-xxl: 3rem;     /* 48px - stat badge backdrop */
   --radius-full: 9999px;  /* pills, badges, tabs */
+  --radius-pill: var(--radius-full); /* semantic alias for tabs, badges, status */
+
+  /* --- semantic table column minimums --- */
+  --table-col-identity-min: 220px;
+  --table-col-numeric-min: 96px;
+  --table-col-status-min: 104px;
 
   /* --- control size / density tiers (heights) --- */
   --control-h-dense: 2rem;    /* 32px - dense toolbar buttons */
@@ -112,11 +122,6 @@
   --fw-regular: 400;
   --fw-medium: 500;
   --fw-semibold: 600;
-
-  /* --- gradient (pastel-mesh) --- */
-  --mesh-peach: #fff0e6;
-  --mesh-lavender: #e9d8ff;
-  --mesh-dusty-green: #dce8db;
 
   /* --- elevation (role-based) --- */
   --elevation-1: rgba(0, 0, 0, 0.1) 0 5px 20px 0;
@@ -203,29 +208,30 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  /* Keep Tailwind radius utilities mapped to the semantic aliases. The
+     aliases above are the only source of canonical radius values. */
+  --radius-sm: var(--radius-control);
+  --radius-md: var(--radius-control);
+  --radius-lg: var(--radius-card);
+  --radius-xl: var(--radius-overlay);
+  --radius-2xl: var(--radius-overlay);
+  --radius-3xl: var(--radius-overlay);
+  --radius-4xl: var(--radius-overlay);
 }
 
 @layer base {
   html {
     background: var(--background);
     color: var(--foreground);
+    scrollbar-gutter: stable;
+    overflow-y: scroll !important;
     @apply font-sans;
   }
 
   body {
+    scrollbar-gutter: auto;
     min-height: 100vh;
-    background:
-      radial-gradient(circle at 20% 50%, var(--mesh-peach) 0%, transparent 50%),
-      radial-gradient(circle at 80% 80%, var(--mesh-lavender) 0%, transparent 50%),
-      radial-gradient(circle at 40% 80%, var(--mesh-dusty-green) 0%, transparent 50%),
-      var(--background);
+    background: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans-stack);
     text-rendering: optimizeLegibility;
@@ -233,6 +239,13 @@
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
     @apply bg-background text-foreground;
+  }
+
+  /* Radix scroll lock reserves the scrollbar with a body margin. The
+     document gutter above already owns that space, so keeping the injected
+     margin at zero prevents menus from shifting the page by one scrollbar. */
+  body[data-scroll-locked] {
+    margin-right: 0 !important;
   }
 
   * {
@@ -275,7 +288,7 @@
   .ui-surface,
   .ui-card {
     border: 1.5px solid var(--border-strong);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-card);
     background: var(--surface);
     box-shadow: var(--elevation-1);
   }
@@ -332,7 +345,7 @@
   .ui-control {
     height: var(--control-h);
     width: 100%;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-control);
     border: 1px solid var(--border);
     background: white;
     padding: 0 var(--space-3);
@@ -363,12 +376,14 @@
 
   .ui-control-sm {
     height: var(--control-h-sm);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-control);
     font-size: var(--text-sm);
   }
 
   .ui-select-trigger {
     display: flex;
+    width: fit-content;
+    max-width: 100%;
     min-width: 0;
     justify-content: space-between;
     align-items: center;
@@ -393,7 +408,7 @@
     z-index: 70;
     overflow: hidden;
     border: 1px solid var(--border-strong);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-control);
     background: var(--surface);
     color: var(--foreground);
     box-shadow: var(--elevation-3);
@@ -413,7 +428,7 @@
     user-select: none;
     align-items: center;
     gap: var(--space-2);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-control);
     padding: var(--space-2) var(--space-2) var(--space-2) var(--space-6);
     font-size: var(--text-base);
     outline: none;
@@ -472,7 +487,7 @@
     align-items: center;
     justify-content: center;
     gap: var(--space-2);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-card);
     border: 1px dashed var(--border-strong);
     background: var(--surface-muted);
     padding: var(--space-4);
@@ -494,7 +509,7 @@
     white-space: nowrap;
     flex-shrink: 0;
     gap: var(--space-2);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-control);
     border: 1px solid transparent;
     padding: 0.875rem 1.75rem;
     font-size: var(--text-md);
@@ -606,14 +621,14 @@
 
   .ui-button-sm {
     height: var(--control-h-md);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-control);
     padding: 0.5rem 1.125rem;
     font-size: var(--text-base);
   }
 
   .ui-button-lg {
     height: var(--control-h-lg);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-control);
     padding: 1rem 1.875rem;
     font-size: var(--text-lg);
   }
@@ -621,7 +636,7 @@
   .ui-button-icon {
     height: var(--control-h);
     width: var(--control-h);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-control);
     padding: 0;
   }
 
@@ -630,7 +645,7 @@
     align-items: center;
     gap: var(--space-1);
     min-height: var(--control-h-dense);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-pill);
     border: 1px solid transparent;
     padding: var(--space-1) var(--space-3);
     font-size: var(--text-xs);
@@ -676,7 +691,7 @@
     justify-content: center;
     gap: var(--space-1);
     min-height: var(--control-h-sm);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-pill);
     border: 1px solid transparent;
     background: transparent;
     padding: var(--space-2) var(--space-4);
@@ -709,7 +724,7 @@
     align-items: center;
     gap: var(--space-1);
     border: 1px solid var(--border);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-pill);
     background: var(--surface-muted);
     padding: var(--space-1);
   }
@@ -723,7 +738,7 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-1);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-pill);
     border: 1px solid var(--border);
     background: white;
     padding: var(--space-1) var(--space-3);
@@ -738,7 +753,7 @@
 
   .ui-table-shell {
     border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-surface);
     overflow: hidden;
     background: white;
     box-shadow: var(--elevation-1);
@@ -749,8 +764,7 @@
     color: var(--muted-foreground);
     font-size: var(--text-xs);
     font-weight: var(--fw-semibold);
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
+    letter-spacing: 0.04em;
   }
 
   .ui-table-cell {
@@ -760,22 +774,22 @@
 
   .ui-empty {
     border: 1px dashed var(--border);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-surface);
     background: var(--surface-muted);
     color: var(--muted-foreground);
   }
 
-  /* Unified data surface: filter toolbar + table read as one seamless
-     bordered surface (no stacked boxes, no internal seam). */
+  /* Data controls sit above this surface; the surface owns only the table and
+     pagination chrome so filtering and scanning remain visually distinct. */
   .ui-data-surface {
     display: flex;
     flex-direction: column;
     min-width: 0;
-    border: 1.5px solid var(--border-strong);
-    border-radius: var(--radius-xl);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
     overflow: hidden;
     background: var(--surface);
-    box-shadow: var(--elevation-1);
+    box-shadow: none;
   }
 
   .ui-data-toolbar {
@@ -788,10 +802,44 @@
     background: color-mix(in srgb, var(--surface-muted) 45%, white);
   }
 
+  .ui-data-controls {
+    display: flex;
+    min-width: 0;
+    align-items: stretch;
+  }
+
+  [data-slot='data-query-start'] > :first-child {
+    min-width: 0;
+  }
+
+  [data-slot='data-query-end'],
+  [data-slot='data-action-end'] {
+    white-space: nowrap;
+  }
+
   .ui-data-scroll {
     width: 100%;
     min-width: 0;
     overflow-x: auto;
+  }
+
+  /* Toolbar rows (data-action-row, IndependentActionGroup, ...) fall back to
+     overflow-x: auto only as a narrow-viewport safety net. A native scrollbar
+     popping in on that axis reserves vertical space and visibly nudges the
+     buttons inside the row, so the bar itself stays hidden while the row
+     keeps scrolling on touch/trackpad and via keyboard. */
+  [data-slot='data-query-row'],
+  [data-slot='data-action-row'],
+  [data-slot='data-action-end'],
+  [data-slot='independent-action-group'] {
+    scrollbar-width: none;
+  }
+
+  [data-slot='data-query-row']::-webkit-scrollbar,
+  [data-slot='data-action-row']::-webkit-scrollbar,
+  [data-slot='data-action-end']::-webkit-scrollbar,
+  [data-slot='independent-action-group']::-webkit-scrollbar {
+    display: none;
   }
 
   .ui-data-footer {
@@ -825,7 +873,7 @@
     min-width: 11rem;
     overflow: hidden;
     border: 1px solid var(--border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-control);
     background: var(--surface);
     padding: var(--space-1);
     color: var(--foreground);
@@ -841,7 +889,7 @@
     user-select: none;
     align-items: center;
     gap: var(--space-2);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-control);
     padding: var(--space-2) var(--space-2);
     font-size: var(--text-base);
     outline: none;
@@ -916,11 +964,11 @@
     top: 50%;
     z-index: 61;
     width: min(92vw, 44rem);
-    max-height: min(86vh, 56rem);
+    max-height: min(94vh, 60rem);
     transform: translate(-50%, -50%);
     overflow: hidden;
     border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-overlay);
     background: var(--surface);
     box-shadow: var(--elevation-4);
   }

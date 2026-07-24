@@ -88,9 +88,12 @@ describe('FactoriesView', () => {
     expect(screen.getByRole('button', { name: '입고처 등록' })).toBeTruthy()
     expect(screen.queryByRole('heading', { name: '공장 목록' })).toBeNull()
     expect(screen.queryByText('행의 상세 버튼으로 공장 정보를 확인하고 상태를 변경합니다.')).toBeNull()
-    expect(screen.queryByText(/총 \d+개/)).toBeNull()
+    expect(screen.getByText(/총 \d+개/)).toBeTruthy()
     expect(screen.getByRole('table', { name: '입고처 목록' })).toBeTruthy()
     expect(screen.getByRole('table', { name: '입고처 목록' }).closest('.ui-data-surface')).toBeTruthy()
+    expect(screen.getByTestId('factories-query-row')).toBeTruthy()
+    expect(screen.getByTestId('factories-action-row')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '컬럼' })).toBeTruthy()
 
     fireEvent.change(screen.getByRole('searchbox', { name: '입고처 검색' }), { target: { value: '부산' } })
     expect(screen.getByRole('row', { name: /부산 협력사/ })).toBeTruthy()
@@ -103,6 +106,7 @@ describe('FactoriesView', () => {
     fireEvent.click(screen.getByRole('button', { name: '상세' }))
 
     expect(screen.getByRole('dialog', { name: '부산 협력사' })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: '부산 협력사' }).getAttribute('data-slot')).toBe('work-dialog-content')
     expect(screen.getByText('김철수')).toBeTruthy()
     expect(screen.getByText('잔여 6개')).toBeTruthy()
     expect(screen.getByRole('table', { name: '상품 소싱 내역' })).toBeTruthy()
@@ -113,6 +117,30 @@ describe('FactoriesView', () => {
     fireEvent.click(screen.getByRole('button', { name: '다시 활성화' }))
 
     await waitFor(() => expect(mocks.setFactoryActive).toHaveBeenCalledWith(2, true))
+  })
+
+  it('uses the shared table and truncation primitives for the factories surface', async () => {
+    render(
+      React.createElement(FactoriesView, {
+        schemaState: { status: 'ready', message: null },
+        factories: [{
+          id: 1,
+          name: '아주 긴 입고처 이름이 한 줄을 넘는 협력 제조 파트너',
+          contactName: null,
+          phone: null,
+          email: null,
+          notes: null,
+          isActive: true,
+          arrivalCount: 0,
+          pendingQuantity: 0,
+        }],
+        factorySourcingItems: {},
+      }),
+    )
+
+    expect(screen.getByRole('table', { name: '입고처 목록' })).toBeTruthy()
+    expect(screen.getByTitle('아주 긴 입고처 이름이 한 줄을 넘는 협력 제조 파트너')).toBeTruthy()
+    expect(screen.queryByTestId('factories-hand-rolled-table')).toBeNull()
   })
 
   it('opens the register modal and submits a new factory', async () => {
@@ -244,7 +272,7 @@ describe('FactoriesView', () => {
     fireEvent.pointerDown(option)
     fireEvent.click(option)
 
-    expect(screen.getByRole('dialog', { name: '광주 협력사' })).toBe(detailDialog)
+    expect(screen.getByRole('dialog', { name: '광주 협력사', hidden: true })).toBe(detailDialog)
     expect(screen.getByRole('dialog', { name: '새 입고 파싱 템플릿' })).toBe(versionDialog)
   })
 

@@ -65,13 +65,12 @@ function DialogContent({
             render={
               <Button
                 variant="ghost"
-                className="absolute top-4 right-4 bg-secondary"
-                size="icon-sm"
+                className="absolute top-4 right-4 h-10 w-10"
+                size="icon"
               />
             }
           >
-            <XIcon
-            />
+            <XIcon className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
         )}
@@ -146,6 +145,67 @@ function DialogDescription({
   )
 }
 
+/**
+ * Wide work surface for table and long-form workflows.
+ *
+ * This is intentionally a composition over the canonical Dialog primitive.
+ * The base layout is an inset-free full-screen surface; from the `sm`
+ * breakpoint onward it becomes a centered wide overlay with a tokenized
+ * overlay radius. Header and footer remain fixed while the body scrolls.
+ */
+function WorkDialogContent({
+  className,
+  children,
+  ...props
+}: DialogPrimitive.Popup.Props & { showCloseButton?: boolean }) {
+  return (
+    <DialogContent
+      data-slot="work-dialog-content"
+      className={cn(
+        "inset-0 top-0 left-0 grid h-[100dvh] min-w-0 max-h-none min-h-[100dvh] max-w-[100vw] translate-x-0 translate-y-0 overflow-x-hidden grid-rows-[auto_minmax(0,1fr)_auto] gap-0 rounded-none p-0",
+        "sm:top-1/2 sm:left-1/2 sm:h-auto sm:min-h-0 sm:max-h-[min(96dvh,980px)] sm:max-w-[min(960px,calc(100%-2rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[var(--radius-overlay)]",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </DialogContent>
+  )
+}
+
+function WorkDialogHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <DialogHeader
+      data-slot="work-dialog-header"
+      className={cn("shrink-0 border-b border-border px-6 py-5", className)}
+      {...props}
+    />
+  )
+}
+
+function WorkDialogBody({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="work-dialog-body"
+      className={cn("min-h-0 w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto px-6 py-5", className)}
+      {...props}
+    />
+  )
+}
+
+function WorkDialogFooter({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <DialogFooter
+      data-slot="work-dialog-footer"
+      className={cn("shrink-0 border-t border-border bg-muted/30 px-6 py-4", className)}
+      {...props}
+    />
+  )
+}
+
+const WorkDialog = Dialog
+const WorkDialogTrigger = DialogTrigger
+
 export {
   Dialog,
   DialogClose,
@@ -157,4 +217,10 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
+  WorkDialog,
+  WorkDialogBody,
+  WorkDialogContent,
+  WorkDialogFooter,
+  WorkDialogHeader,
+  WorkDialogTrigger,
 }

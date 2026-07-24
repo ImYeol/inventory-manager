@@ -9,7 +9,9 @@ import { PageHeader } from '@/app/components/ui'
 import { StatusBadge } from '@/components/ui/badge-1'
 import { ChannelBadge } from '@/components/ui/channel-badge'
 import { Button } from '@/components/ui/button'
-import { FilterToolbar } from '@/components/ui/filter-toolbar'
+import { ButtonGroup } from '@/components/ui/button-group'
+import { ColumnVisibilityMenu } from '@/components/ui/column-visibility-menu'
+import { ActionRow, FilterToolbar, QueryRow } from '@/components/ui/filter-toolbar'
 import { TableSurface } from '@/components/ui/table-surface'
 import { Input } from '@/components/ui/input'
 import {
@@ -21,6 +23,11 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Modal } from '@/components/ui/modal'
+
+type TestModalProps = Omit<React.ComponentProps<typeof Modal>, 'children'> & { children?: React.ReactNode }
+type TestToolbarActionProps = Omit<React.ComponentProps<typeof ToolbarButtonAction>, 'children'> & { children?: React.ReactNode }
+const TestModal = Modal as React.ComponentType<TestModalProps>
+const TestToolbarButtonAction = ToolbarButtonAction as React.ComponentType<TestToolbarActionProps>
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { StoreConnectionStatus } from '@/components/ui/store-connection-status'
@@ -50,6 +57,47 @@ afterEach(() => {
 })
 
 describe('shared action and status primitives', () => {
+  it('exposes the standalone query/action row contract without forced wrapping', () => {
+    render(
+      React.createElement(
+        FilterToolbar,
+        null,
+        React.createElement(QueryRow, null, React.createElement(Input, { 'aria-label': '검색' })),
+        React.createElement(ActionRow, null, React.createElement('span', null, '4건')),
+      ),
+    )
+
+    expect(screen.getByLabelText('검색').closest('[data-slot="data-query-row"]')).toBeTruthy()
+    expect(screen.getByText('4건').closest('[data-slot="data-action-row"]')).toBeTruthy()
+    expect(screen.getByText('4건').closest('[data-slot="data-action-row"]')?.className).toContain('justify-between')
+    expect(screen.getByText('4건').closest('[data-slot="data-action-row"]')?.className).not.toContain('flex-wrap')
+  })
+
+  it('keeps related actions grouped and the column control intrinsic width', () => {
+    render(
+      React.createElement(
+        'div',
+        null,
+        React.createElement(
+          ButtonGroup,
+          null,
+          React.createElement(Button, { variant: 'outline', size: 'sm' }, '입고'),
+          React.createElement(Button, { variant: 'outline', size: 'sm' }, '출고'),
+        ),
+        React.createElement(ColumnVisibilityMenu, {
+          columns: [{ key: 'name', label: '상품명' }],
+          visibleColumns: new Set(['name']),
+          onToggle: vi.fn(),
+        }),
+      ),
+    )
+
+    expect(screen.getByRole('group').getAttribute('data-slot')).toBe('button-group')
+    const columnButton = screen.getByRole('button', { name: '컬럼' })
+    expect(columnButton.className).toContain('w-fit')
+    expect(columnButton.className).toContain('shrink-0')
+  })
+
   it('keeps the approved commerce IA and inventory invariants in the document contract', () => {
     const readDocument = (relativePath: string) => fs.readFileSync(path.resolve(process.cwd(), relativePath), 'utf8')
     const prd = readDocument('docs/product/prd.md')
@@ -95,7 +143,7 @@ describe('shared action and status primitives', () => {
     expect(screen.getByRole('button', { name: '필터' }).className).toContain('ui-button-outline')
   })
 
-  it('binds filter toolbar and table into one data surface on shared tokens', () => {
+  it('keeps FilterToolbar layout-only when a caller explicitly places it in a TableSurface slot', () => {
     render(
       React.createElement(
         TableSurface,
@@ -115,6 +163,22 @@ describe('shared action and status primitives', () => {
     // FilterToolbar is layout-only; the bordered strip lives on the data surface.
     expect(input.closest('.ui-data-toolbar')).not.toBeNull()
     expect(input.closest('.ui-data-surface')).not.toBeNull()
+  })
+
+  it('keeps TableSurface controls optional and its canonical surface limited to table chrome', () => {
+    render(
+      React.createElement(
+        'div',
+        null,
+        React.createElement(FilterToolbar, null, React.createElement(Input, { 'aria-label': '검색' })),
+        React.createElement(TableSurface, null, React.createElement('div', { 'data-testid': 'table-body' }, '표 본문')),
+      ),
+    )
+
+    const surface = screen.getByTestId('table-body').closest('.ui-data-surface')
+    expect(surface).toBeTruthy()
+    expect(surface?.querySelector('.ui-data-toolbar')).toBeNull()
+    expect(screen.getByLabelText('검색').closest('.ui-data-surface')).toBeNull()
   })
 
   it('switches tabs as an intra-page view primitive', () => {
@@ -254,7 +318,7 @@ describe('shared action and status primitives', () => {
 
     render(
       React.createElement(
-        Modal,
+        TestModal,
         {
           open: true,
           title: '창고 추가',
@@ -389,7 +453,7 @@ describe('shared action and status primitives', () => {
           }),
         }),
         React.createElement(
-          ToolbarButtonAction,
+          TestToolbarButtonAction,
           {
             icon: React.createElement('svg', {
               'aria-hidden': 'true',
@@ -426,7 +490,7 @@ describe('shared action and status primitives', () => {
     expect(toolbar).toBeTruthy()
     expect((toolbar as HTMLElement).className).toContain('flex')
     expect((toolbar as HTMLElement).className).toContain('items-center')
-    expect((toolbar as HTMLElement).className).toContain('gap-1.5')
+    expect((toolbar as HTMLElement).className).toContain('gap-2')
     expect(screen.getByRole('button', { name: '새로고침' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '내보내기' })).toBeTruthy()
   })

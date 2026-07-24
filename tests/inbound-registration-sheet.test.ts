@@ -37,6 +37,18 @@ beforeEach(() => {
 })
 
 describe('InboundRegistrationSheet', () => {
+  it('uses the shared wide work dialog for template mapping instead of the legacy modal', async () => {
+    render(React.createElement(InboundRegistrationSheet, {
+      suppliers: [{ id: 4, name: '한빛 공장' }], warehouses: [{ id: 2, name: '대자동' }],
+    }))
+
+    await chooseSupplier('한빛 공장')
+    fireEvent.click(screen.getByRole('button', { name: '파싱 템플릿 만들기' }))
+
+    const dialog = screen.getByRole('dialog', { name: '입고 파싱 템플릿 만들기' })
+    expect(dialog.getAttribute('data-slot')).toBe('work-dialog-content')
+  })
+
   it('keeps the template select and template-creation button disabled until a 입고처 is chosen', () => {
     render(React.createElement(InboundRegistrationSheet, {
       suppliers: [{ id: 4, name: '한빛 공장' }], warehouses: [{ id: 2, name: '대자동' }],

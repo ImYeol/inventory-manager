@@ -143,6 +143,7 @@ type InOutFormProps = {
    * row. Does not change operation mode-lock (ADR-004).
    */
   initialVariant?: InitialVariant
+  formId?: string
   onSubmitted?: () => void
 }
 
@@ -166,6 +167,7 @@ export default function InOutForm({
   initialWarehouseId,
   lockedWarehouseId,
   initialVariant,
+  formId,
   onSubmitted,
 }: InOutFormProps) {
   const router = useRouter()
@@ -373,7 +375,7 @@ export default function InOutForm({
   }
 
   return (
-    <div className="space-y-4">
+    <form id={formId} onSubmit={(event) => { event.preventDefault(); submitAll() }} className="space-y-4">
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-end">
         <div>
           <label className={ui.label} htmlFor="transaction-date">
@@ -526,6 +528,7 @@ export default function InOutForm({
         onAddRow={addRow}
         onDeleteRow={removeRow}
         onDuplicateRow={duplicateRow}
+        validationSummary={formId && invalidRowCount > 0 ? `확인 필요 ${invalidRowCount}건: 입력한 행의 필수 항목을 확인하세요.` : undefined}
         rowError={(row) => {
           const errors = rowErrors[resolvedRows.findIndex((entry) => entry.key === row.key)] ?? []
           return errors.length > 0 ? `${errors.join(', ')} 필요` : null
@@ -551,17 +554,12 @@ export default function InOutForm({
             </p>
           ) : null}
         </div>
-        <div className="flex flex-wrap gap-2 md:justify-end">
-          <button
-            type="button"
-            onClick={submitAll}
-            disabled={isPending || filledRows.length === 0 || !canInput}
-            className={cx(ui.buttonPrimary, 'h-12 justify-center text-base')}
-          >
+        {!formId ? <div className="flex flex-wrap gap-2 md:justify-end">
+          <button type="submit" disabled={isPending || filledRows.length === 0 || !canInput} className={cx(ui.buttonPrimary, 'h-12 justify-center text-base')}>
             {isPending ? '등록 중…' : `${operationLabel} 등록 (${filledRows.length}건)`}
           </button>
-        </div>
+        </div> : null}
       </div>
-    </div>
+    </form>
   )
 }

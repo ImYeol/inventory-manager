@@ -4,6 +4,7 @@ import { Copy, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from './button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './table'
+import { TableSurface } from './table-surface'
 
 export type EditableTableColumn = {
   key: string
@@ -24,6 +25,7 @@ export type EditableTableProps<Row> = {
   rowError?: (row: Row) => string | null
   minRows?: number
   addLabel?: string
+  validationSummary?: ReactNode
   className?: string
   disabled?: boolean
 }
@@ -45,6 +47,7 @@ export function EditableTable<Row>({
   rowError,
   minRows = 1,
   addLabel = '행 추가',
+  validationSummary,
   className,
   disabled = false,
 }: EditableTableProps<Row>): React.JSX.Element {
@@ -52,12 +55,20 @@ export function EditableTable<Row>({
   const columnCount = columns.length + (hasRowActions ? 1 : 0)
 
   return (
-    <div
-      className={cn(
-        'overflow-hidden rounded-[var(--radius-lg)] border border-[color:var(--border)] bg-[color:var(--surface)] shadow-[var(--elevation-1)]',
-        className,
-      )}
-    >
+    <TableSurface className={className} footer={onAddRow ? (
+      <Button type="button" variant="secondary" size="sm" disabled={disabled} onClick={onAddRow}>
+        {addLabel}
+      </Button>
+    ) : undefined}>
+      {validationSummary != null ? (
+        <div
+          role="alert"
+          aria-label="입력 오류"
+          className="mx-4 my-3 rounded-[var(--radius-control)] border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm text-[color:var(--danger-foreground)]"
+        >
+          {validationSummary}
+        </div>
+      ) : null}
       <div className="overflow-x-auto">
         <Table aria-disabled={disabled || undefined}>
           <colgroup>
@@ -69,12 +80,15 @@ export function EditableTable<Row>({
           <TableHeader className="[&_tr:hover]:bg-transparent">
             <TableRow className="bg-[color:var(--surface-muted)] hover:bg-[color:var(--surface-muted)]">
               {columns.map((column) => (
-                <TableHead key={column.key} className={cn(alignmentClassNames[column.align ?? 'left'])}>
+                <TableHead
+                  key={column.key}
+                  className={cn('sticky top-0 bg-[color:var(--surface-muted)]', alignmentClassNames[column.align ?? 'left'])}
+                >
                   {column.headerSrOnly ? <span className="sr-only">{column.header}</span> : column.header}
                 </TableHead>
               ))}
               {hasRowActions ? (
-                <TableHead className="text-right">
+                <TableHead className="sticky top-0 bg-[color:var(--surface-muted)] text-right">
                   <span className="sr-only">행 작업</span>
                 </TableHead>
               ) : null}
@@ -88,9 +102,9 @@ export function EditableTable<Row>({
 
               return (
                 <Fragment key={key}>
-                  <TableRow className={error ? 'bg-[color:var(--surface-muted)] hover:bg-[color:var(--surface-muted)]' : undefined}>
+                  <TableRow className={cn('h-12 min-h-12', error ? 'bg-[color:var(--surface-muted)] hover:bg-[color:var(--surface-muted)]' : undefined)}>
                     {columns.map((column) => (
-                      <TableCell key={column.key} className={alignmentClassNames[column.align ?? 'left']}>
+                      <TableCell key={column.key} className={cn('h-12 min-h-12', alignmentClassNames[column.align ?? 'left'])}>
                         {renderCell(row, column.key, rowIndex)}
                       </TableCell>
                     ))}
@@ -101,7 +115,7 @@ export function EditableTable<Row>({
                             <Button
                               type="button"
                               variant="ghost"
-                              size="icon"
+                              size="icon-sm"
                               aria-label="행 복제"
                               disabled={disabled}
                               onClick={() => onDuplicateRow(key)}
@@ -113,7 +127,7 @@ export function EditableTable<Row>({
                             <Button
                               type="button"
                               variant="ghost"
-                              size="icon"
+                              size="icon-sm"
                               aria-label="행 삭제"
                               disabled={deleteDisabled}
                               onClick={() => onDeleteRow(key)}
@@ -138,13 +152,6 @@ export function EditableTable<Row>({
           </TableBody>
         </Table>
       </div>
-      {onAddRow ? (
-        <div className="border-t border-[color:var(--border)] p-[var(--space-2)]">
-          <Button type="button" variant="secondary" size="sm" disabled={disabled} onClick={onAddRow}>
-            {addLabel}
-          </Button>
-        </div>
-      ) : null}
-    </div>
+    </TableSurface>
   )
 }

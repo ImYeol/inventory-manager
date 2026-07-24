@@ -8,13 +8,13 @@ import { koreaLocalDate } from '@/lib/factory-arrival'
 import { StatusBadge } from '@/components/ui/badge-1'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/data-table'
 import { EditableTable } from '@/components/ui/editable-table'
+import { ResponsiveFilterControls } from '@/components/ui/filter-toolbar'
 import { Input } from '@/components/ui/input'
 import { ProductVariantCombobox, type ProductVariantOption } from '@/components/ui/product-variant-combobox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { DialogDescription, DialogTitle, WorkDialog, WorkDialogBody, WorkDialogContent, WorkDialogFooter, WorkDialogHeader } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Timeline, TimelineContent, TimelineIndicator, TimelineItem, type TimelineStepStatus } from '@/components/ui/timeline'
 import InboundRegistrationSheet from '@/app/components/inventory/InboundRegistrationSheet'
@@ -193,35 +193,34 @@ export default function ArrivalsView({ schemaState, factories, warehouses, model
       {operation === 'correction' ? <div className="space-y-3">{selected.receiptLines.map((line) => <div key={line.id} className="grid gap-2 border-t border-[color:var(--border)] pt-3 sm:grid-cols-[1fr_1fr_auto]"><p className="text-sm text-[color:var(--muted-foreground)]">{line.businessDate} · 정상 {line.normalQuantity} · 초과 {line.overageQuantity}{line.corrected ? ' · 정정 완료' : ''}</p>{!line.corrected && <><Input aria-label={`입고 기록 #${line.id} 정정 사유`} value={corrections[line.id] ?? ''} onChange={(event) => setCorrections((current) => ({ ...current, [line.id]: event.target.value }))} /><Button type="button" variant="outline" size="sm" onClick={() => correct(line.id)} disabled={isPending}>전체 반전</Button>{operationErrors[`receipt-line-${line.id}`] ? <p role="alert" aria-live="assertive" data-testid={`operation-error-receipt-line-${line.id}`} className="sm:col-span-3 text-sm font-medium text-[color:var(--warning-foreground)]">{operationErrors[`receipt-line-${line.id}`]}</p> : null}</>}</div>)}</div> : null}
     </section>
   }
-  const renderManual = () => <div className="space-y-4">
+  const renderManual = () => <div className="flex flex-col gap-5">
     {sheetError ? <p role="alert" aria-live="assertive" className="text-sm font-medium text-[color:var(--warning-foreground)]">{sheetError}</p> : null}
-    <Card>
-      <CardHeader><CardTitle>기본 정보</CardTitle></CardHeader>
-      <CardContent>
-        <div className="grid gap-3 md:grid-cols-3">
-          <FieldSelect label="공장" value={factoryId} options={factoryOptions} onValueChange={setFactoryId} disabled={!factoryOptions.length} />
-          <FieldSelect label="입고 예정 창고" value={warehouseId} options={warehouses} onValueChange={setWarehouseId} disabled={!warehouses.length} />
-          <label><span className={ui.label}>예정 입고일</span><Input aria-label="예정 입고일" type="date" value={expectedDate} onChange={(event) => setExpectedDate(event.target.value)} /></label>
-        </div>
-      </CardContent>
-    </Card>
-    <Card>
-      <CardHeader><CardTitle>등록 항목</CardTitle></CardHeader>
-      <CardContent>
-        <EditableTable
-          columns={[{ key: 'variant', header: '상품 옵션' }, { key: 'quantity', header: '수량', width: '8rem' }]}
-          rows={rows}
-          getRowKey={(row) => row.key}
-          minRows={1}
-          onAddRow={() => setRows((current) => [...current, createRow()])}
-          onDeleteRow={(key) => setRows((current) => current.filter((row) => row.key !== key))}
-          renderCell={(row, columnKey, index) => columnKey === 'variant'
-            ? <ProductVariantCombobox aria-label={`항목 #${index + 1} 상품 옵션`} variants={variants} value={row.modelId ? `${row.modelId}:${row.sizeId}:${row.colorId}` : null} onValueChange={(id) => { const variant = variants.find((item) => item.id === id); setRows((current) => current.map((item) => item.key === row.key ? { ...item, modelId: variant?.modelId ?? '', sizeId: variant?.sizeId ?? '', colorId: variant?.colorId ?? '' } : item)) }} />
-            : <Input aria-label={`항목 #${index + 1} 수량`} placeholder="수량" type="number" min={1} value={row.orderedQuantity} onChange={(event) => setRows((current) => current.map((item) => item.key === row.key ? { ...item, orderedQuantity: event.target.value ? Number(event.target.value) : '' } : item))} />}
-        />
-      </CardContent>
-    </Card>
-    <Button type="button" onClick={submitManual} disabled={isPending || schemaState.status === 'missing'}>예정 입고 등록</Button>
+    <section aria-labelledby="manual-arrival-context-title" className="flex flex-col gap-3">
+      <h2 id="manual-arrival-context-title" className="text-sm font-semibold text-[color:var(--foreground)]">기본 정보</h2>
+      <div className="grid gap-3 md:grid-cols-3">
+        <FieldSelect label="공장" value={factoryId} options={factoryOptions} onValueChange={setFactoryId} disabled={!factoryOptions.length} />
+        <FieldSelect label="입고 예정 창고" value={warehouseId} options={warehouses} onValueChange={setWarehouseId} disabled={!warehouses.length} />
+        <label><span className={ui.label}>예정 입고일</span><Input aria-label="예정 입고일" type="date" value={expectedDate} onChange={(event) => setExpectedDate(event.target.value)} /></label>
+      </div>
+    </section>
+    <section aria-labelledby="manual-arrival-items-title" className="flex flex-col gap-3">
+      <h2 id="manual-arrival-items-title" className="text-sm font-semibold text-[color:var(--foreground)]">등록 항목</h2>
+      <EditableTable
+        validationSummary={rows.some((row) => !row.modelId || !row.sizeId || !row.colorId || !row.orderedQuantity) ? '상품 옵션과 수량을 입력한 행만 등록할 수 있습니다.' : undefined}
+        columns={[{ key: 'variant', header: '상품 옵션' }, { key: 'quantity', header: '수량', width: '8rem', align: 'right' }]}
+        rows={rows}
+        getRowKey={(row) => row.key}
+        minRows={1}
+        onAddRow={() => setRows((current) => [...current, createRow()])}
+        onDeleteRow={(key) => setRows((current) => current.filter((row) => row.key !== key))}
+        renderCell={(row, columnKey, index) => columnKey === 'variant'
+          ? <ProductVariantCombobox aria-label={`항목 #${index + 1} 상품 옵션`} variants={variants} value={row.modelId ? `${row.modelId}:${row.sizeId}:${row.colorId}` : null} onValueChange={(id) => { const variant = variants.find((item) => item.id === id); setRows((current) => current.map((item) => item.key === row.key ? { ...item, modelId: variant?.modelId ?? '', sizeId: variant?.sizeId ?? '', colorId: variant?.colorId ?? '' } : item)) }} />
+          : <Input aria-label={`항목 #${index + 1} 수량`} placeholder="수량" type="number" min={1} value={row.orderedQuantity} onChange={(event) => setRows((current) => current.map((item) => item.key === row.key ? { ...item, orderedQuantity: event.target.value ? Number(event.target.value) : '' } : item))} />}
+      />
+    </section>
+    <div className="flex justify-end">
+      <Button type="button" onClick={submitManual} disabled={isPending || schemaState.status === 'missing'}>예정 입고 등록</Button>
+    </div>
   </div>
   const renderAdd = () => {
     if (sheet?.kind !== 'add') return null
@@ -242,12 +241,14 @@ export default function ArrivalsView({ schemaState, factories, warehouses, model
       header: '공장',
       accessorFn: (arrival) => arrival.factoryName,
       enableHiding: false,
+      meta: { role: 'identity', minWidth: 'identity', truncate: 'primary' },
       cell: ({ getValue }) => <span className="font-medium text-[color:var(--foreground)]">{getValue<string>()}</span>,
     },
     {
       id: 'expectedDate',
       header: '예정일',
       accessorFn: (arrival) => arrival.expectedDate,
+      meta: { role: 'text', minWidth: '7rem' },
       cell: ({ getValue }) => <span className="text-[color:var(--muted-foreground)]">{getValue<string>()}</span>,
     },
     {
@@ -261,6 +262,7 @@ export default function ArrivalsView({ schemaState, factories, warehouses, model
       id: 'status',
       header: '상태',
       accessorFn: (arrival) => arrival.status,
+      meta: { role: 'status', minWidth: 'status' },
       cell: ({ row }) => <StatusBadge tone={(status[row.original.status] ?? status.DRAFT).tone}>{(status[row.original.status] ?? { label: row.original.status }).label}</StatusBadge>,
     },
     {
@@ -296,28 +298,37 @@ export default function ArrivalsView({ schemaState, factories, warehouses, model
       tableAriaLabel="입고 예정 목록"
       rowAriaLabel={(arrival) => `${arrival.factoryName} 입고 예정 상세 보기`}
       onRowClick={(arrival) => { setSheet({ kind: 'arrival', arrivalId: arrival.id, operation: 'overview' }); setSheetError(null) }}
-      emptyState={arrivals.length === 0 ? '등록된 예정 입고가 없습니다.' : '검색 조건에 맞는 예정 입고가 없습니다.'}
-      toolbarStart={
-        <div className={ui.toolbarDense}>
-          <Input type="search" aria-label="입고 예정 검색" value={arrivalQuery} onChange={(event) => setArrivalQuery(event.target.value)} placeholder="공장 또는 예정일 검색" className="w-52 shrink-0" />
-          <Select value={arrivalStatus ?? 'all'} onValueChange={(value) => setArrivalStatus(value === 'all' ? null : value)}>
-            <SelectTrigger aria-label="입고 예정 상태" className={ui.controlSm}><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="all">전체 상태</SelectItem>{Object.entries(status).map(([value, item]) => <SelectItem key={value} value={value}>{item.label}</SelectItem>)}</SelectContent>
-          </Select>
-        </div>
-      }
-      toolbarEnd={<span className={ui.statusPillDense}>총 {visibleArrivals.length}건</span>}
+      emptyState="등록된 예정 입고가 없습니다."
+      dataEmptyState="등록된 예정 입고가 없습니다."
+      filteredEmptyState="검색 조건에 맞는 예정 입고가 없습니다."
+      emptyStateKind={arrivals.length === 0 ? 'dataset' : 'filtered'}
+      onResetFilters={() => { setArrivalQuery(''); setArrivalStatus(null) }}
+      queryStart={<div data-testid="arrivals-query-controls" className="flex min-w-0 flex-1 items-center gap-2">
+        <Input type="search" aria-label="입고 예정 검색" value={arrivalQuery} onChange={(event) => setArrivalQuery(event.target.value)} placeholder="공장 또는 예정일 검색" className="min-w-0 flex-1" />
+        <ResponsiveFilterControls label="필터">
+          <div data-testid="responsive-arrivals-filters" className="flex min-w-0 items-center gap-2">
+            <Select value={arrivalStatus ?? 'all'} onValueChange={(value) => setArrivalStatus(value === 'all' ? null : value)}>
+              <SelectTrigger aria-label="입고 예정 상태" className={ui.controlSm}><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="all">전체 상태</SelectItem>{Object.entries(status).map(([value, item]) => <SelectItem key={value} value={value}>{item.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+        </ResponsiveFilterControls>
+      </div>}
+      actionStart={<span className={ui.statusPillDense}>총 {visibleArrivals.length}건</span>}
     />
-    <Sheet open={sheet !== null} onOpenChange={(open) => { if (!open) closeSheet() }}>
-      <SheetContent side="right" className="sm:max-w-2xl">
-        <SheetHeader>
-          <SheetTitle>{title}</SheetTitle>
-          {description ? <SheetDescription>{description}</SheetDescription> : null}
-        </SheetHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
+    <WorkDialog open={sheet !== null} onOpenChange={(open) => { if (!open) closeSheet() }}>
+      <WorkDialogContent>
+        <WorkDialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          {description ? <DialogDescription>{description}</DialogDescription> : null}
+        </WorkDialogHeader>
+        <WorkDialogBody>
           {sheet?.kind === 'arrival' ? renderOperation() : sheet?.kind === 'add' ? renderAdd() : null}
-        </div>
-      </SheetContent>
-    </Sheet>
+        </WorkDialogBody>
+        <WorkDialogFooter>
+          <Button type="button" variant="secondary" onClick={closeSheet}>닫기</Button>
+        </WorkDialogFooter>
+      </WorkDialogContent>
+    </WorkDialog>
   </div>
 }

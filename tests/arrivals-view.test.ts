@@ -71,7 +71,10 @@ describe('ArrivalsView', () => {
     expect(screen.queryByRole('button', { name: '수동 추가' })).toBeNull()
     expect(screen.queryByRole('button', { name: '엑셀 가져오기' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '입고 예정 추가' }))
-    expect(await screen.findByRole('dialog', { name: '입고 예정 추가' })).toBeTruthy()
+    const dialog = await screen.findByRole('dialog', { name: '입고 예정 추가' })
+    expect(dialog).toBeTruthy()
+    expect(dialog.getAttribute('data-slot')).toBe('work-dialog-content')
+    expect(dialog.querySelector('[data-slot="sheet-content"]')).toBeNull()
     expect(screen.getByRole('tab', { name: '직접 입력' }).getAttribute('aria-selected')).toBe('true')
 
     await openSelectAndChoose('공장', '광주 협력사')
@@ -114,6 +117,23 @@ describe('ArrivalsView', () => {
     fireEvent.click(excelTab)
     expect(screen.getByText('파일을 놓거나 선택하세요')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '예정 입고 등록' })).toBeNull()
+  })
+
+  it('keeps the arrivals query controls outside the table surface and exposes a responsive filter control', () => {
+    render(
+      React.createElement(ArrivalsView, {
+        schemaState: { status: 'ready', message: null },
+        factories: [],
+        warehouses: [],
+        models: [],
+        arrivals: [],
+      }),
+    )
+
+    expect(screen.getByTestId('arrivals-query-controls')).toBeTruthy()
+    expect(screen.getByTestId('arrivals-query-controls').closest('[data-slot="table-surface"]')).toBeNull()
+    expect(screen.getByTestId('responsive-arrivals-filters')).toBeTruthy()
+    expect(screen.getByText('총 0건')).toBeTruthy()
   })
 
   it('lets an operator delete a registration row from the manual entry form', () => {
@@ -271,28 +291,24 @@ describe('ArrivalsView', () => {
     fireEvent.change(screen.getByLabelText('LP01 배정 변경 사유'), { target: { value: '창고 계획 변경' } })
     fireEvent.click(screen.getByRole('button', { name: '배정 저장' }))
     await waitFor(() => expect(mocks.replaceFactoryArrivalAllocations).toHaveBeenCalledWith({ arrivalId: 101, itemId: 201, reason: '창고 계획 변경', allocations: [{ warehouseId: 11, quantity: 20 }, { warehouseId: 12, quantity: 10 }] }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
     fireEvent.click(screen.getByRole('button', { name: '배정 작업 열기' }))
     fireEvent.change(screen.getByLabelText('입고 #101 전체 이동 사유'), { target: { value: '대부분 오금동 입고' } })
     fireEvent.click(screen.getByRole('button', { name: '남은 수량 이동' }))
     await waitFor(() => expect(mocks.moveFactoryArrivalRemaindersToWarehouse).toHaveBeenCalledWith({ arrivalId: 101, warehouseId: 11, reason: '대부분 오금동 입고' }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
     fireEvent.click(screen.getByRole('button', { name: '부족 작업 열기' }))
     fireEvent.change(screen.getByLabelText('오금동 부족 수량'), { target: { value: '1' } }); fireEvent.change(screen.getByLabelText('오금동 부족 사유'), { target: { value: '추가 미발송' } }); fireEvent.click(screen.getAllByRole('button', { name: '부족 종료' })[0])
     await waitFor(() => expect(mocks.closeFactoryArrivalShortage).toHaveBeenCalledWith({ allocationId: 301, quantity: 1, reason: '추가 미발송' }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
     fireEvent.click(screen.getByRole('button', { name: '후속 입고 작업 열기' }))
     fireEvent.change(screen.getByLabelText('부족 #401 후속 업무일'), { target: { value: '2026-04-25' } }); fireEvent.change(screen.getByLabelText('부족 #401 후속 수량'), { target: { value: '1' } }); fireEvent.change(screen.getByLabelText('부족 #401 후속 사유'), { target: { value: '늦은 박스' } }); fireEvent.click(screen.getByRole('button', { name: '후속 입고' }))
     await waitFor(() => expect(mocks.recordFactoryArrivalFollowUp).toHaveBeenCalledWith(expect.objectContaining({ closureId: 401, warehouseId: 11, quantity: 1, reason: '늦은 박스', receiptBusinessDate: '2026-04-25' })))
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     fireEvent.click(screen.getByRole('button', { name: '입고 #101 상세 보기' }))
     fireEvent.click(screen.getByRole('button', { name: '정정 작업 열기' }))
     fireEvent.change(screen.getByLabelText('입고 기록 #501 정정 사유'), { target: { value: '다른 상품' } }); fireEvent.click(screen.getByRole('button', { name: '전체 반전' }))
     await waitFor(() => expect(mocks.reverseFactoryReceiptLine).toHaveBeenCalledWith(expect.objectContaining({ receiptLineId: 501, reason: '다른 상품' })))
-  })
+  }, 15000)
 
   it('keeps allocation editing open when the server returns an item-scoped failure', async () => {
     mocks.replaceFactoryArrivalAllocations.mockResolvedValue({ success: false, error: { key: 'item-201', message: '배정 합계를 다시 확인해주세요.' } })

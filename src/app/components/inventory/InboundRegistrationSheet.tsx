@@ -11,7 +11,7 @@ import { DataTable } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
 import { FileDropInput } from '@/components/ui/file-drop-input'
 import { Input } from '@/components/ui/input'
-import { Modal } from '@/components/ui/modal'
+import { DialogDescription, DialogTitle, WorkDialog, WorkDialogBody, WorkDialogContent, WorkDialogFooter, WorkDialogHeader } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { StatusBadge } from '@/components/ui/badge-1'
 import { ParseTemplateBuilder, extractHeaders as extractSampleHeaders, type ParseTemplateCustomMapping, type ParseTemplateMapping } from '@/components/ui/parse-template-builder'
@@ -294,6 +294,7 @@ export default function InboundRegistrationSheet({
       />
 
       {preview ? <EditableTable
+        validationSummary={reviewBlockers.length ? `${reviewBlockers.length}행의 연결·수량·원본 검증을 완료해주세요.` : undefined}
         columns={[{ key: 'externalSku', header: '외부 SKU' }, { key: 'quantity', header: '수량', align: 'right' }, { key: 'evidence', header: '원본 셀' }, { key: 'mapping', header: '내부 SKU 상태' }]}
         rows={rows}
         getRowKey={(row) => row.key}
@@ -312,8 +313,14 @@ export default function InboundRegistrationSheet({
       {message ? <p role="alert" className="text-sm text-[color:var(--muted-foreground)]">{message}</p> : null}
       {savedRevisionId ? <div className="flex items-end justify-between gap-3 border-t border-[color:var(--border)] pt-[var(--space-4)]"><div><p className="text-sm font-medium text-[color:var(--foreground)]">2단계 · 입고 예정 전환</p><p className="text-sm text-[color:var(--muted-foreground)]">{reviewBlockers.length ? `${reviewBlockers.map((row) => row.sourceRowNumber).join(', ')}행의 연결·수량 문제를 먼저 해결하세요.` : '기본 창고 하나로 입고 예정 수량을 만듭니다.'}</p></div><label className="space-y-1"><span className={ui.label}>입고 창고</span><Select value={warehouseId || EMPTY_VALUE} onValueChange={(value) => setWarehouseId(value === EMPTY_VALUE ? '' : value)}><SelectTrigger aria-label="입고 창고"><SelectValue placeholder="창고 선택" /></SelectTrigger><SelectContent><SelectItem value={EMPTY_VALUE}>창고 선택</SelectItem>{warehouses.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></label><Button type="button" disabled={isPending || !warehouseId || reviewBlockers.length > 0} onClick={promote}>입고 예정 전환</Button></div> : <div className="flex justify-end"><Button type="button" disabled={isPending || !sourceFile || rows.length === 0} onClick={saveDraft}>검토 저장</Button></div>}
 
-      <Modal open={templateModalOpen} title="입고 파싱 템플릿 만들기" description="샘플 파일에서 시트·헤더 행과 외부 SKU, 수량 열을 선택하고 실제 데이터 미리보기를 확인해 저장합니다." onOpenChange={setTemplateModalOpen} footer={<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setTemplateModalOpen(false)}>닫기</Button><Button type="button" disabled={isPending || !sampleSheet || !templateName.trim() || !externalSkuColumn || !quantityColumn} onClick={saveTemplate}>파싱 템플릿 저장</Button></div>}>
-        <div className="space-y-4">
+      <WorkDialog open={templateModalOpen} onOpenChange={setTemplateModalOpen}>
+        <WorkDialogContent>
+          <WorkDialogHeader>
+            <DialogTitle>입고 파싱 템플릿 만들기</DialogTitle>
+            <DialogDescription>샘플 파일에서 시트·헤더 행과 외부 SKU, 수량 열을 선택하고 실제 데이터 미리보기를 확인해 저장합니다.</DialogDescription>
+          </WorkDialogHeader>
+          <WorkDialogBody>
+          <div className="flex flex-col gap-4">
           <label className="space-y-1"><span className={ui.label}>파싱 템플릿 이름</span><Input aria-label="파싱 템플릿 이름" value={templateName} onChange={(event) => setTemplateName(event.target.value)} /></label>
           <div className="space-y-1"><span className={ui.label}>샘플 파일</span><FileDropInput ariaLabel="샘플 파일" accept=".xlsx,.xls,.csv" onFile={inspectSample} /></div>
           {templateSample ? <ParseTemplateBuilder<InboundRole>
@@ -332,8 +339,14 @@ export default function InboundRegistrationSheet({
             previewLabel="샘플 데이터 미리보기"
             emptyPreviewState="시트와 헤더 행을 선택하면 샘플 데이터가 표시됩니다."
           /> : null}
-        </div>
-      </Modal>
+          </div>
+          </WorkDialogBody>
+          <WorkDialogFooter>
+            <Button type="button" variant="secondary" onClick={() => setTemplateModalOpen(false)}>닫기</Button>
+            <Button type="button" disabled={isPending || !sampleSheet || !templateName.trim() || !externalSkuColumn || !quantityColumn} onClick={saveTemplate}>파싱 템플릿 저장</Button>
+          </WorkDialogFooter>
+        </WorkDialogContent>
+      </WorkDialog>
     </div>
   )
 }

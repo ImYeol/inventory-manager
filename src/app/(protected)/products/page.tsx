@@ -1,4 +1,5 @@
 import { getCatalogData, getFactoriesData, getProductWorkspaceData, getTransactionsWithRelations } from '@/lib/data'
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { PageHeader, ui } from '../../components/ui'
 import MasterDataManager from '../master-data/MasterDataManager'
 import { getSupplierSkuMappingWorkspace } from '@/lib/actions/supplier-sku-mapping'
@@ -51,6 +52,13 @@ export default async function ProductsPage() {
 
   return (
     <div className={ui.shell}>
+      <Breadcrumb className="mb-3">
+        <BreadcrumbList>
+          <BreadcrumbItem><BreadcrumbLink href="/">대시보드</BreadcrumbLink></BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem><BreadcrumbPage>상품 관리</BreadcrumbPage></BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
       <PageHeader title="상품 관리" description="상품과 창고 기준정보를 표에서 관리합니다." />
       <MasterDataManager {...workspace} warehouses={warehouses} warehouseStats={warehouseStats} suppliers={factoriesData.factories.filter((factory) => factory.isActive).map((factory) => ({ id: factory.id, name: factory.name }))} supplierSkuMappings={supplierSkuWorkspace.mappings} supplierSkuMappingAudits={supplierSkuWorkspace.audits} />
     </div>

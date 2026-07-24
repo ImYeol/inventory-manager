@@ -6,18 +6,15 @@ import { toast } from 'sonner'
 import { Trash2 } from 'lucide-react'
 import type { ColumnDef } from '@tanstack/react-table'
 
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
 import { ChannelBadge } from '@/components/ui/channel-badge'
 import { StatusBadge } from '@/components/ui/badge-1'
 import { DataTable } from '@/components/ui/data-table'
-import { FilterToolbar } from '@/components/ui/filter-toolbar'
+import { ResponsiveFilterControls } from '@/components/ui/filter-toolbar'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
-import { TableSurface } from '@/components/ui/table-surface'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TagInput } from '@/components/ui/tag-input'
 import { ActionToolbar } from '@/components/ui/toolbar'
@@ -105,6 +102,8 @@ export default function MasterDataManager({
   const [productQuery, setProductQuery] = useState('')
   const [channelFilter, setChannelFilter] = useState<ProductChannelFilter>('all')
   const [mappingStateFilter, setMappingStateFilter] = useState<MappingStateFilter>('all')
+  const [warehouseQuery, setWarehouseQuery] = useState('')
+  const [supplierSkuQuery, setSupplierSkuQuery] = useState('')
   const [selectedVariant, setSelectedVariant] = useState<ProductWorkspaceVariant | null>(null)
   const [mappingDraft, setMappingDraft] = useState<MappingDraft | null>(null)
   const [editingMappingId, setEditingMappingId] = useState<number | null>(null)
@@ -116,7 +115,6 @@ export default function MasterDataManager({
   const warehouseNameRef = useRef<HTMLInputElement>(null)
   const [deleteWarehouseTarget, setDeleteWarehouseTarget] = useState<WarehouseLookup | null>(null)
   const [supplierMappingDraft, setSupplierMappingDraft] = useState({ supplierId: '', externalSku: '' })
-  const [supplierSkuQuery, setSupplierSkuQuery] = useState('')
   const [supplierSkuState, setSupplierSkuState] = useState<'all' | 'active' | 'inactive'>('active')
   const [selectedSupplierMapping, setSelectedSupplierMapping] = useState<SupplierSkuMappingRow | null>(null)
   const [unlinkTarget, setUnlinkTarget] = useState<SupplierSkuMappingRow | null>(null)
@@ -162,6 +160,7 @@ export default function MasterDataManager({
       latestMovementDate: stat?.latestMovementDate ?? null,
     }
   })
+  const filteredWarehouseRows = warehouseRows.filter((row) => row.warehouse.name.toLowerCase().includes(warehouseQuery.trim().toLowerCase()))
   const draftSizes = internalProductDraft.sizes
   const draftColors = internalProductDraft.colors
   const draftVariantCount = Math.max(draftSizes.length, 1) * Math.max(draftColors.length, 1)
@@ -226,6 +225,7 @@ export default function MasterDataManager({
       header: 'SKU / 옵션',
       enableSorting: false,
       enableHiding: false,
+      meta: { role: 'identity', minWidth: 'identity', truncate: 'primary' },
       cell: ({ row }) => {
         const variant = row.original
         return <div><p className="font-mono text-sm font-medium text-[color:var(--foreground)]">{variant.sellerSku}</p><p className="text-sm text-[color:var(--muted-foreground)]">{variant.modelName} · {variant.sizeName} / {variant.colorName}</p></div>
@@ -235,13 +235,14 @@ export default function MasterDataManager({
       id: 'inventory',
       header: '출고 가능',
       accessorFn: (variant) => variant.available,
-      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      meta: { role: 'numeric', minWidth: 'numeric', align: 'right' },
       cell: ({ getValue }) => <span className="font-mono tabular-nums text-sm text-[color:var(--foreground)]">{getValue<number>()}</span>,
     },
     {
       id: 'mappings',
       header: '판매 옵션',
       enableSorting: false,
+      meta: { role: 'status', minWidth: 'status', align: 'center' },
       cell: ({ row }) => {
         const refs = refsForVariant(row.original.id)
         return (
@@ -268,6 +269,7 @@ export default function MasterDataManager({
       id: 'reported',
       header: '마지막 보고 / 오류',
       enableSorting: false,
+      meta: { role: 'status', minWidth: 'status', align: 'center', truncate: 'secondary' },
       cell: ({ row }) => {
         const refs = refsForVariant(row.original.id)
         return refs.length ? <div className="space-y-1">{refs.map((ref) => <div key={ref.id} className="flex items-center gap-2"><ChannelBadge channel={ref.channel} listingStatus={ref.lastSyncError ? 'sync-error' : ref.listingStatus} compact /><span className="font-mono text-xs text-[color:var(--muted-foreground)]">{ref.channelReported ?? '—'}</span>{ref.lastSyncError ? <span className="text-xs text-[color:var(--danger-foreground)]">{ref.lastSyncError}</span> : null}</div>)}</div> : <span className="text-sm text-[color:var(--muted-foreground)]">연결 필요</span>
@@ -278,7 +280,7 @@ export default function MasterDataManager({
       header: '작업',
       enableSorting: false,
       enableHiding: false,
-      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      meta: { role: 'action', align: 'right' },
       cell: ({ row }) => <Button type="button" variant="ghost" size="sm" onClick={(event) => { event.stopPropagation(); openSkuModal(row.original) }}>상세</Button>,
     },
   ]
@@ -289,26 +291,28 @@ export default function MasterDataManager({
       header: '창고',
       accessorFn: (row) => row.warehouse.name,
       enableHiding: false,
+      meta: { role: 'identity', minWidth: 'identity', truncate: 'primary' },
       cell: ({ row }) => <span className="font-medium">{row.original.warehouse.name}</span>,
     },
     {
       id: 'skuCount',
       header: 'SKU',
       accessorFn: (row) => row.skuCount,
-      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      meta: { role: 'numeric', minWidth: 'numeric', align: 'right' },
       cell: ({ getValue }) => <span className="font-mono tabular-nums">{getValue<number>()}</span>,
     },
     {
       id: 'stockQty',
       header: '현재 재고',
       accessorFn: (row) => row.stockQty,
-      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      meta: { role: 'numeric', minWidth: 'numeric', align: 'right' },
       cell: ({ getValue }) => <span className="font-semibold tabular-nums">{getValue<number>()}</span>,
     },
     {
       id: 'movement',
       header: '최근 변동',
       enableSorting: false,
+      meta: { role: 'text', truncate: 'secondary' },
       cell: ({ row }) => <span className="text-sm text-[color:var(--muted-foreground)]">입고 {row.original.latestInbound?.quantity ?? '없음'} · 출고 {row.original.latestOutbound?.quantity ?? '없음'} · {formatDate(row.original.latestMovementDate)}</span>,
     },
     {
@@ -316,7 +320,7 @@ export default function MasterDataManager({
       header: '작업',
       enableSorting: false,
       enableHiding: false,
-      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      meta: { role: 'action', align: 'right' },
       cell: ({ row }) => (
         <Tooltip>
           <TooltipTrigger
@@ -337,18 +341,21 @@ export default function MasterDataManager({
       id: 'supplier',
       header: '공급자',
       accessorFn: (mapping) => mapping.supplierName,
+      meta: { role: 'identity', minWidth: 'identity', truncate: 'primary' },
       cell: ({ getValue }) => <span>{getValue<string>()}</span>,
     },
     {
       id: 'external',
       header: '외부 SKU',
       accessorFn: (mapping) => mapping.externalSku,
+      meta: { truncate: 'secondary' },
       cell: ({ getValue }) => <span className="font-mono text-sm text-[color:var(--foreground)]">{getValue<string>()}</span>,
     },
     {
       id: 'internal',
       header: '내부 SKU',
       enableSorting: false,
+      meta: { role: 'identity', minWidth: 'identity', truncate: 'primary' },
       cell: ({ row }) => {
         const variant = variants.find((item) => item.id === row.original.productVariantId)
         return <div><p className="font-mono text-sm text-[color:var(--foreground)]">{variant?.sellerSku ?? `#${row.original.productVariantId}`}</p>{variant ? <p className="text-xs text-[color:var(--muted-foreground)]">{variant.modelName} · {variant.colorName} / {variant.sizeName}</p> : null}</div>
@@ -358,12 +365,14 @@ export default function MasterDataManager({
       id: 'state',
       header: '상태',
       accessorFn: (mapping) => mapping.isActive,
+      meta: { role: 'status', minWidth: 'status', align: 'center' },
       cell: ({ getValue }) => <StatusBadge tone={getValue<boolean>() ? 'success' : 'neutral'}>{getValue<boolean>() ? '활성' : '비활성'}</StatusBadge>,
     },
     {
       id: 'date',
       header: '변경일',
       accessorFn: (mapping) => mapping.deactivatedAt ?? mapping.createdAt,
+      meta: { truncate: 'secondary' },
       cell: ({ getValue }) => <span className="text-sm text-[color:var(--muted-foreground)]">{formatDate(getValue<string>())}</span>,
     },
     {
@@ -371,62 +380,52 @@ export default function MasterDataManager({
       header: '작업',
       enableSorting: false,
       enableHiding: false,
-      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      meta: { role: 'action', align: 'right' },
       cell: ({ row }) => <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedSupplierMapping(row.original)}>관리</Button>,
     },
   ]
 
   return (
     <div className="space-y-4">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/">대시보드</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>기준정보</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)} className="mt-4">
         <TabsList aria-label="상품 관리 보기 전환"><TabsTrigger value="product">상품</TabsTrigger><TabsTrigger value="warehouse">창고</TabsTrigger><TabsTrigger value="supplier-audit">공급자 SKU 감사</TabsTrigger></TabsList>
         <TabsContent value="product">
-          <TableSurface
-            toolbar={<FilterToolbar>
-              <div className="flex min-w-0 items-center gap-2">
-                <Input aria-label="상품 검색" value={productQuery} onChange={(event) => setProductQuery(event.target.value)} placeholder="SKU 또는 옵션 검색" className="w-56 ui-control-sm" />
-                <Select value={channelFilter} onValueChange={(value) => setChannelFilter(value as ProductChannelFilter)}><SelectTrigger aria-label="채널 필터" className="w-28 ui-control-sm"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">전체 채널</SelectItem><SelectItem value="naver">네이버</SelectItem><SelectItem value="coupang">쿠팡</SelectItem></SelectContent></Select>
-                <Select value={mappingStateFilter} onValueChange={(value) => setMappingStateFilter(value as MappingStateFilter)}><SelectTrigger aria-label="매핑 상태 필터" className="w-32 ui-control-sm"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">전체 상태</SelectItem><SelectItem value="mapped">매핑됨</SelectItem><SelectItem value="mapping-required">연결 필요</SelectItem><SelectItem value="sync-error">동기화 오류</SelectItem></SelectContent></Select>
-              </div>
-              <ActionToolbar className="shrink-0"><span className={ui.dataMeta}>{filteredVariants.length}개 SKU</span><Button type="button" variant="secondary" size="sm" onClick={() => { setInternalProductDraft(createInternalProductDraft()); setIsInternalProductModalOpen(true) }}>내부 상품 등록</Button></ActionToolbar>
-            </FilterToolbar>}
-          >
-            {isPending ? (
-              <div className="space-y-2 p-4">
-                {Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-10 w-full" />)}
-              </div>
-            ) : (
-              <DataTable<ProductWorkspaceVariant>
-                bare
-                tableAriaLabel="내부 SKU 목록"
-                columns={variantColumns}
-                rows={filteredVariants}
-                onRowClick={openSkuModal}
-                rowAriaLabel={(variant) => `${variant.sellerSku} 매핑 상세`}
-                emptyState="등록된 내부 판매 옵션이 없습니다. 내부 상품을 등록한 뒤 채널 판매 옵션을 연결하세요."
-              />
-            )}
-          </TableSurface>
+          <DataTable<ProductWorkspaceVariant>
+            tableAriaLabel="내부 SKU 목록"
+            columns={variantColumns}
+            rows={filteredVariants}
+            loading={isPending}
+            onRowClick={openSkuModal}
+            rowAriaLabel={(variant) => `${variant.sellerSku} 매핑 상세`}
+            emptyState="등록된 내부 판매 옵션이 없습니다. 내부 상품을 등록한 뒤 채널 판매 옵션을 연결하세요."
+            dataEmptyState="등록된 내부 판매 옵션이 없습니다. 내부 상품을 등록한 뒤 채널 판매 옵션을 연결하세요."
+            filteredEmptyState="조건에 맞는 상품이 없습니다."
+            emptyStateKind={productQuery || channelFilter !== 'all' || mappingStateFilter !== 'all' ? 'filtered' : 'dataset'}
+            onResetFilters={() => { setProductQuery(''); setChannelFilter('all'); setMappingStateFilter('all') }}
+            queryStart={
+              <>
+                <Input aria-label="상품 검색" value={productQuery} onChange={(event) => setProductQuery(event.target.value)} placeholder="SKU 또는 옵션 검색" className="min-w-0 flex-1 ui-control-sm" />
+                <ResponsiveFilterControls>
+                  <Select value={channelFilter} onValueChange={(value) => setChannelFilter(value as ProductChannelFilter)}><SelectTrigger aria-label="채널 필터" className="ui-control-sm"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">전체 채널</SelectItem><SelectItem value="naver">네이버</SelectItem><SelectItem value="coupang">쿠팡</SelectItem></SelectContent></Select>
+                  <Select value={mappingStateFilter} onValueChange={(value) => setMappingStateFilter(value as MappingStateFilter)}><SelectTrigger aria-label="매핑 상태 필터" className="ui-control-sm"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">전체 상태</SelectItem><SelectItem value="mapped">매핑됨</SelectItem><SelectItem value="mapping-required">연결 필요</SelectItem><SelectItem value="sync-error">동기화 오류</SelectItem></SelectContent></Select>
+                </ResponsiveFilterControls>
+              </>
+            }
+            actionAlignment="end"
+            actionEnd={<Button type="button" variant="secondary" size="sm" onClick={() => { setInternalProductDraft(createInternalProductDraft()); setIsInternalProductModalOpen(true) }}>내부 상품 등록</Button>}
+          />
         </TabsContent>
         <TabsContent value="warehouse">
           <DataTable<WarehouseRow>
             columns={warehouseColumns}
-            rows={warehouseRows}
+            rows={filteredWarehouseRows}
             emptyState="등록된 창고가 없습니다."
-            toolbarStart={<span className={ui.dataMeta}>{warehouseRows.length}개 창고</span>}
-            toolbarEnd={<Button type="button" variant="secondary" size="sm" onClick={() => { setWarehouseName(''); setIsWarehouseModalOpen(true) }}>창고 등록</Button>}
+            filteredEmptyState="조건에 맞는 창고가 없습니다."
+            emptyStateKind={warehouseQuery ? 'filtered' : 'dataset'}
+            onResetFilters={() => setWarehouseQuery('')}
+            queryStart={<Input aria-label="창고 검색" value={warehouseQuery} onChange={(event) => setWarehouseQuery(event.target.value)} placeholder="창고 검색" className="min-w-0 flex-1 ui-control-sm" />}
+            actionStart={<span className={ui.dataMeta}>{filteredWarehouseRows.length}개 창고</span>}
+            actionEnd={<Button type="button" variant="secondary" size="sm" onClick={() => { setWarehouseName(''); setIsWarehouseModalOpen(true) }}>창고 등록</Button>}
           />
         </TabsContent>
         <TabsContent value="supplier-audit">
@@ -436,13 +435,11 @@ export default function MasterDataManager({
             rows={filteredSupplierMappings}
             tableAriaLabel="공급자 SKU 매핑 목록"
             emptyState="조건에 맞는 공급자 SKU 매핑이 없습니다."
-            toolbarStart={
-              <div className="flex min-w-0 items-center gap-2">
-                <Input aria-label="공급자 SKU 검색" value={supplierSkuQuery} onChange={(event) => setSupplierSkuQuery(event.target.value)} placeholder="공급자, 외부 SKU, 내부 SKU 검색" className="w-64 ui-control-sm" />
-                <Select value={supplierSkuState} onValueChange={(value) => setSupplierSkuState(value as typeof supplierSkuState)}><SelectTrigger aria-label="공급자 SKU 상태" className="w-28 ui-control-sm"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">활성</SelectItem><SelectItem value="inactive">비활성</SelectItem><SelectItem value="all">전체</SelectItem></SelectContent></Select>
-              </div>
-            }
-            toolbarEnd={<span className={ui.dataMeta}>{filteredSupplierMappings.length}개 매핑</span>}
+            filteredEmptyState="조건에 맞는 공급자 SKU 매핑이 없습니다."
+            emptyStateKind={supplierSkuQuery || supplierSkuState !== 'active' ? 'filtered' : 'dataset'}
+            onResetFilters={() => { setSupplierSkuQuery(''); setSupplierSkuState('active') }}
+            queryStart={<><Input aria-label="공급자 SKU 검색" value={supplierSkuQuery} onChange={(event) => setSupplierSkuQuery(event.target.value)} placeholder="공급자, 외부 SKU, 내부 SKU 검색" className="min-w-0 flex-1 ui-control-sm" /><ResponsiveFilterControls><Select value={supplierSkuState} onValueChange={(value) => setSupplierSkuState(value as typeof supplierSkuState)}><SelectTrigger aria-label="공급자 SKU 상태" className="ui-control-sm"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">활성</SelectItem><SelectItem value="inactive">비활성</SelectItem><SelectItem value="all">전체</SelectItem></SelectContent></Select></ResponsiveFilterControls></>}
+            actionStart={<span className={ui.dataMeta}>{filteredSupplierMappings.length}개 매핑</span>}
           />
         </TabsContent>
       </Tabs>

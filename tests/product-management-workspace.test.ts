@@ -65,7 +65,8 @@ describe('Product management workspace', () => {
     expect(screen.getByText('네이버 1 · 쿠팡 1')).toBeTruthy()
     expect(screen.getByRole('combobox', { name: '채널 필터' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: '매핑 상태 필터' })).toBeTruthy()
-    expect(screen.getByText('1개 SKU')).toBeTruthy()
+    expect(screen.queryByText('1개 SKU')).toBeNull()
+    expect(screen.getByRole('button', { name: '내부 상품 등록' }).closest('[data-slot="data-action-row"]')).toHaveAttribute('data-align', 'end')
 
     fireEvent.change(screen.getByRole('textbox', { name: '상품 검색' }), { target: { value: '없는 SKU' } })
     expect(screen.queryAllByText('LP01-M-NV')).toHaveLength(0)

@@ -118,7 +118,7 @@ describe('InventoryWorkspace', () => {
     return trigger
   }
 
-  it('renders a table-first workspace with compact filters and action buttons', async () => {
+  it('renders a table-first workspace with detached query/action rows and compact filters', async () => {
     render(
       React.createElement(InventoryWorkspace, {
         warehouses: [
@@ -173,10 +173,22 @@ describe('InventoryWorkspace', () => {
     expect(screen.getByLabelText('상태 필터')).toBeTruthy()
     expect(screen.getByRole('button', { name: '컬럼' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '수동 입고' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '수동 출고' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '실사 조정' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '창고 이동' })).toBeNull()
-    expect(screen.getByRole('button', { name: '다른 재고 운영 action 더보기' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '수동 출고' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '실사 조정' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '창고 이동' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '다른 재고 운영 action 더보기' })).toBeNull()
+    const operations = screen.getByRole('group', { name: '재고 운영 작업' })
+    expect(operations).toHaveAttribute('data-slot', 'independent-action-group')
+    expect(operations).toHaveClass('overflow-x-auto')
+    expect(screen.queryByText('2개')).toBeNull()
+    for (const label of ['수동 입고', '수동 출고', '실사 조정', '창고 이동']) {
+      expect(screen.getByRole('button', { name: label })).toHaveClass('ui-button-sm')
+      expect(screen.getByRole('button', { name: label })).toHaveAttribute('data-variant', 'outline')
+    }
+    expect(screen.getByLabelText('상품명 검색').closest('[data-slot="data-query-row"]')).toContainElement(screen.getByLabelText('상품명 검색'))
+    expect(operations.closest('[data-slot="data-action-row"]')).toHaveAttribute('data-align', 'start')
+    expect(operations.closest('[data-slot="data-action-start"]')).toContainElement(operations)
+    expect(screen.getByRole('table', { name: '재고 목록' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '재고 추가' })).toBeNull()
     expect(within(screen.getByRole('table')).getByText('현재 재고')).toBeTruthy()
     expect(within(screen.getByRole('table')).getByText('예약 재고')).toBeTruthy()
@@ -193,6 +205,9 @@ describe('InventoryWorkspace', () => {
     expect(within(table).getByText('대자동')).toBeTruthy()
     expect(within(table).queryByText('오금동')).toBeNull()
 
+    fireEvent.change(screen.getByLabelText('상품명 검색'), { target: { value: '' } })
+    expect(screen.getByLabelText('상품명 검색')).toHaveValue('')
+
     fireEvent.pointerDown(screen.getByRole('button', { name: '컬럼' }))
     const menu = screen.getByRole('menu')
     fireEvent.click(within(menu).getByText('창고'))
@@ -200,36 +215,56 @@ describe('InventoryWorkspace', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '수동 입고' }))
     expect(screen.getByRole('dialog', { name: '수동 입고' })).toBeTruthy()
-    expect(screen.getByText('InOutForm:inbound:2:none')).toBeTruthy()
+    expect(screen.getByText('InOutForm:inbound:all:none')).toBeTruthy()
 
-    // Sheet is a true modal (base-ui default: background is inert while open),
-    // so switching to another quick-action mode closes the current sheet first.
+    const inventoryDialog = screen.getByRole('dialog', { name: '수동 입고' })
+    expect(inventoryDialog).toHaveAttribute('data-slot', 'work-dialog-content')
+    expect(inventoryDialog).toHaveClass('sm:max-w-[min(960px,calc(100%-2rem))]')
+    expect(screen.getByText('InOutForm:inbound:all:none')).toBeTruthy()
+
+    // WorkDialog is a true modal (base-ui default: background is inert while open),
+    // so switching to another quick-action mode closes the current dialog first.
     fireEvent.keyDown(document, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 
-    fireEvent.pointerDown(screen.getByRole('button', { name: '다른 재고 운영 action 더보기' }))
-    let operationsMenu = screen.getByRole('menu')
-    fireEvent.click(within(operationsMenu).getByText('수동 출고'))
+    fireEvent.click(screen.getByRole('button', { name: '수동 출고' }))
     expect(screen.getByRole('dialog', { name: '수동 출고' })).toBeTruthy()
-    expect(screen.getByText('InOutForm:manual-outbound:2:none')).toBeTruthy()
+    expect(screen.getByText('InOutForm:manual-outbound:all:none')).toBeTruthy()
 
     fireEvent.keyDown(document, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 
-    fireEvent.pointerDown(screen.getByRole('button', { name: '다른 재고 운영 action 더보기' }))
-    operationsMenu = screen.getByRole('menu')
-    fireEvent.click(within(operationsMenu).getByText('실사 조정'))
+    fireEvent.click(screen.getByRole('button', { name: '실사 조정' }))
     expect(screen.getByRole('dialog', { name: '실사 수량 조정' })).toBeTruthy()
-    expect(screen.getByText('InOutForm:count-adjustment:2:none')).toBeTruthy()
+    expect(screen.getByText('InOutForm:count-adjustment:all:none')).toBeTruthy()
 
     fireEvent.keyDown(document, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 
-    fireEvent.pointerDown(screen.getByRole('button', { name: '다른 재고 운영 action 더보기' }))
-    operationsMenu = screen.getByRole('menu')
-    fireEvent.click(within(operationsMenu).getByText('창고 이동'))
+    fireEvent.click(screen.getByRole('button', { name: '창고 이동' }))
     expect(screen.getByRole('dialog', { name: '창고 이동' })).toBeTruthy()
     expect(screen.getByText('WarehouseTransferForm:none')).toBeTruthy()
+  }, 15000)
+
+  it('marks inventory columns by semantic role and keeps long identity values accessible', () => {
+    render(
+      React.createElement(InventoryWorkspace, {
+        warehouses: [{ id: 1, name: '오금동' }],
+        models: [{
+          id: 1,
+          name: '아주 긴 상품명-카드지갑-핑크-기본-추가설명',
+          sizes: [{ id: 11, name: '기본', sortOrder: 1, modelId: 1 }],
+          colors: [{ id: 21, name: '핑크', rgbCode: '#111111', textWhite: true, sortOrder: 1, modelId: 1 }],
+          inventory: [{ id: 101, modelId: 1, sizeId: 11, colorId: 21, warehouseId: 1, warehouseName: '오금동', quantity: 2 }],
+        }],
+        transactions: [],
+      }),
+    )
+
+    expect(screen.getByRole('columnheader', { name: '상품' })).toHaveAttribute('data-column-role', 'identity')
+    expect(screen.getByRole('columnheader', { name: '현재 재고' })).toHaveAttribute('data-column-role', 'numeric')
+    expect(screen.getByRole('columnheader', { name: '상태' })).toHaveAttribute('data-column-role', 'status')
+    expect(screen.getByTitle('아주 긴 상품명-카드지갑-핑크-기본-추가설명')).toHaveAttribute('aria-label', '아주 긴 상품명-카드지갑-핑크-기본-추가설명')
   })
 
   it('opens a mode-locked count-adjustment sheet pre-filled with the row variant and warehouse, and clears the prefill for toolbar-triggered actions', async () => {
@@ -256,8 +291,8 @@ describe('InventoryWorkspace', () => {
     expect(screen.getByRole('dialog', { name: '실사 수량 조정' })).toBeTruthy()
     expect(screen.getByText('InOutForm:count-adjustment:1:1-11-21')).toBeTruthy()
 
-    // Sheet is a true modal (base-ui default: background is inert while open),
-    // so the toolbar action is reachable again only after the sheet closes.
+    // WorkDialog is a true modal (base-ui default: background is inert while open),
+    // so the toolbar action is reachable again only after the dialog closes.
     fireEvent.keyDown(document, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 
@@ -275,7 +310,7 @@ describe('InventoryWorkspace', () => {
       }),
     )
 
-    expect(screen.getByText('조회 조건에 맞는 재고가 없습니다.')).toBeTruthy()
+    expect(screen.getByText('등록된 재고 데이터가 없습니다.')).toBeTruthy()
     expect(screen.queryByText('운영 SKU')).toBeNull()
     expect(screen.queryByText('주의 항목')).toBeNull()
   })
@@ -338,6 +373,27 @@ describe('InventoryWorkspace', () => {
     expect(screen.getByText('매핑 없음')).toBeTruthy()
     expect(screen.queryByText('CP-1')).toBeNull()
     expect(screen.queryByText('CPV-1')).toBeNull()
+  })
+
+  it('truncates long product and option labels while preserving their full accessible title', () => {
+    const longName = 'T-꼬리-카드지갑-핑크-기본-매우-긴-상품명'
+
+    render(
+      React.createElement(InventoryWorkspace, {
+        warehouses: [{ id: 1, name: '오금동' }],
+        models: [{
+          id: 1,
+          name: longName,
+          sizes: [{ id: 11, name: '기본', sortOrder: 1, modelId: 1 }],
+          colors: [{ id: 21, name: '핑크', rgbCode: '#ff99cc', textWhite: false, sortOrder: 1, modelId: 1 }],
+          inventory: [{ id: 101, modelId: 1, sizeId: 11, colorId: 21, warehouseId: 1, warehouseName: '오금동', quantity: 2 }],
+        }],
+        transactions: [],
+      }),
+    )
+
+    expect(screen.getByTitle(longName)).toHaveClass('line-clamp-2')
+    expect(screen.getByTitle(`${longName}-핑크-기본 · 핑크 / 기본`)).toHaveClass('truncate')
   })
 
   it('switches to the embedded history view through tabs without duplicating top-level filters and keeps history filters independent', async () => {

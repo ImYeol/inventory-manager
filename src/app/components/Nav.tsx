@@ -117,6 +117,7 @@ function NavigationContent({
 }) {
   const userInitial = (user?.name?.trim().charAt(0) || user?.email?.trim().charAt(0) || 'U').toUpperCase()
   const [sourcingOpen, setSourcingOpen] = useState(true)
+  const sourcingActive = sourcingItems.some((item) => isActivePath(pathname, item.href))
 
   return (
     <>
@@ -146,6 +147,7 @@ function NavigationContent({
             title="소싱"
             icon={<PackageSearch className="h-4 w-4" />}
             open={sourcingOpen}
+            active={sourcingActive}
             onToggle={() => setSourcingOpen((open) => !open)}
           >
             {sourcingItems.map((item) => (
@@ -248,7 +250,7 @@ function NavInner({ pathname, user }: { pathname: string; user?: NavProps['user'
 
   return (
     <>
-      <Sidebar collapsible="offcanvas" className="z-30 h-screen">
+      <Sidebar collapsible="offcanvas" className="pointer-events-auto z-30 h-screen">
         <NavigationContent pathname={pathname} user={user} onNavigate={() => setOpenMobile(false)} />
       </Sidebar>
 
@@ -265,7 +267,7 @@ export default function Nav({ user }: NavProps) {
   // and permanently expanded here, so there is no need for SidebarInset to
   // wrap the page content — the layout keeps its own md:ml-72 offset).
   return (
-    <SidebarProvider>
+    <SidebarProvider data-testid="sidebar-provider" className="pointer-events-none fixed inset-0 z-30">
       <NavInner pathname={pathname} user={user} />
     </SidebarProvider>
   )

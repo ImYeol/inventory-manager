@@ -28,12 +28,12 @@ export function ColumnVisibilityMenu<T extends string>({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-9 gap-2 rounded-lg border-[color:var(--border)]">
-          <Columns3 className="h-4 w-4" />
+        <Button variant="outline" size="sm" className="w-fit shrink-0 self-start">
+          <Columns3 data-icon="inline-start" />
           <span>컬럼</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" data-scroll-lock="menu">
         <DropdownMenuLabel>표시할 컬럼</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {columns.map((column) => (

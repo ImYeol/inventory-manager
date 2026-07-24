@@ -6,8 +6,8 @@ export function cx(...parts: Array<string | false | null | undefined>) {
 }
 
 export const ui = {
-  shell: 'mx-auto w-full max-w-7xl px-4 py-5 md:px-8 md:py-6',
-  shellNarrow: 'mx-auto w-full max-w-3xl px-4 py-5 md:px-8 md:py-6',
+  shell: 'mx-auto w-full max-w-7xl px-4 py-3 md:px-8 md:py-4',
+  shellNarrow: 'mx-auto w-full max-w-3xl px-4 py-3 md:px-8 md:py-4',
   surface: 'ui-surface',
   surfaceMuted: 'ui-surface ui-surface-muted',
   surfaceStrong: 'ui-surface ui-surface-strong',
@@ -39,13 +39,13 @@ export const ui = {
   buttonGhost: 'ui-button ui-button-ghost',
   buttonDanger: 'ui-button ui-button-danger',
   buttonLink: 'ui-button ui-button-link',
-  toolbar: 'flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1',
-  toolbarDense: 'flex min-w-0 items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-0.5',
+  toolbar: 'flex flex-nowrap items-center gap-2 overflow-x-auto pb-1',
+  toolbarDense: 'flex min-w-0 items-center gap-2 overflow-x-auto whitespace-nowrap pb-0.5',
   toolbarAction: 'ui-button ui-button-secondary ui-button-sm whitespace-nowrap',
   actionGroupDense: 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap',
   statusPillDense:
     'inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-0.5 text-[11px] font-semibold text-[color:var(--muted-foreground)]',
-  buttonDense: 'h-8 rounded-xl px-2.5 text-xs',
+  buttonDense: 'ui-button ui-button-sm',
   iconButton: 'ui-button ui-button-secondary ui-button-icon shrink-0',
   badge: 'ui-badge',
   tab: 'ui-tab',
@@ -82,7 +82,7 @@ export const ui = {
   desktopSidebar:
     'fixed left-0 top-0 z-30 hidden h-screen w-[17rem] border-r border-[color:var(--border)] bg-[color:var(--surface)] md:flex md:flex-col',
   mobileTopbar:
-    'fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-[color:var(--border)] bg-[color:var(--surface)]/95 px-4 backdrop-blur md:hidden',
+    'pointer-events-auto fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-[color:var(--border)] bg-[color:var(--surface)]/95 px-4 backdrop-blur md:hidden',
   mobileDrawerScrim: 'fixed inset-0 z-40 bg-[color:var(--foreground)]/35 md:hidden',
   mobileDrawer:
     'fixed inset-y-0 left-0 z-50 flex w-[min(88vw,22rem)] flex-col border-r border-[color:var(--border)] bg-[color:var(--surface)] shadow-[var(--elevation-3)] md:hidden',

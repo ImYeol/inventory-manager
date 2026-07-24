@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/ui/data-table'
@@ -87,6 +87,20 @@ describe('DataTable', () => {
     expect(rows[0]).toHaveTextContent('Alice')
     expect(rows[1]).toHaveTextContent('Bob')
     expect(rows[2]).toHaveTextContent('Charlie')
+  })
+
+  it('exposes sortable headers as accessible buttons with sort state', () => {
+    render(<DataTable columns={createColumns()} rows={mockRows} emptyState="No data" />)
+
+    const nameHeader = screen.getByRole('columnheader', { name: /Name/ })
+    const sortButton = within(nameHeader).getByRole('button', { name: /Name/ })
+
+    expect(sortButton).toHaveAttribute('type', 'button')
+    expect(nameHeader).toHaveAttribute('aria-sort', 'none')
+
+    fireEvent.click(sortButton)
+
+    expect(nameHeader).toHaveAttribute('aria-sort', 'ascending')
   })
 
   it('sort direction icon appears in active sorted column', () => {
@@ -424,6 +438,36 @@ describe('DataTable', () => {
     expect(screen.getByText(toolbarEndContent)).toBeInTheDocument()
   })
 
+  it('keeps controls outside the bordered table surface and groups them from the start edge', () => {
+    const columns = createColumns()
+
+    render(
+      <DataTable
+        columns={columns}
+        rows={mockRows}
+        emptyState="No data"
+        toolbarStart={<div>Search Input</div>}
+        toolbarEnd={<button type="button">Add Button</button>}
+      />
+    )
+
+    const controls = screen.getByText('Search Input').closest('.ui-data-controls')
+    const surface = screen.getByRole('table').closest('.ui-data-surface')
+
+    expect(controls).not.toBeNull()
+    expect(surface).not.toBeNull()
+    expect(controls?.contains(surface)).toBe(false)
+    expect(surface?.contains(controls)).toBe(false)
+    expect(controls?.firstElementChild).toHaveClass('justify-between')
+  })
+
+  it('uses an intrinsic-width column control and a sticky, padded header', () => {
+    render(<DataTable columns={createColumns()} rows={mockRows} emptyState="No data" />)
+
+    expect(screen.getByRole('button', { name: '컬럼' })).toHaveClass('w-fit', 'shrink-0')
+    expect(screen.getByRole('columnheader', { name: /Name/ })).toHaveClass('px-4', 'sticky', 'top-0')
+  })
+
   it('does not render toolbar when bare mode is enabled', () => {
     const columns = createColumns()
     const toolbarStartContent = 'Search Input'
@@ -442,6 +486,23 @@ describe('DataTable', () => {
     expect(screen.queryByText(toolbarStartContent)).not.toBeInTheDocument()
     // But the table should still be rendered
     expect(screen.getByText('Name')).toBeInTheDocument()
+  })
+
+  it('does not render toolbar when mode is bare', () => {
+    render(
+      <DataTable
+        columns={createColumns()}
+        rows={mockRows}
+        emptyState="No data"
+        mode="bare"
+        queryRow={<div>Query Row</div>}
+        actionRow={<div>Action Row</div>}
+      />,
+    )
+
+    expect(screen.queryByText('Query Row')).not.toBeInTheDocument()
+    expect(screen.queryByText('Action Row')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '컬럼' })).not.toBeInTheDocument()
   })
 
   it('does not render pagination when pageSizeOptions is empty', () => {
@@ -475,5 +536,158 @@ describe('DataTable', () => {
 
     // Pagination controls should not be rendered
     expect(screen.queryByRole('button', { name: /다음 페이지/ })).not.toBeInTheDocument()
+  })
+
+  it('supports explicit query and action rows without putting controls inside TableSurface', () => {
+    render(
+      <DataTable
+        columns={createColumns()}
+        rows={mockRows}
+        emptyState="No data"
+        queryRow={<div>Query Row</div>}
+        actionRow={<div>Action Row</div>}
+      />,
+    )
+
+    const query = screen.getByText('Query Row').closest('[data-slot="data-query-row"]')
+    const action = screen.getByText('Action Row').closest('[data-slot="data-action-row"]')
+    const surface = screen.getByRole('table').closest('.ui-data-surface')
+
+    expect(query).toBeTruthy()
+    expect(action).toBeTruthy()
+    expect(surface?.contains(query)).toBe(false)
+    expect(surface?.contains(action)).toBe(false)
+  })
+
+  it('keeps the Column control as a descendant of the Query Row', () => {
+    render(<DataTable columns={createColumns()} rows={mockRows} emptyState="No data" />)
+
+    const queryRow = screen.getByRole('button', { name: '컬럼' }).closest('[data-slot="data-query-row"]')
+
+    expect(queryRow).toBeTruthy()
+    expect(queryRow).toContainElement(screen.getByRole('button', { name: '컬럼' }))
+    expect(screen.getByRole('button', { name: '컬럼' })).toHaveClass('w-fit', 'shrink-0')
+  })
+
+  it('applies semantic column metadata for minimum width, alignment, and accessible truncation', () => {
+    const longName = '상품명이 아주 긴 경우에도 전체 정보는 title로 확인할 수 있습니다.'
+    const columns: ColumnDef<TestRow>[] = [
+      {
+        accessorKey: 'name',
+        header: '상품',
+        meta: { minWidth: 'identity', align: 'left', truncate: true },
+      },
+      {
+        accessorKey: 'status',
+        header: '상태',
+        meta: { minWidth: 'status', align: 'center' },
+      },
+    ]
+
+    render(
+      <DataTable
+        columns={columns}
+        rows={[{ ...mockRows[0], name: longName }]}
+        emptyState="No data"
+      />,
+    )
+
+    const nameCell = screen.getByText(longName).closest('td')
+    const nameHeader = screen.getByRole('columnheader', { name: /상품/ })
+    const statusCell = screen.getByText('active').closest('td')
+
+    expect(nameCell).toHaveClass('text-left')
+    expect(screen.getByLabelText(longName)).toBeInTheDocument()
+    expect(screen.getByLabelText(longName)).toHaveAttribute('tabindex', '0')
+    expect(nameHeader.getAttribute('style')).toContain('min-width: var(--table-col-identity-min)')
+    expect(statusCell).toHaveClass('text-center')
+  })
+
+  it('supports explicit dataset-empty and filtered-empty slots with optional actions', () => {
+    const resetFilters = vi.fn()
+    const { rerender } = render(
+      <DataTable
+        columns={createColumns()}
+        rows={[]}
+        emptyState="legacy fallback"
+        emptyStateKind="filtered"
+        filteredEmptyState={<span>조건에 맞는 결과가 없습니다.</span>}
+        onResetFilters={resetFilters}
+      />,
+    )
+
+    expect(screen.getByText('조건에 맞는 결과가 없습니다.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '필터 초기화' }))
+    expect(resetFilters).toHaveBeenCalledOnce()
+
+    rerender(
+      <DataTable
+        columns={createColumns()}
+        rows={[]}
+        emptyState="legacy fallback"
+        emptyStateKind="dataset"
+        dataEmptyState={<span>아직 데이터가 없습니다.</span>}
+        emptyStateAction={<button type="button">새로 만들기</button>}
+      />,
+    )
+
+    expect(screen.getByText('아직 데이터가 없습니다.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '새로 만들기' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '필터 초기화' })).not.toBeInTheDocument()
+  })
+
+  it('uses primary truncation with mobile two-line allowance and secondary single-line contract', () => {
+    const columns: ColumnDef<TestRow>[] = [
+      { accessorKey: 'name', header: '상품', meta: { role: 'identity', truncate: 'primary' } },
+      { accessorKey: 'status', header: '메타', meta: { truncate: 'secondary' } },
+    ]
+    const longName = '매우 긴 상품 식별자 전체 값'
+    const longMeta = '긴 보조 정보 전체 값'
+
+    render(<DataTable columns={columns} rows={[{ ...mockRows[0], name: longName, status: longMeta }]} emptyState="No data" />)
+
+    expect(screen.getByLabelText(longName)).toHaveClass('line-clamp-2', 'sm:truncate')
+    expect(screen.getByLabelText(longMeta)).toHaveClass('truncate')
+  })
+
+  it('derives layout from semantic column role and keeps priority metadata on the column', () => {
+    const columns: ColumnDef<TestRow>[] = [
+      { accessorKey: 'name', header: '상품', meta: { role: 'identity', priority: 'high', truncate: true } },
+      { accessorKey: 'status', header: '상태', meta: { role: 'status', priority: 'medium' } },
+      { accessorKey: 'action', header: '수량', meta: { role: 'numeric', priority: 'low' } },
+    ]
+
+    render(<DataTable columns={columns} rows={mockRows} emptyState="No data" />)
+
+    expect(screen.getByRole('columnheader', { name: /상품/ })).toHaveAttribute('data-column-priority', 'high')
+    expect(screen.getByRole('columnheader', { name: /상품/ }).getAttribute('style')).toContain(
+      'min-width: var(--table-col-identity-min)',
+    )
+    expect(screen.getByRole('columnheader', { name: /상태/ }).getAttribute('style')).toContain(
+      'min-width: var(--table-col-status-min)',
+    )
+    expect(screen.getAllByText('active')[0].closest('td')).toHaveClass('text-center')
+    expect(screen.getAllByText('view')[0].closest('td')).toHaveClass('text-right')
+  })
+
+  it('renders loading and error states inside the table surface', () => {
+    const { rerender } = render(
+      <DataTable columns={createColumns()} rows={[]} emptyState="No data" loading />,
+    )
+
+    expect(screen.getByRole('status', { name: '표를 불러오는 중' })).toBeInTheDocument()
+    expect(screen.getByRole('table').closest('.ui-data-surface')).toBeTruthy()
+
+    rerender(
+      <DataTable columns={createColumns()} rows={[]} emptyState="No data" errorState="불러오지 못했습니다." />,
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent('불러오지 못했습니다.')
+  })
+
+  it('keeps the table header and renders multiple skeleton rows while loading', () => {
+    render(<DataTable columns={createColumns()} rows={[]} emptyState="No data" loading />)
+
+    expect(screen.getByRole('columnheader', { name: /Name/ })).toBeInTheDocument()
+    expect(screen.getAllByTestId('skeleton-row')).toHaveLength(3)
   })
 })

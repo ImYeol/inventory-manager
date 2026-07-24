@@ -18,6 +18,7 @@ const arrivalsViewSource = source('src/app/(protected)/sourcing/arrivals/Arrival
 
 // Dashboard & Inventory
 const dashboardSource = source('src/app/components/DashboardView.tsx')
+const dashboardTablesSource = source('src/app/components/DashboardTables.tsx')
 const inventoryWorkspaceSource = source('src/app/components/inventory/InventoryWorkspace.tsx')
 
 // Settings & Master Data
@@ -39,8 +40,8 @@ describe('navigation token contract', () => {
 describe('HistoryView token usage', () => {
   it('uses semantic tokens for UI chrome and retains only transaction-driven option color chips inline', () => {
     expect(historyViewSource).not.toMatch(/(?:text|bg|border)-(?:slate|zinc|gray|neutral)-/)
-    expect(historyViewSource.match(/style=\{\{/g)).toHaveLength(2)
-    expect(historyViewSource.match(/backgroundColor: item\.colorRgb/g)).toHaveLength(2)
+    expect(historyViewSource.match(/style=\{\{/g)).toHaveLength(1)
+    expect(historyViewSource.match(/backgroundColor: row\.original\.colorRgb/g)).toHaveLength(1)
   })
 })
 
@@ -70,12 +71,35 @@ describe('dashboard and inventory workspace token usage', () => {
     expect(dashboardSource).toContain('ring-offset-[color:var(--surface)]')
     expect(dashboardSource).toContain('text-[color:var(--foreground)]')
     expect(dashboardSource).toContain('bg-[color:var(--surface-muted)]')
-    expect(dashboardSource).toContain('bg-[color:var(--foreground)]')
+    expect(dashboardTablesSource).toContain('bg-[color:var(--accent)]')
   })
 
   it('retains the inventory option chip as data-driven color', () => {
-    expect(inventoryWorkspaceSource).toContain('style={{ backgroundColor: color.rgbCode }}')
+    expect(inventoryWorkspaceSource).toContain('style={{ backgroundColor: row.original.colorRgb }}')
     expect(inventoryWorkspaceSource).toContain('border-[color:var(--border)]')
+  })
+
+  it('uses the standalone inventory layout contract', () => {
+    expect(inventoryWorkspaceSource).toContain('<Breadcrumb')
+    expect(inventoryWorkspaceSource).toContain('<PageHeader')
+    expect(inventoryWorkspaceSource).toContain('queryStart=')
+    expect(inventoryWorkspaceSource).toContain('actionStart=')
+    expect(inventoryWorkspaceSource).toContain('<ResponsiveFilterControls')
+    expect(inventoryWorkspaceSource).toContain('dataEmptyState=')
+    expect(inventoryWorkspaceSource).toContain('filteredEmptyState=')
+    expect(inventoryWorkspaceSource).toContain("minWidth: 'identity'")
+    expect(inventoryWorkspaceSource).toContain("minWidth: 'numeric'")
+    expect(inventoryWorkspaceSource).toContain("minWidth: 'status'")
+    expect(inventoryWorkspaceSource).toContain('TruncatedText')
+    expect(inventoryWorkspaceSource).not.toContain('toolbarStart=')
+    expect(inventoryWorkspaceSource).not.toContain('toolbarEnd=')
+  })
+
+  it('keeps factory status inside the query filter cluster after search', () => {
+    expect(factoriesViewSource).toContain('queryStart=')
+    expect(factoriesViewSource).toContain('data-testid="factories-status-filter"')
+    expect(factoriesViewSource.indexOf('factory-search')).toBeLessThan(factoriesViewSource.indexOf('factories-status-filter'))
+    expect(factoriesViewSource).toContain('ResponsiveFilterControls')
   })
 })
 

@@ -35,11 +35,12 @@ type MenuSectionProps = {
   title: string
   icon?: ReactNode
   open: boolean
+  active?: boolean
   onToggle: () => void
   children: ReactNode
 }
 
-export function MenuSection({ title, icon, open, onToggle, children }: MenuSectionProps) {
+export function MenuSection({ title, icon, open, active = false, onToggle, children }: MenuSectionProps) {
   return (
     <div className="space-y-1">
       <button
@@ -48,7 +49,7 @@ export function MenuSection({ title, icon, open, onToggle, children }: MenuSecti
         onClick={onToggle}
         className={cn(
           ui.navSectionButton,
-          open && ui.navItemActive,
+          active && ui.navItemActive,
         )}
       >
         <span className="flex items-center gap-2">
